@@ -1,0 +1,11 @@
+<!-- PKCE-flow invite email: links to our own /auth/confirm route with a token_hash
+     (query param, server-readable) instead of the default GoTrue /verify endpoint
+     which returns tokens in the URL fragment (client-only, unusable by SSR). -->
+<h2>You've been invited to EduSphere</h2>
+<p>An administrator has invited you to join their school on EduSphere.</p>
+<p>
+  <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&next=/accept-invite">
+    Accept your invitation
+  </a>
+</p>
+<p>If you weren't expecting this, you can safely ignore this email.</p>

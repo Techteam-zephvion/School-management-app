@@ -1,26 +1,218 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-inter);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* semantic status colors (doc 04 §2.2) -- attendance / fees / results share this mapping:
+     present/paid/approved -> success, late/partial/pending -> warning,
+     absent/overdue/rejected -> danger, excused/info -> info, holiday -> holiday */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-soft: var(--success-soft);
+  --color-success-soft-foreground: var(--success-soft-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-soft-foreground: var(--warning-soft-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-soft-foreground: var(--danger-soft-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-soft: var(--info-soft);
+  --color-info-soft-foreground: var(--info-soft-foreground);
+  --color-holiday: var(--holiday);
+  --color-holiday-foreground: var(--holiday-foreground);
+  --color-holiday-soft: var(--holiday-soft);
+  --color-holiday-soft-foreground: var(--holiday-soft-foreground);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  /* EduSphere teacher/admin portal palette, extracted from the Figma exports in
+     `school_teacher portal/`. Values are close approximations (no live Figma Dev Mode
+     access) -- fine-tune against exact hex/variable values if the design file is available. */
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+
+  --primary: #10203f; /* deep navy: primary CTA buttons, brand mark */
+  --primary-foreground: #ffffff;
+  --secondary: #eef2ff; /* soft indigo tint: secondary buttons, chips */
+  --secondary-foreground: #1e293b;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #2563eb; /* bright blue: links, active tab, "View" actions */
+  --accent-foreground: #ffffff;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #2563eb;
+
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+  --success-soft: #dcfce7;
+  --success-soft-foreground: #166534;
+
+  --warning: #d97706;
+  --warning-foreground: #ffffff;
+  --warning-soft: #fef3c7;
+  --warning-soft-foreground: #92400e;
+
+  --danger: #dc2626;
+  --danger-foreground: #ffffff;
+  --danger-soft: #fee2e2;
+  --danger-soft-foreground: #991b1b;
+
+  --info: #0284c7;
+  --info-foreground: #ffffff;
+  --info-soft: #e0f2fe;
+  --info-soft-foreground: #075985;
+
+  --holiday: #94a3b8;
+  --holiday-foreground: #ffffff;
+  --holiday-soft: #f1f5f9;
+  --holiday-soft-foreground: #475569;
+
+  --chart-1: #2563eb;
+  --chart-2: #16a34a;
+  --chart-3: #d97706;
+  --chart-4: #dc2626;
+  --chart-5: #7c3aed;
+
+  --radius: 1rem;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1e293b;
+  --sidebar-primary: #10203f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e8ecfc; /* active nav item background */
+  --sidebar-accent-foreground: #1d4ed8; /* active nav item text/icon */
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #2563eb;
+}
+
+.dark {
+  --background: #0b1220;
+  --foreground: #f1f5f9;
+  --card: #111a2e;
+  --card-foreground: #f1f5f9;
+  --popover: #111a2e;
+  --popover-foreground: #f1f5f9;
+
+  --primary: #3b5bdb;
+  --primary-foreground: #ffffff;
+  --secondary: #1b2436;
+  --secondary-foreground: #e2e8f0;
+  --muted: #1b2436;
+  --muted-foreground: #94a3b8;
+  --accent: #3b82f6;
+  --accent-foreground: #ffffff;
+  --destructive: #f87171;
+  --destructive-foreground: #1a0505;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.15);
+  --ring: #3b82f6;
+
+  --success: #22c55e;
+  --success-foreground: #052e12;
+  --success-soft: rgba(34, 197, 94, 0.16);
+  --success-soft-foreground: #86efac;
+
+  --warning: #f59e0b;
+  --warning-foreground: #241300;
+  --warning-soft: rgba(245, 158, 11, 0.16);
+  --warning-soft-foreground: #fcd34d;
+
+  --danger: #f87171;
+  --danger-foreground: #240707;
+  --danger-soft: rgba(248, 113, 113, 0.16);
+  --danger-soft-foreground: #fca5a5;
+
+  --info: #38bdf8;
+  --info-foreground: #001e2e;
+  --info-soft: rgba(56, 189, 248, 0.16);
+  --info-soft-foreground: #7dd3fc;
+
+  --holiday: #64748b;
+  --holiday-foreground: #ffffff;
+  --holiday-soft: rgba(100, 116, 139, 0.2);
+  --holiday-soft-foreground: #cbd5e1;
+
+  --chart-1: #3b82f6;
+  --chart-2: #22c55e;
+  --chart-3: #f59e0b;
+  --chart-4: #f87171;
+  --chart-5: #a78bfa;
+
+  --sidebar: #111a2e;
+  --sidebar-foreground: #e2e8f0;
+  --sidebar-primary: #3b5bdb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1b2450;
+  --sidebar-accent-foreground: #93c5fd;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: #3b82f6;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }

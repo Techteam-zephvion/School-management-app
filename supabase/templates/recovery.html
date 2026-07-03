@@ -1,0 +1,9 @@
+<!-- PKCE-flow password-recovery email -- see invite.html for why we use token_hash. -->
+<h2>Reset your EduSphere password</h2>
+<p>We received a request to reset the password for your account.</p>
+<p>
+  <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password">
+    Reset your password
+  </a>
+</p>
+<p>If you didn't request this, you can safely ignore this email.</p>
