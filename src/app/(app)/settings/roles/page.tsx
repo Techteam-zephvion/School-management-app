@@ -54,7 +54,7 @@ export default async function RolesPage() {
     await Promise.all([
       supabase
         .from("staff")
-        .select("id, profiles(full_name, email)")
+        .select("id, user_id, profiles(full_name, email)")
         .eq("school_id", schoolId)
         .eq("status", "active"),
       supabase
@@ -73,7 +73,17 @@ export default async function RolesPage() {
         .eq("academic_year_id", activeYear.id),
     ]);
 
-  const staff = (staffRows ?? []).map(staffName);
+  // Only teachers are assignable as class/subject teachers -- exclude admins
+  // (they get a staff row too, but shouldn't appear in the teacher pickers).
+  const { data: teacherMembers } = await supabase
+    .from("school_members")
+    .select("user_id")
+    .eq("school_id", schoolId)
+    .eq("role", "teacher");
+  const teacherUserIds = new Set((teacherMembers ?? []).map((m) => m.user_id));
+  const staff = (staffRows ?? [])
+    .filter((s) => teacherUserIds.has(s.user_id))
+    .map(staffName);
 
   const sectionRows = (sections ?? []).map((s) => ({
     id: s.id,

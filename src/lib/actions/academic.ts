@@ -145,9 +145,14 @@ export async function setActiveAcademicYear(yearId: string): Promise<ActionState
 // ---------------------------------------------------------------------------
 // Classes
 // ---------------------------------------------------------------------------
+// Classes are grade levels: admin enters just the number; we prefix "Grade"
+// for storage + display and use the number as the sort order.
 const classSchema = z.object({
-  name: z.string().min(1, { error: "Enter a class name, e.g. Grade 5." }),
-  sortOrder: z.coerce.number().int().optional(),
+  gradeNumber: z.coerce
+    .number({ error: "Enter a grade number, e.g. 5." })
+    .int({ error: "Grade must be a whole number." })
+    .min(1, { error: "Grade must be at least 1." })
+    .max(20, { error: "Grade must be 20 or less." }),
 });
 
 export async function createClass(
@@ -158,16 +163,15 @@ export async function createClass(
   if ("error" in guard) return guard;
 
   const parsed = classSchema.safeParse({
-    name: formData.get("name"),
-    sortOrder: formData.get("sortOrder") || undefined,
+    gradeNumber: formData.get("gradeNumber"),
   });
   if (!parsed.success) return { error: firstError(parsed.error) };
 
   const supabase = await createClient();
   const { error } = await supabase.from("classes").insert({
     school_id: guard.membership.schoolId,
-    name: parsed.data.name,
-    sort_order: parsed.data.sortOrder ?? 0,
+    name: `Grade ${parsed.data.gradeNumber}`,
+    sort_order: parsed.data.gradeNumber,
   });
 
   if (error) {

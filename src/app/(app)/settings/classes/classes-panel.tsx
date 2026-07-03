@@ -88,17 +88,27 @@ export function ClassesPanel({
             </DialogHeader>
             <form action={formAction} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="class-name">Name</Label>
-                <Input id="class-name" name="name" placeholder="Grade 5" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="class-order">Sort order (optional)</Label>
-                <Input
-                  id="class-order"
-                  name="sortOrder"
-                  type="number"
-                  placeholder="5"
-                />
+                <Label htmlFor="class-grade">Grade number</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Grade
+                  </span>
+                  <Input
+                    id="class-grade"
+                    name="gradeNumber"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={20}
+                    step={1}
+                    placeholder="5"
+                    className="w-24"
+                    required
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Saved as &ldquo;Grade 5&rdquo;. Numbers only.
+                </p>
               </div>
               {state?.error && (
                 <p className="text-sm text-destructive">{state.error}</p>
@@ -314,22 +324,26 @@ function AddSectionForm({
   );
 
   return (
-    <form action={formAction} className="flex items-center gap-1.5">
-      <input type="hidden" name="classId" value={classId} />
-      <Input
-        name="name"
-        placeholder="A"
-        autoFocus
-        required
-        className="h-8 w-16"
-      />
-      <Button type="submit" size="sm" disabled={pending}>
-        {pending ? "…" : "Add"}
-      </Button>
-      <Button type="button" size="sm" variant="ghost" onClick={onDone}>
-        Cancel
-      </Button>
-      {state?.error ? <span className="sr-only">{state.error}</span> : null}
-    </form>
+    <span className="inline-flex flex-col gap-1">
+      <form action={formAction} className="flex items-center gap-1.5">
+        <input type="hidden" name="classId" value={classId} />
+        <Input
+          name="name"
+          placeholder="A"
+          autoFocus
+          required
+          className="h-8 w-16"
+        />
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? "…" : "Add"}
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onDone}>
+          Cancel
+        </Button>
+      </form>
+      {state?.error ? (
+        <span className="text-xs text-destructive">{state.error}</span>
+      ) : null}
+    </span>
   );
 }
