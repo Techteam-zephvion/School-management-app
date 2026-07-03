@@ -28,6 +28,41 @@ export default async function DashboardPage() {
   });
 
   if (membership.role === "teacher") {
+    // This teacher's own staff record -> their subject assignments + class-teacher sections.
+    const { data: staff } = await supabase
+      .from("staff")
+      .select("id")
+      .eq("school_id", membership.schoolId)
+      .eq("user_id", profile?.id ?? "")
+      .maybeSingle();
+
+    let assignments: { id: string; label: string; subject: string }[] = [];
+    let classTeacherOf: string[] = [];
+    if (staff) {
+      const [{ data: ta }, { data: ct }] = await Promise.all([
+        supabase
+          .from("teacher_assignments")
+          .select("id, sections(name, classes(name)), subjects(name)")
+          .eq("staff_id", staff.id),
+        supabase
+          .from("sections")
+          .select("name, classes(name)")
+          .eq("class_teacher_staff_id", staff.id),
+      ]);
+      assignments = (ta ?? []).map((a) => {
+        const section = a.sections as { name: string; classes: { name: string } | null } | null;
+        return {
+          id: a.id,
+          label: `${section?.classes?.name ?? ""} · ${section?.name ?? ""}`,
+          subject: (a.subjects as { name: string } | null)?.name ?? "",
+        };
+      });
+      classTeacherOf = (ct ?? []).map((s) => {
+        const section = s as { name: string; classes: { name: string } | null };
+        return `${section.classes?.name ?? ""} · ${section.name}`;
+      });
+    }
+
     return (
       <div className="space-y-6">
         <div>
@@ -35,7 +70,7 @@ export default async function DashboardPage() {
             Good morning, {firstName}
           </h1>
           <p className="text-muted-foreground">
-            Here&apos;s what&apos;s happening today, {today}.
+            {school?.name ?? "Your school"} · {today}
           </p>
         </div>
         <QuickActions />
@@ -43,14 +78,68 @@ export default async function DashboardPage() {
           <CardHeader>
             <CardTitle>Your classes</CardTitle>
             <CardDescription>
-              Section and subject assignments show up here once your admin
-              maps them (Phase 2 of the build plan).
+              {assignments.length === 0 && classTeacherOf.length === 0
+                ? "No assignments yet — your admin will map your sections and subjects."
+                : "Sections and subjects assigned to you this year."}
             </CardDescription>
           </CardHeader>
+          {(assignments.length > 0 || classTeacherOf.length > 0) && (
+            <CardContent className="space-y-4">
+              {classTeacherOf.length > 0 && (
+                <div>
+                  <p className="mb-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    Class teacher of
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {classTeacherOf.map((label) => (
+                      <span
+                        key={label}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-3 py-1 text-sm font-medium text-accent"
+                      >
+                        <Star className="size-3.5" /> {label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {assignments.length > 0 && (
+                <div>
+                  <p className="mb-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    Teaching
+                  </p>
+                  <div className="divide-y divide-border rounded-lg border border-border">
+                    {assignments.map((a) => (
+                      <div
+                        key={a.id}
+                        className="flex items-center justify-between px-3 py-2 text-sm"
+                      >
+                        <span className="font-medium">{a.subject}</span>
+                        <span className="text-muted-foreground">{a.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          )}
         </Card>
       </div>
     );
   }
+
+  // Admin setup progress (real counts). Students land in Phase 3.
+  const [{ count: classCount }, { count: teacherCount }] = await Promise.all([
+    supabase
+      .from("classes")
+      .select("id", { count: "exact", head: true })
+      .eq("school_id", membership.schoolId),
+    supabase
+      .from("school_members")
+      .select("id", { count: "exact", head: true })
+      .eq("school_id", membership.schoolId)
+      .eq("role", "teacher"),
+  ]);
+  const studentCount = 0;
 
   const setupSteps = [
     {
@@ -63,8 +152,12 @@ export default async function DashboardPage() {
       done: Boolean(academicYear),
       href: "/settings/school",
     },
-    { label: "Classes, sections & subjects", done: false, href: "/settings/classes" },
-    { label: "Invite staff", done: false, href: "/settings/staff" },
+    {
+      label: "Classes, sections & subjects",
+      done: (classCount ?? 0) > 0,
+      href: "/settings/classes",
+    },
+    { label: "Invite staff", done: (teacherCount ?? 0) > 0, href: "/settings/staff" },
     { label: "Add students & guardians", done: false, href: "/students" },
   ];
   const remaining = setupSteps.filter((s) => !s.done);
@@ -112,7 +205,7 @@ export default async function DashboardPage() {
       <QuickActions />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatTile label="Total students" value="0" icon={Users} />
+        <StatTile label="Total students" value={String(studentCount)} icon={Users} />
         <StatTile label="Attendance % today" value="—" icon={ClipboardCheck} />
         <StatTile label="Pending invoices" value="0" icon={Star} />
       </div>

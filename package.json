@@ -9,8 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:rls": "vitest run tests/rls.phase1.test.ts",
-    "db:reset": "supabase db reset",
-    "db:types": "supabase gen types typescript --local > src/lib/supabase/database.types.ts",
+    "db:reset": "npx supabase db reset",
+    "db:types": "npx supabase gen types typescript --local > src/lib/supabase/database.types.ts",
     "seed:admin": "node scripts/seed-admin.mjs"
   },
   "dependencies": {

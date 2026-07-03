@@ -16,8 +16,9 @@ values (
 )
 on conflict (id) do nothing;
 
-insert into public.academic_years (school_id, name, start_date, end_date, is_active)
+insert into public.academic_years (id, school_id, name, start_date, end_date, is_active)
 values (
+  '00000000-0000-0000-0000-0000000000a1',
   '00000000-0000-0000-0000-000000000001',
   '2025-26',
   '2025-06-01',
@@ -25,3 +26,30 @@ values (
   true
 )
 on conflict do nothing;
+
+-- Demo academic structure so a fresh `db reset` boots a usable school.
+insert into public.classes (id, school_id, name, sort_order)
+values
+  ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-000000000001', 'Grade 5', 5),
+  ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-000000000001', 'Grade 6', 6)
+on conflict (school_id, name) do nothing;
+
+insert into public.subjects (id, school_id, name, code)
+values
+  ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-000000000001', 'Mathematics', 'MATH'),
+  ('00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-000000000001', 'Science', 'SCI'),
+  ('00000000-0000-0000-0000-0000000000d3', '00000000-0000-0000-0000-000000000001', 'English', 'ENG')
+on conflict (school_id, name) do nothing;
+
+insert into public.class_subjects (school_id, class_id, subject_id)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d1'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d2'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d3')
+on conflict (class_id, subject_id) do nothing;
+
+insert into public.sections (school_id, class_id, name, academic_year_id)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000c1', 'A', '00000000-0000-0000-0000-0000000000a1'),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000c1', 'B', '00000000-0000-0000-0000-0000000000a1')
+on conflict (class_id, name, academic_year_id) do nothing;
