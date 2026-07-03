@@ -3,10 +3,15 @@
 import { useActionState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Mail, Lock } from "lucide-react";
 import { login } from "@/lib/actions/auth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  AuthCard,
+  AuthField,
+  PasswordField,
+  AuthSubmit,
+  AuthError,
+} from "@/components/auth/auth-ui";
 
 export function LoginForm() {
   const searchParams = useSearchParams();
@@ -14,43 +19,42 @@ export function LoginForm() {
   const [state, formAction, pending] = useActionState(login, undefined);
 
   return (
-    <form action={formAction} className="space-y-4">
-      <input type="hidden" name="next" value={next} />
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
+    <AuthCard
+      title="Welcome back"
+      description="Sign in to your EduSphere teacher portal."
+    >
+      <form action={formAction} className="space-y-4">
+        <input type="hidden" name="next" value={next} />
+        <AuthField
+          label="Email"
           name="email"
           type="email"
+          icon={Mail}
           autoComplete="email"
           placeholder="you@school.edu"
           required
         />
-      </div>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="password">Password</Label>
-          <Link
-            href="/forgot-password"
-            className="text-sm font-medium text-accent hover:underline"
-          >
-            Forgot password?
-          </Link>
-        </div>
-        <Input
-          id="password"
+        <PasswordField
+          label="Password"
           name="password"
-          type="password"
+          icon={Lock}
           autoComplete="current-password"
+          placeholder="••••••••"
           required
+          labelAside={
+            <Link
+              href="/forgot-password"
+              className="text-sm font-medium text-accent hover:underline"
+            >
+              Forgot password?
+            </Link>
+          }
         />
-      </div>
-      {state?.error && (
-        <p className="text-sm text-destructive">{state.error}</p>
-      )}
-      <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "Signing in…" : "Sign in"}
-      </Button>
-    </form>
+        <AuthError>{state?.error}</AuthError>
+        <AuthSubmit pending={pending} pendingLabel="Signing in…">
+          Sign in
+        </AuthSubmit>
+      </form>
+    </AuthCard>
   );
 }

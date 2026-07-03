@@ -1,38 +1,51 @@
 "use client";
 
 import { useActionState } from "react";
+import { Lock, ShieldCheck } from "lucide-react";
 import { updatePassword } from "@/lib/actions/auth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  AuthCard,
+  PasswordField,
+  AuthSubmit,
+  AuthError,
+} from "@/components/auth/auth-ui";
 
 export function ResetPasswordForm() {
-  const [state, formAction, pending] = useActionState(
-    updatePassword,
-    undefined
-  );
+  const [state, formAction, pending] = useActionState(updatePassword, undefined);
 
   return (
-    <form action={formAction} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="password">New password</Label>
-        <Input id="password" name="password" type="password" required />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirm new password</Label>
-        <Input
-          id="confirmPassword"
-          name="confirmPassword"
-          type="password"
+    <AuthCard
+      title="Choose a new password"
+      description="You're verified — set a new password to finish securing your account."
+    >
+      <form action={formAction} className="space-y-4">
+        <div className="flex items-center gap-2.5 rounded-xl border border-info-soft-foreground/15 bg-info-soft/50 px-3.5 py-2.5 text-info-soft-foreground">
+          <ShieldCheck className="size-4 shrink-0" />
+          <p className="text-xs font-medium">
+            Use at least 8 characters with a mix of letters and numbers.
+          </p>
+        </div>
+        <PasswordField
+          label="New password"
+          name="password"
+          icon={Lock}
+          autoComplete="new-password"
+          placeholder="••••••••"
           required
         />
-      </div>
-      {state?.error && (
-        <p className="text-sm text-destructive">{state.error}</p>
-      )}
-      <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "Updating…" : "Update password"}
-      </Button>
-    </form>
+        <PasswordField
+          label="Confirm new password"
+          name="confirmPassword"
+          icon={Lock}
+          autoComplete="new-password"
+          placeholder="••••••••"
+          required
+        />
+        <AuthError>{state?.error}</AuthError>
+        <AuthSubmit pending={pending} pendingLabel="Updating…">
+          Update password
+        </AuthSubmit>
+      </form>
+    </AuthCard>
   );
 }

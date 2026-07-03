@@ -17,6 +17,12 @@ type InviteBody = {
 
 const VALID_ROLES: InviteRole[] = ["school_admin", "teacher", "parent"];
 
+const ROLE_LABELS: Record<InviteRole, string> = {
+  school_admin: "School Administrator",
+  teacher: "Teacher",
+  parent: "Parent / Guardian",
+};
+
 export default {
   fetch: withSupabase({ auth: "user" }, async (req, ctx) => {
     if (req.method !== "POST") {
@@ -76,6 +82,17 @@ export default {
 
     const appUrl = Deno.env.get("APP_URL") ?? "http://localhost:3000";
 
+    // School name + role label feed the invite email template (design in
+    // school_teacher portal/email_format.png): "{school} invited you to join
+    // their academic team as: {role}".
+    const { data: school } = await ctx.supabaseAdmin
+      .from("schools")
+      .select("name")
+      .eq("id", schoolId)
+      .single();
+    const schoolName = school?.name ?? "your school";
+    const roleLabel = ROLE_LABELS[role];
+
     // Re-inviting an existing user (e.g. a teacher moving to a second school)
     // just adds a membership -- they already have credentials to sign in with.
     const { data: existingProfile } = await ctx.supabaseAdmin
@@ -92,7 +109,11 @@ export default {
       const { data: invited, error: inviteError } =
         await ctx.supabaseAdmin.auth.admin.inviteUserByEmail(email, {
           redirectTo: `${appUrl}/auth/confirm?next=/accept-invite`,
-          data: { full_name: fullName },
+          data: {
+            full_name: fullName,
+            school_name: schoolName,
+            role_label: roleLabel,
+          },
         });
       if (inviteError || !invited?.user) {
         return Response.json(

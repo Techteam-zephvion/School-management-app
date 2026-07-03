@@ -1,42 +1,61 @@
 "use client";
 
 import { useActionState } from "react";
+import { User, Lock } from "lucide-react";
 import { acceptInvite } from "@/lib/actions/auth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  AuthCard,
+  AuthField,
+  PasswordField,
+  AuthSubmit,
+  AuthError,
+} from "@/components/auth/auth-ui";
 
-export function AcceptInviteForm() {
-  const [state, formAction, pending] = useActionState(
-    acceptInvite,
-    undefined
-  );
+export function AcceptInviteForm({
+  greetingName,
+  defaultFullName,
+}: {
+  greetingName: string;
+  defaultFullName: string;
+}) {
+  const [state, formAction, pending] = useActionState(acceptInvite, undefined);
 
   return (
-    <form action={formAction} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="fullName">Full name</Label>
-        <Input id="fullName" name="fullName" autoComplete="name" required />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="password">Create a password</Label>
-        <Input id="password" name="password" type="password" required />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirm password</Label>
-        <Input
-          id="confirmPassword"
-          name="confirmPassword"
-          type="password"
+    <AuthCard
+      title={`Welcome, ${greetingName}!`}
+      description="Confirm your name and set a password to activate your account."
+    >
+      <form action={formAction} className="space-y-4">
+        <AuthField
+          label="Full name"
+          name="fullName"
+          icon={User}
+          autoComplete="name"
+          defaultValue={defaultFullName}
+          placeholder="Your full name"
           required
         />
-      </div>
-      {state?.error && (
-        <p className="text-sm text-destructive">{state.error}</p>
-      )}
-      <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "Setting up…" : "Activate account"}
-      </Button>
-    </form>
+        <PasswordField
+          label="Create a password"
+          name="password"
+          icon={Lock}
+          autoComplete="new-password"
+          placeholder="At least 8 characters"
+          required
+        />
+        <PasswordField
+          label="Confirm password"
+          name="confirmPassword"
+          icon={Lock}
+          autoComplete="new-password"
+          placeholder="Re-enter your password"
+          required
+        />
+        <AuthError>{state?.error}</AuthError>
+        <AuthSubmit pending={pending} pendingLabel="Setting up…">
+          Activate account
+        </AuthSubmit>
+      </form>
+    </AuthCard>
   );
 }

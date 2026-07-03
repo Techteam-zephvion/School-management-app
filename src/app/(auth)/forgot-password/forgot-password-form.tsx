@@ -1,10 +1,15 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
+import { Mail, MailCheck, ArrowLeft } from "lucide-react";
 import { requestPasswordReset } from "@/lib/actions/auth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  AuthCard,
+  AuthField,
+  AuthSubmit,
+  AuthError,
+} from "@/components/auth/auth-ui";
 
 export function ForgotPasswordForm() {
   const [submitted, setSubmitted] = useState(false);
@@ -19,32 +24,54 @@ export function ForgotPasswordForm() {
 
   if (submitted && !state?.error) {
     return (
-      <p className="text-sm text-muted-foreground">
-        If that email is registered, we&apos;ve sent a link to reset the
-        password. Check the inbox (and spam folder).
-      </p>
+      <AuthCard
+        title="Check your inbox"
+        description="If that email is registered, we've sent a link to reset your password. It may take a minute to arrive — remember to check spam."
+        footer={
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-1.5 font-medium text-accent hover:underline"
+          >
+            <ArrowLeft className="size-4" /> Back to sign in
+          </Link>
+        }
+      >
+        <div className="flex items-center gap-3 rounded-xl border border-success-soft-foreground/15 bg-success-soft/60 px-4 py-3.5 text-success-soft-foreground">
+          <MailCheck className="size-5 shrink-0" />
+          <p className="text-sm font-medium">Reset link sent.</p>
+        </div>
+      </AuthCard>
     );
   }
 
   return (
-    <form action={formAction} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
+    <AuthCard
+      title="Reset your password"
+      description="Enter the email tied to your account and we'll send you a secure reset link."
+      footer={
+        <Link
+          href="/login"
+          className="inline-flex items-center gap-1.5 font-medium text-accent hover:underline"
+        >
+          <ArrowLeft className="size-4" /> Back to sign in
+        </Link>
+      }
+    >
+      <form action={formAction} className="space-y-4">
+        <AuthField
+          label="Email"
           name="email"
           type="email"
+          icon={Mail}
           autoComplete="email"
           placeholder="you@school.edu"
           required
         />
-      </div>
-      {state?.error && (
-        <p className="text-sm text-destructive">{state.error}</p>
-      )}
-      <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "Sending…" : "Send reset link"}
-      </Button>
-    </form>
+        <AuthError>{state?.error}</AuthError>
+        <AuthSubmit pending={pending} pendingLabel="Sending…">
+          Send reset link
+        </AuthSubmit>
+      </form>
+    </AuthCard>
   );
 }

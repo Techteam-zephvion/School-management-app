@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Building2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Building2, ChevronRight } from "lucide-react";
+import { AuthCard } from "@/components/auth/auth-ui";
 import { getMemberships } from "@/lib/auth/session";
+import { roleLabel } from "@/lib/roles";
 import { selectSchool } from "@/lib/actions/auth";
 
 export const metadata: Metadata = { title: "Choose a school — EduSphere" };
@@ -14,14 +14,11 @@ export default async function SelectSchoolPage() {
   if (memberships.length === 1) redirect("/dashboard");
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-xl">Choose a school</CardTitle>
-        <CardDescription>
-          Your account has access to more than one school.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2">
+    <AuthCard
+      title="Choose a school"
+      description="Your account has access to more than one school. Pick one to continue."
+    >
+      <div className="space-y-2.5">
         {memberships.map((m) => (
           <form
             key={m.schoolId}
@@ -30,22 +27,26 @@ export default async function SelectSchoolPage() {
               await selectSchool(m.schoolId);
             }}
           >
-            <Button
+            <button
               type="submit"
-              variant="outline"
-              className="w-full justify-start gap-3 py-6"
+              className="group flex w-full items-center gap-3.5 rounded-xl border border-border bg-background/70 px-4 py-3.5 text-left shadow-sm transition-colors hover:border-accent/40 hover:bg-accent/5"
             >
-              <Building2 className="size-4 text-muted-foreground" />
-              <span className="flex flex-col items-start">
-                <span className="font-medium">{m.schoolName}</span>
-                <span className="text-xs capitalize text-muted-foreground">
-                  {m.role.replace("_", " ")}
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary">
+                <Building2 className="size-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium text-foreground">
+                  {m.schoolName}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {roleLabel(m.role)}
                 </span>
               </span>
-            </Button>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+            </button>
           </form>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </AuthCard>
   );
 }

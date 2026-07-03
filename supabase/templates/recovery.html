@@ -1,9 +1,60 @@
-<!-- PKCE-flow password-recovery email -- see invite.html for why we use token_hash. -->
-<h2>Reset your EduSphere password</h2>
-<p>We received a request to reset the password for your account.</p>
-<p>
-  <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password">
-    Reset your password
-  </a>
-</p>
-<p>If you didn't request this, you can safely ignore this email.</p>
+<!-- EduSphere password-recovery email. Same visual language as invite.html.
+     PKCE flow: links to /auth/confirm?token_hash=… (not GoTrue's /verify). -->
+<div style="margin:0;padding:0;background:#eef4ff;background-image:linear-gradient(180deg,#e7efff 0%,#f4f7fc 55%,#f8fafc 100%);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td align="center" style="padding:48px 16px;">
+        <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
+
+          <tr>
+            <td align="center" style="padding:8px 0 28px;">
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding-right:10px;vertical-align:middle;">
+                    <span style="display:inline-block;width:34px;height:34px;border-radius:9px;background:#10203f;text-align:center;line-height:34px;">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+                    </span>
+                  </td>
+                  <td style="vertical-align:middle;">
+                    <span style="font-size:20px;font-weight:700;color:#10203f;letter-spacing:-0.02em;">EduSphere</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 8px 30px rgba(16,32,63,0.06);padding:36px 34px;">
+              <h1 style="margin:0 0 12px;font-size:24px;font-weight:800;color:#0f172a;letter-spacing:-0.01em;">Reset your password</h1>
+              <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#64748b;">
+                We received a request to reset the password for your EduSphere account.
+                Click the button below to choose a new one. This link expires shortly.
+              </p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="border-radius:12px;background:#2563eb;">
+                    <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password"
+                       style="display:block;padding:15px 24px;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:12px;">
+                      Reset Password &nbsp;&rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#94a3b8;">
+                If you didn't request this, you can safely ignore this email — your
+                password won't change.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding:24px 8px;font-size:13px;color:#94a3b8;">
+              EduSphere &copy; 2026
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</div>

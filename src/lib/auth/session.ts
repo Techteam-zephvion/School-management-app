@@ -55,6 +55,31 @@ export const getMemberships = cache(async (): Promise<Membership[]> => {
   }));
 });
 
+/** The pending (invited-but-not-yet-active) membership for the current user,
+ * used by the accept-invite screen to greet them with their school + role
+ * (mirrors the invite email). Returns the first pending invite, or null. */
+export const getPendingInvite = cache(
+  async (): Promise<Membership | null> => {
+    const user = await getAuthUser();
+    if (!user) return null;
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("school_members")
+      .select("school_id, role, schools(name)")
+      .eq("user_id", user.id)
+      .eq("status", "invited")
+      .limit(1)
+      .maybeSingle();
+
+    if (!data) return null;
+    return {
+      schoolId: data.school_id,
+      role: data.role,
+      schoolName: (data.schools as { name: string } | null)?.name ?? "",
+    };
+  }
+);
+
 /** Resolves the active school for this request: auto-selected if the user has
  * exactly one membership, otherwise read from the `active_school_id` cookie
  * (set by /select-school). Returns null if unresolved. */

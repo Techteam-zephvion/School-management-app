@@ -169,4 +169,31 @@ describe("Phase 1 RLS: cross-school isolation", () => {
     expect(check ?? []).toHaveLength(0);
     expect(error).not.toBeNull();
   });
+
+  test("An INVITED user can see their own school but not another school", async () => {
+    // Invite a fresh user into School A (status 'invited', never activated).
+    const email = `invited.${rand()}@test.local`;
+    const invitedId = await makeUser(email, ctx.password);
+    await admin.from("school_members").insert({
+      school_id: ctx.schoolAId,
+      user_id: invitedId,
+      role: "teacher",
+      status: "invited",
+    });
+    const invitedClient = await signIn(email, ctx.password);
+
+    // schools_select_invited lets them read the school that invited them...
+    const { data: own } = await invitedClient
+      .from("schools")
+      .select("id, name")
+      .eq("id", ctx.schoolAId);
+    expect(own ?? []).toHaveLength(1);
+
+    // ...but the policy is scoped -- School B stays invisible.
+    const { data: other } = await invitedClient
+      .from("schools")
+      .select("id")
+      .eq("id", ctx.schoolBId);
+    expect(other ?? []).toHaveLength(0);
+  });
 });
