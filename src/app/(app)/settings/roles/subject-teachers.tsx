@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useTransition } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Plus, X } from "lucide-react";
 import { assignSubjectTeacher, removeSubjectTeacher } from "@/lib/actions/academic";
@@ -21,8 +21,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type SectionRow = { id: string; label: string };
+type SectionRow = { id: string; classId: string; label: string };
 type Option = { id: string; name: string };
+type ClassSubject = { class_id: string; subject_id: string };
 type Assignment = {
   id: string;
   teacher: string;
@@ -33,23 +34,29 @@ type Assignment = {
 export function SubjectTeachers({
   sections,
   subjects,
+  classSubjects,
   staff,
   assignments,
 }: {
   sections: SectionRow[];
   subjects: Option[];
+  classSubjects: ClassSubject[];
   staff: Option[];
   assignments: Assignment[];
 }) {
-  const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
+  const [staffId, setStaffId] = useState("");
+  const [sectionId, setSectionId] = useState("");
+  const [subjectId, setSubjectId] = useState("");
 
   const [state, formAction, pending] = useActionState(
     async (prev: Awaited<ReturnType<typeof assignSubjectTeacher>>, fd: FormData) => {
       const result = await assignSubjectTeacher(prev, fd);
       if (!result?.error) {
         toast.success("Subject teacher assigned.");
-        formRef.current?.reset();
+        setStaffId("");
+        setSectionId("");
+        setSubjectId("");
       }
       return result;
     },
@@ -64,26 +71,40 @@ export function SubjectTeachers({
     });
   }
 
-  const ready = sections.length > 0 && subjects.length > 0 && staff.length > 0;
+  // Only subjects mapped to the selected section's class are assignable (doc 03).
+  const selectedSection = sections.find((s) => s.id === sectionId);
+  const allowedIds = new Set(
+    classSubjects
+      .filter((cs) => cs.class_id === selectedSection?.classId)
+      .map((cs) => cs.subject_id)
+  );
+  const availableSubjects = subjects.filter((s) => allowedIds.has(s.id));
+
+  const ready = sections.length > 0 && staff.length > 0;
+  const canSubmit = Boolean(staffId && sectionId && subjectId);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Subject teachers</CardTitle>
         <CardDescription>
-          Assign a teacher to teach a subject in a section.
+          Assign a teacher to a subject in a section. Only subjects mapped to
+          that section&apos;s class can be chosen.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         {ready ? (
           <form
-            ref={formRef}
             action={formAction}
             className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end"
           >
+            <input type="hidden" name="staffId" value={staffId} />
+            <input type="hidden" name="sectionId" value={sectionId} />
+            <input type="hidden" name="subjectId" value={subjectId} />
+
             <div className="space-y-1.5">
               <Label>Teacher</Label>
-              <Select name="staffId">
+              <Select value={staffId} onValueChange={setStaffId}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Teacher" />
                 </SelectTrigger>
@@ -96,9 +117,16 @@ export function SubjectTeachers({
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-1.5">
               <Label>Section</Label>
-              <Select name="sectionId">
+              <Select
+                value={sectionId}
+                onValueChange={(v) => {
+                  setSectionId(v);
+                  setSubjectId(""); // subject options depend on the class
+                }}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Section" />
                 </SelectTrigger>
@@ -111,14 +139,27 @@ export function SubjectTeachers({
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-1.5">
               <Label>Subject</Label>
-              <Select name="subjectId">
+              <Select
+                value={subjectId}
+                onValueChange={setSubjectId}
+                disabled={!sectionId || availableSubjects.length === 0}
+              >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Subject" />
+                  <SelectValue
+                    placeholder={
+                      !sectionId
+                        ? "Pick a section first"
+                        : availableSubjects.length === 0
+                          ? "No subjects mapped"
+                          : "Subject"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {subjects.map((s) => (
+                  {availableSubjects.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.name}
                     </SelectItem>
@@ -126,14 +167,25 @@ export function SubjectTeachers({
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" disabled={pending} className="gap-1.5">
+
+            <Button type="submit" disabled={pending || !canSubmit} className="gap-1.5">
               <Plus className="size-4" /> Assign
             </Button>
           </form>
         ) : (
           <p className="text-sm text-muted-foreground">
-            You need at least one section, one subject, and one staff member
-            before assigning subject teachers.
+            You need at least one section and one teacher before assigning
+            subject teachers.
+          </p>
+        )}
+
+        {sectionId && availableSubjects.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            This section&apos;s class has no subjects yet. Map subjects to it in{" "}
+            <a href="/settings/classes" className="font-medium text-accent underline">
+              Classes &amp; subjects
+            </a>
+            .
           </p>
         )}
 

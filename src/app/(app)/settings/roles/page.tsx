@@ -50,28 +50,37 @@ export default async function RolesPage() {
     );
   }
 
-  const [{ data: staffRows }, { data: sections }, { data: subjects }, { data: assignments }] =
-    await Promise.all([
-      supabase
-        .from("staff")
-        .select("id, user_id, profiles(full_name, email)")
-        .eq("school_id", schoolId)
-        .eq("status", "active"),
-      supabase
-        .from("sections")
-        .select("id, name, class_teacher_staff_id, classes(name)")
-        .eq("school_id", schoolId)
-        .eq("academic_year_id", activeYear.id)
-        .order("name"),
-      supabase.from("subjects").select("id, name").eq("school_id", schoolId).order("name"),
-      supabase
-        .from("teacher_assignments")
-        .select(
-          "id, staff_id, section_id, subject_id, staff(profiles(full_name, email)), sections(name, classes(name)), subjects(name)"
-        )
-        .eq("school_id", schoolId)
-        .eq("academic_year_id", activeYear.id),
-    ]);
+  const [
+    { data: staffRows },
+    { data: sections },
+    { data: subjects },
+    { data: classSubjects },
+    { data: assignments },
+  ] = await Promise.all([
+    supabase
+      .from("staff")
+      .select("id, user_id, profiles(full_name, email)")
+      .eq("school_id", schoolId)
+      .eq("status", "active"),
+    supabase
+      .from("sections")
+      .select("id, name, class_id, class_teacher_staff_id, classes(name)")
+      .eq("school_id", schoolId)
+      .eq("academic_year_id", activeYear.id)
+      .order("name"),
+    supabase.from("subjects").select("id, name").eq("school_id", schoolId).order("name"),
+    supabase
+      .from("class_subjects")
+      .select("class_id, subject_id")
+      .eq("school_id", schoolId),
+    supabase
+      .from("teacher_assignments")
+      .select(
+        "id, staff_id, section_id, subject_id, staff(profiles(full_name, email)), sections(name, classes(name)), subjects(name)"
+      )
+      .eq("school_id", schoolId)
+      .eq("academic_year_id", activeYear.id),
+  ]);
 
   // Only teachers are assignable as class/subject teachers -- exclude admins
   // (they get a staff row too, but shouldn't appear in the teacher pickers).
@@ -87,6 +96,7 @@ export default async function RolesPage() {
 
   const sectionRows = (sections ?? []).map((s) => ({
     id: s.id,
+    classId: s.class_id,
     label: `${(s.classes as { name: string } | null)?.name ?? ""} · ${s.name}`,
     classTeacherStaffId: s.class_teacher_staff_id,
   }));
@@ -112,6 +122,7 @@ export default async function RolesPage() {
       <SubjectTeachers
         sections={sectionRows}
         subjects={subjects ?? []}
+        classSubjects={classSubjects ?? []}
         staff={staff}
         assignments={assignmentRows}
       />

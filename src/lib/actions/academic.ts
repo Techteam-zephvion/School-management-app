@@ -460,6 +460,25 @@ export async function assignSubjectTeacher(
   const yearId = await activeYearId(supabase, guard.membership.schoolId);
   if (!yearId) return { error: "Set an active academic year first." };
 
+  // The subject must be mapped to this section's class (class_subjects).
+  const { data: section } = await supabase
+    .from("sections")
+    .select("class_id")
+    .eq("id", parsed.data.sectionId)
+    .eq("school_id", guard.membership.schoolId)
+    .maybeSingle();
+  if (!section) return { error: "Section not found." };
+
+  const { data: mapping } = await supabase
+    .from("class_subjects")
+    .select("id")
+    .eq("class_id", section.class_id)
+    .eq("subject_id", parsed.data.subjectId)
+    .maybeSingle();
+  if (!mapping) {
+    return { error: "That subject isn't assigned to this section's class." };
+  }
+
   const { error } = await supabase.from("teacher_assignments").insert({
     school_id: guard.membership.schoolId,
     staff_id: parsed.data.staffId,
