@@ -127,19 +127,23 @@ export default async function DashboardPage() {
     );
   }
 
-  // Admin setup progress (real counts). Students land in Phase 3.
-  const [{ count: classCount }, { count: teacherCount }] = await Promise.all([
-    supabase
-      .from("classes")
-      .select("id", { count: "exact", head: true })
-      .eq("school_id", membership.schoolId),
-    supabase
-      .from("school_members")
-      .select("id", { count: "exact", head: true })
-      .eq("school_id", membership.schoolId)
-      .eq("role", "teacher"),
-  ]);
-  const studentCount = 0;
+  // Admin setup progress (real counts).
+  const [{ count: classCount }, { count: teacherCount }, { count: studentCount }] =
+    await Promise.all([
+      supabase
+        .from("classes")
+        .select("id", { count: "exact", head: true })
+        .eq("school_id", membership.schoolId),
+      supabase
+        .from("school_members")
+        .select("id", { count: "exact", head: true })
+        .eq("school_id", membership.schoolId)
+        .eq("role", "teacher"),
+      supabase
+        .from("students")
+        .select("id", { count: "exact", head: true })
+        .eq("school_id", membership.schoolId),
+    ]);
 
   const setupSteps = [
     {
@@ -158,7 +162,7 @@ export default async function DashboardPage() {
       href: "/settings/classes",
     },
     { label: "Invite staff", done: (teacherCount ?? 0) > 0, href: "/settings/staff" },
-    { label: "Add students & guardians", done: false, href: "/students" },
+    { label: "Add students & guardians", done: (studentCount ?? 0) > 0, href: "/students" },
   ];
   const remaining = setupSteps.filter((s) => !s.done);
 
@@ -205,7 +209,7 @@ export default async function DashboardPage() {
       <QuickActions />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatTile label="Total students" value={String(studentCount)} icon={Users} />
+        <StatTile label="Total students" value={String(studentCount ?? 0)} icon={Users} />
         <StatTile label="Attendance % today" value="—" icon={ClipboardCheck} />
         <StatTile label="Pending invoices" value="0" icon={Star} />
       </div>

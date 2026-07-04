@@ -159,6 +159,71 @@ export type Database = {
           },
         ]
       }
+      enrollments: {
+        Row: {
+          academic_year_id: string
+          created_at: string
+          id: string
+          roll_no: string | null
+          school_id: string
+          section_id: string
+          status: Database["public"]["Enums"]["enroll_status"]
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          academic_year_id: string
+          created_at?: string
+          id?: string
+          roll_no?: string | null
+          school_id: string
+          section_id: string
+          status?: Database["public"]["Enums"]["enroll_status"]
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          academic_year_id?: string
+          created_at?: string
+          id?: string
+          roll_no?: string | null
+          school_id?: string
+          section_id?: string
+          status?: Database["public"]["Enums"]["enroll_status"]
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrollments_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollments_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -400,6 +465,117 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_guardians: {
+        Row: {
+          created_at: string
+          guardian_user_id: string
+          id: string
+          is_primary: boolean
+          relation: string | null
+          school_id: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          guardian_user_id: string
+          id?: string
+          is_primary?: boolean
+          relation?: string | null
+          school_id: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          guardian_user_id?: string
+          id?: string
+          is_primary?: boolean
+          relation?: string | null
+          school_id?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_guardians_guardian_user_id_fkey"
+            columns: ["guardian_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_guardians_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_guardians_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      students: {
+        Row: {
+          address: string | null
+          admission_no: string
+          blood_group: string | null
+          created_at: string
+          dob: string | null
+          first_name: string
+          gender: Database["public"]["Enums"]["gender"] | null
+          id: string
+          last_name: string | null
+          photo_url: string | null
+          school_id: string
+          status: Database["public"]["Enums"]["enroll_status"]
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          admission_no: string
+          blood_group?: string | null
+          created_at?: string
+          dob?: string | null
+          first_name: string
+          gender?: Database["public"]["Enums"]["gender"] | null
+          id?: string
+          last_name?: string | null
+          photo_url?: string | null
+          school_id: string
+          status?: Database["public"]["Enums"]["enroll_status"]
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          admission_no?: string
+          blood_group?: string | null
+          created_at?: string
+          dob?: string | null
+          first_name?: string
+          gender?: Database["public"]["Enums"]["gender"] | null
+          id?: string
+          last_name?: string | null
+          photo_url?: string | null
+          school_id?: string
+          status?: Database["public"]["Enums"]["enroll_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
             referencedColumns: ["id"]
           },
         ]
