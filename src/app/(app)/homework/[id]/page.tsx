@@ -117,7 +117,7 @@ export default async function HomeworkDetailPage({
             <p className="text-xs text-muted-foreground">
               Posted by {(hw.profiles as { full_name: string | null } | null)?.full_name ?? "Staff"}
             </p>
-            {canManage && <DeleteHomeworkButton id={hw.id} />}
+            {canManage && <DeleteHomeworkButton id={hw.id} title={hw.title} />}
           </div>
         </CardContent>
       </Card>
