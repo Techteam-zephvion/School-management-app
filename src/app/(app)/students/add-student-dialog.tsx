@@ -29,9 +29,11 @@ type SectionOption = { id: string; label: string };
 export function AddStudentDialog({
   sections,
   hasActiveYear,
+  sectionRequired = false,
 }: {
   sections: SectionOption[];
   hasActiveYear: boolean;
+  sectionRequired?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [gender, setGender] = useState("");
@@ -112,7 +114,7 @@ export function AddStudentDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Enrol into section (optional)</Label>
+            <Label>Enrol into section{sectionRequired ? "" : " (optional)"}</Label>
             <Select
               value={sectionId}
               onValueChange={setSectionId}
@@ -142,7 +144,11 @@ export function AddStudentDialog({
           {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
 
           <DialogFooter>
-            <Button type="submit" disabled={pending} className="gap-2">
+            <Button
+              type="submit"
+              disabled={pending || (sectionRequired && !sectionId)}
+              className="gap-2"
+            >
               {pending && <Loader2 className="size-4 animate-spin" />}
               {pending ? "Adding…" : "Add student"}
             </Button>

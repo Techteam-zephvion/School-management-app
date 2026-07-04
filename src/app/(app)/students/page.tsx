@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight, Users } from "lucide-react";
-import { requireActiveMembership } from "@/lib/auth/session";
+import { requireActiveMembership, getAuthUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,11 +46,18 @@ export default async function StudentsPage() {
       activeYear
         ? supabase
             .from("sections")
-            .select("id, name, classes(name)")
+            .select("id, name, class_teacher_staff_id, classes(name)")
             .eq("school_id", schoolId)
             .eq("academic_year_id", activeYear.id)
             .order("name")
-        : Promise.resolve({ data: [] as { id: string; name: string; classes: { name: string } | null }[] }),
+        : Promise.resolve({
+            data: [] as {
+              id: string;
+              name: string;
+              class_teacher_staff_id: string | null;
+              classes: { name: string } | null;
+            }[],
+          }),
     ]);
 
   const sectionByStudent = new Map<string, string>();
@@ -63,10 +70,30 @@ export default async function StudentsPage() {
     guardianCount.set(g.student_id, (guardianCount.get(g.student_id) ?? 0) + 1);
   }
 
-  const sectionOptions = (sections ?? []).map((s) => ({
+  const allSectionOptions = (sections ?? []).map((s) => ({
     id: s.id,
     label: `${(s.classes as { name: string } | null)?.name ?? ""} · ${s.name}`,
   }));
+
+  // A class teacher may add students only into the section(s) they class-teach.
+  let canAdd = isAdmin;
+  let dialogSections = allSectionOptions;
+  if (!isAdmin) {
+    const user = await getAuthUser();
+    const { data: staff } = await supabase
+      .from("staff")
+      .select("id")
+      .eq("school_id", schoolId)
+      .eq("user_id", user?.id ?? "")
+      .maybeSingle();
+    const mySectionIds = new Set(
+      (sections ?? [])
+        .filter((s) => staff && s.class_teacher_staff_id === staff.id)
+        .map((s) => s.id)
+    );
+    dialogSections = allSectionOptions.filter((s) => mySectionIds.has(s.id));
+    canAdd = mySectionIds.size > 0;
+  }
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -74,8 +101,12 @@ export default async function StudentsPage() {
         title="Students"
         description={`${students?.length ?? 0} students at ${membership.schoolName}.`}
         action={
-          isAdmin ? (
-            <AddStudentDialog sections={sectionOptions} hasActiveYear={Boolean(activeYear)} />
+          canAdd ? (
+            <AddStudentDialog
+              sections={dialogSections}
+              hasActiveYear={Boolean(activeYear)}
+              sectionRequired={!isAdmin}
+            />
           ) : undefined
         }
       />
@@ -86,7 +117,7 @@ export default async function StudentsPage() {
             <div className="flex flex-col items-center gap-2 py-12 text-center">
               <Users className="size-8 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                No students yet.{isAdmin ? " Add your first student above." : ""}
+                No students yet.{canAdd ? " Add your first student above." : ""}
               </p>
             </div>
           ) : (

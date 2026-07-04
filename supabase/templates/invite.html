@@ -42,8 +42,13 @@
           <tr>
             <td align="center" style="padding:12px 40px 30px;">
               <p style="margin:0;font-size:16px;line-height:1.6;color:#64748b;">
+                {{ if .Data.temp_password }}
+                You've been invited to follow your child's school journey — attendance,
+                homework, results and fees — right from the EduSphere app.
+                {{ else }}
                 You've been invited to join the premier teacher portal, designed to
                 streamline your academic workflow and enhance student engagement.
+                {{ end }}
               </p>
             </td>
           </tr>
@@ -74,6 +79,26 @@
                 </tr>
                 <tr>
                   <td style="padding:24px 28px;">
+                    {{ if .Data.temp_password }}
+                    <!-- Parent / guardian: sign into the EduSphere app with these credentials -->
+                    <p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:#475569;">
+                      Open the <strong>EduSphere Parent app</strong> and sign in with the
+                      credentials below. You can change your password once you're in.
+                    </p>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;">
+                      <tr>
+                        <td style="padding:16px 18px;">
+                          <div style="font-size:12px;font-weight:700;letter-spacing:0.06em;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;">Email</div>
+                          <div style="font-size:15px;font-weight:600;color:#0f172a;margin-bottom:14px;">{{ .Data.login_email }}</div>
+                          <div style="font-size:12px;font-weight:700;letter-spacing:0.06em;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;">Temporary password</div>
+                          <div style="font-size:18px;font-weight:700;letter-spacing:0.04em;color:#10203f;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;">{{ .Data.temp_password }}</div>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin:14px 0 0;font-size:12px;line-height:1.5;color:#94a3b8;">
+                      For your security, please change this password after your first sign-in.
+                    </p>
+                    {{ else }}
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                       <tr>
                         <td align="center" style="border-radius:12px;background:#2563eb;">
@@ -84,6 +109,7 @@
                         </td>
                       </tr>
                     </table>
+                    {{ end }}
                   </td>
                 </tr>
               </table>

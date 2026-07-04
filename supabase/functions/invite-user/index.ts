@@ -23,6 +23,16 @@ const ROLE_LABELS: Record<InviteRole, string> = {
   parent: "Parent / Guardian",
 };
 
+// Readable one-time password for parent accounts (no ambiguous 0/O/1/l/I).
+function generatePassword(length = 10): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  let out = "";
+  for (const b of bytes) out += alphabet[b % alphabet.length];
+  return out;
+}
+
 export default {
   fetch: withSupabase({ auth: "user" }, async (req, ctx) => {
     if (req.method !== "POST") {
@@ -101,10 +111,45 @@ export default {
       .eq("email", email)
       .maybeSingle();
 
+    // Parents/guardians live only in the separate React Native app -- they never
+    // touch this web portal's accept-invite flow. So instead of a magic link we
+    // create a real password-backed, email-confirmed account and email them the
+    // credentials (they change the password later in the app). Staff keep the
+    // web magic-link invite.
+    const isParent = role === "parent";
     let userId: string;
 
     if (existingProfile) {
       userId = existingProfile.id;
+    } else if (isParent) {
+      const tempPassword = generatePassword();
+      const { data: invited, error: inviteError } =
+        await ctx.supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+          redirectTo: `${appUrl}/auth/confirm`,
+          data: {
+            full_name: fullName,
+            school_name: schoolName,
+            role_label: roleLabel,
+            temp_password: tempPassword,
+            login_email: email,
+          },
+        });
+      if (inviteError || !invited?.user) {
+        return Response.json(
+          { error: inviteError?.message ?? "Could not send invite." },
+          { status: 400 }
+        );
+      }
+      userId = invited.user.id;
+      // Give them a usable password and confirm the email so they can sign into
+      // the app immediately with the credentials from the invite email.
+      const { error: pwError } = await ctx.supabaseAdmin.auth.admin.updateUserById(
+        userId,
+        { password: tempPassword, email_confirm: true }
+      );
+      if (pwError) {
+        return Response.json({ error: pwError.message }, { status: 400 });
+      }
     } else {
       const { data: invited, error: inviteError } =
         await ctx.supabaseAdmin.auth.admin.inviteUserByEmail(email, {
@@ -130,8 +175,9 @@ export default {
         {
           school_id: schoolId,
           user_id: userId,
+          // Parents are set up fully here (no web accept step), so they start active.
+          status: existingProfile || isParent ? "active" : "invited",
           role,
-          status: existingProfile ? "active" : "invited",
         },
         { onConflict: "school_id,user_id" }
       );

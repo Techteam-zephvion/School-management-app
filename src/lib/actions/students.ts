@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireActiveMembership, type Membership } from "@/lib/auth/session";
+import { requireActiveMembership, getAuthUser, type Membership } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/actions/auth";
 
 async function requireAdmin(): Promise<
@@ -14,6 +14,27 @@ async function requireAdmin(): Promise<
     return { error: "Only school admins can manage students." };
   }
   return { membership };
+}
+
+/** The section ids the current user is the class teacher of (empty for admins
+ *  who go through the school-wide path). Used to scope class-teacher adds. */
+async function myClassTeacherSectionIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  schoolId: string,
+  userId: string
+): Promise<Set<string>> {
+  const { data: staff } = await supabase
+    .from("staff")
+    .select("id")
+    .eq("school_id", schoolId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!staff) return new Set();
+  const { data: sections } = await supabase
+    .from("sections")
+    .select("id")
+    .eq("class_teacher_staff_id", staff.id);
+  return new Set((sections ?? []).map((s) => s.id));
 }
 
 function firstError(err: z.ZodError): string {
@@ -52,8 +73,10 @@ export async function createStudent(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const guard = await requireAdmin();
-  if ("error" in guard) return guard;
+  const membership = await requireActiveMembership();
+  const user = await getAuthUser();
+  if (!user) return { error: "You are not signed in." };
+  const isAdmin = membership.role === "school_admin";
 
   const parsed = studentSchema.safeParse({
     admissionNo: formData.get("admissionNo") ?? undefined,
@@ -69,7 +92,22 @@ export async function createStudent(
   if (!parsed.success) return { error: firstError(parsed.error) };
 
   const supabase = await createClient();
-  const schoolId = guard.membership.schoolId;
+  const schoolId = membership.schoolId;
+
+  // Class teachers may add students, but only into a section they class-teach,
+  // and a section is required for them (admins can add unenrolled students).
+  if (!isAdmin) {
+    const mySections = await myClassTeacherSectionIds(supabase, schoolId, user.id);
+    if (mySections.size === 0) {
+      return { error: "Only school admins or class teachers can add students." };
+    }
+    if (!parsed.data.sectionId) {
+      return { error: "Choose the section to add this student to." };
+    }
+    if (!mySections.has(parsed.data.sectionId)) {
+      return { error: "You can only add students to a section you are the class teacher of." };
+    }
+  }
 
   const { data: student, error } = await supabase
     .from("students")
