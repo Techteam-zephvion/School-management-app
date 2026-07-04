@@ -166,9 +166,6 @@ export async function updateStudent(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const guard = await requireAdmin();
-  if ("error" in guard) return guard;
-
   const parsed = updateStudentSchema.safeParse({
     studentId: formData.get("studentId"),
     firstName: formData.get("firstName"),
@@ -179,6 +176,10 @@ export async function updateStudent(
     address: formData.get("address"),
   });
   if (!parsed.success) return { error: firstError(parsed.error) };
+
+  // Admin (any student) or the class teacher of the student's section.
+  const guard = await guardManageStudent(parsed.data.studentId);
+  if ("error" in guard) return guard;
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -192,7 +193,7 @@ export async function updateStudent(
       address: parsed.data.address || null,
     })
     .eq("id", parsed.data.studentId)
-    .eq("school_id", guard.membership.schoolId);
+    .eq("school_id", guard.schoolId);
 
   if (error) return { error: error.message };
   revalidatePath(`/students/${parsed.data.studentId}`);

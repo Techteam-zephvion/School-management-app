@@ -155,18 +155,55 @@ describe("Class-teacher student add", () => {
     expect(error).not.toBeNull();
   });
 
-  test("class teacher CANNOT update/delete students (admin-only)", async () => {
+  test("class teacher CAN edit details of a student in their own section", async () => {
     const { data: student } = await insertStudent(ctx.teacher);
-    // RLS filters the row out of the write scope, so delete/update affect 0 rows
-    // (no error, but nothing changes) -- verify the row survives untouched.
-    await ctx.teacher.from("students").delete().eq("id", student!.id);
-    await ctx.teacher.from("students").update({ first_name: "Hacked" }).eq("id", student!.id);
-    const { data: still } = await admin
+    await admin.from("enrollments").insert({
+      school_id: ctx.schoolId,
+      student_id: student!.id,
+      section_id: ctx.ownSectionId,
+      academic_year_id: ctx.yearId,
+    });
+    const { error } = await ctx.teacher
       .from("students")
-      .select("first_name")
+      .update({ blood_group: "O+", address: "12 Main St" })
+      .eq("id", student!.id);
+    expect(error).toBeNull();
+    const { data: after } = await admin
+      .from("students")
+      .select("blood_group, address")
       .eq("id", student!.id)
-      .maybeSingle();
-    expect(still).not.toBeNull(); // survived the delete
-    expect(still!.first_name).toBe("Kid"); // survived the update
+      .single();
+    expect(after!.blood_group).toBe("O+");
+    expect(after!.address).toBe("12 Main St");
+  });
+
+  test("class teacher CANNOT edit a student in a section they don't teach", async () => {
+    const { data: student } = await insertStudent(ctx.teacher);
+    await admin.from("enrollments").insert({
+      school_id: ctx.schoolId,
+      student_id: student!.id,
+      section_id: ctx.otherSectionId,
+      academic_year_id: ctx.yearId,
+    });
+    await ctx.teacher.from("students").update({ blood_group: "X" }).eq("id", student!.id);
+    const { data: after } = await admin
+      .from("students")
+      .select("blood_group")
+      .eq("id", student!.id)
+      .single();
+    expect(after!.blood_group).toBeNull(); // update was filtered out
+  });
+
+  test("class teacher still CANNOT delete students (admin-only)", async () => {
+    const { data: student } = await insertStudent(ctx.teacher);
+    await admin.from("enrollments").insert({
+      school_id: ctx.schoolId,
+      student_id: student!.id,
+      section_id: ctx.ownSectionId,
+      academic_year_id: ctx.yearId,
+    });
+    await ctx.teacher.from("students").delete().eq("id", student!.id);
+    const { data: still } = await admin.from("students").select("id").eq("id", student!.id);
+    expect(still ?? []).toHaveLength(1); // delete blocked
   });
 });

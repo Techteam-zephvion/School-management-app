@@ -96,9 +96,10 @@ export default async function StudentProfilePage({
       }
     | null;
 
-  // Guardians can be managed by an admin, or by the class teacher of the
-  // student's current section (they own their class's parent relationships).
-  let canManageGuardians = isAdmin;
+  // A student can be managed (edit details + guardians) by an admin, or by the
+  // class teacher of the student's current section -- they get the same
+  // per-student controls an admin has for the students in their class.
+  let canManageStudent = isAdmin;
   if (!isAdmin && enrolled?.sections?.class_teacher_staff_id) {
     const user = await getAuthUser();
     const { data: staff } = await supabase
@@ -107,7 +108,7 @@ export default async function StudentProfilePage({
       .eq("school_id", schoolId)
       .eq("user_id", user?.id ?? "")
       .maybeSingle();
-    canManageGuardians =
+    canManageStudent =
       Boolean(staff) && enrolled.sections.class_teacher_staff_id === staff!.id;
   }
   const sectionOptions = (sections ?? []).map((s) => ({
@@ -158,7 +159,7 @@ export default async function StudentProfilePage({
                 : " · Not enrolled"}
             </p>
           </div>
-          {isAdmin && <EditStudentDialog student={student} />}
+          {canManageStudent && <EditStudentDialog student={student} />}
         </CardContent>
       </Card>
 
@@ -190,7 +191,7 @@ export default async function StudentProfilePage({
         />
       </div>
 
-      <GuardiansCard studentId={student.id} guardians={guardians} canEdit={canManageGuardians} />
+      <GuardiansCard studentId={student.id} guardians={guardians} canEdit={canManageStudent} />
     </div>
   );
 }
