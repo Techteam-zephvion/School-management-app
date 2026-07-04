@@ -83,6 +83,27 @@ export default {
       authorized = Boolean(membership);
     }
 
+    // Class teachers may invite parents/guardians (they manage the guardians of
+    // students in their own sections). Staff invites stay school_admin-only.
+    if (!authorized && role === "parent") {
+      const { data: staff } = await ctx.supabase
+        .from("staff")
+        .select("id")
+        .eq("school_id", schoolId)
+        .eq("user_id", callerId)
+        .maybeSingle();
+      if (staff) {
+        const { data: ctSection } = await ctx.supabase
+          .from("sections")
+          .select("id")
+          .eq("school_id", schoolId)
+          .eq("class_teacher_staff_id", staff.id)
+          .limit(1)
+          .maybeSingle();
+        authorized = Boolean(ctSection);
+      }
+    }
+
     if (!authorized) {
       return Response.json(
         { error: "Not authorized to invite members for this school." },

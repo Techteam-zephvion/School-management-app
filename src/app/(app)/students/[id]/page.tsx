@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, Cake, Droplet, MapPin, IdCard } from "lucide-react";
-import { requireActiveMembership } from "@/lib/auth/session";
+import { requireActiveMembership, getAuthUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import {
   Card,
@@ -50,7 +50,7 @@ export default async function StudentProfilePage({
     activeYear
       ? supabase
           .from("enrollments")
-          .select("id, roll_no, sections(id, name, classes(name))")
+          .select("id, roll_no, sections(id, name, class_teacher_staff_id, classes(name))")
           .eq("student_id", id)
           .eq("academic_year_id", activeYear.id)
           .eq("status", "active")
@@ -84,8 +84,32 @@ export default async function StudentProfilePage({
   }
 
   const enrolled = enrollment as
-    | { id: string; roll_no: string | null; sections: { id: string; name: string; classes: { name: string } | null } | null }
+    | {
+        id: string;
+        roll_no: string | null;
+        sections: {
+          id: string;
+          name: string;
+          class_teacher_staff_id: string | null;
+          classes: { name: string } | null;
+        } | null;
+      }
     | null;
+
+  // Guardians can be managed by an admin, or by the class teacher of the
+  // student's current section (they own their class's parent relationships).
+  let canManageGuardians = isAdmin;
+  if (!isAdmin && enrolled?.sections?.class_teacher_staff_id) {
+    const user = await getAuthUser();
+    const { data: staff } = await supabase
+      .from("staff")
+      .select("id")
+      .eq("school_id", schoolId)
+      .eq("user_id", user?.id ?? "")
+      .maybeSingle();
+    canManageGuardians =
+      Boolean(staff) && enrolled.sections.class_teacher_staff_id === staff!.id;
+  }
   const sectionOptions = (sections ?? []).map((s) => ({
     id: s.id,
     label: `${(s.classes as { name: string } | null)?.name ?? ""} · ${s.name}`,
@@ -166,7 +190,7 @@ export default async function StudentProfilePage({
         />
       </div>
 
-      <GuardiansCard studentId={student.id} guardians={guardians} canEdit={isAdmin} />
+      <GuardiansCard studentId={student.id} guardians={guardians} canEdit={canManageGuardians} />
     </div>
   );
 }

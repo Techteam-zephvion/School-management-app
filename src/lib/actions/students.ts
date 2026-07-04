@@ -253,6 +253,37 @@ export async function enrollStudent(
 // ---------------------------------------------------------------------------
 // Guardians (invite the parent, then link)
 // ---------------------------------------------------------------------------
+
+/** Admin (any student) or a class teacher of the student's active section.
+ *  Returns the school id to operate under, or an error message. */
+async function guardManageStudent(
+  studentId: string
+): Promise<{ schoolId: string } | { error: string }> {
+  const membership = await requireActiveMembership();
+  const supabase = await createClient();
+  const schoolId = membership.schoolId;
+
+  if (membership.role === "school_admin") return { schoolId };
+
+  const user = await getAuthUser();
+  if (user) {
+    const mySections = await myClassTeacherSectionIds(supabase, schoolId, user.id);
+    if (mySections.size > 0) {
+      const { data: enrollments } = await supabase
+        .from("enrollments")
+        .select("section_id")
+        .eq("student_id", studentId)
+        .eq("status", "active");
+      if ((enrollments ?? []).some((e) => mySections.has(e.section_id))) {
+        return { schoolId };
+      }
+    }
+  }
+  return {
+    error: "Only an admin or this student's class teacher can manage guardians.",
+  };
+}
+
 const guardianSchema = z.object({
   studentId: z.string().uuid(),
   fullName: z.string().trim().min(2, { error: "Enter the guardian's name." }),
@@ -267,9 +298,6 @@ export async function inviteGuardian(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const guard = await requireAdmin();
-  if ("error" in guard) return guard;
-
   const parsed = guardianSchema.safeParse({
     studentId: formData.get("studentId"),
     fullName: formData.get("fullName"),
@@ -279,8 +307,11 @@ export async function inviteGuardian(
   });
   if (!parsed.success) return { error: firstError(parsed.error) };
 
+  const guard = await guardManageStudent(parsed.data.studentId);
+  if ("error" in guard) return guard;
+
   const supabase = await createClient();
-  const schoolId = guard.membership.schoolId;
+  const schoolId = guard.schoolId;
 
   // Create/attach the parent auth user + membership + invite email.
   const { data, error } = await supabase.functions.invoke("invite-user", {
@@ -324,24 +355,27 @@ export async function inviteGuardian(
 }
 
 export async function removeGuardian(linkId: string): Promise<ActionState> {
-  const guard = await requireAdmin();
-  if ("error" in guard) return guard;
-
+  const membership = await requireActiveMembership();
   const supabase = await createClient();
+
   const { data: link } = await supabase
     .from("student_guardians")
     .select("student_id")
     .eq("id", linkId)
-    .eq("school_id", guard.membership.schoolId)
+    .eq("school_id", membership.schoolId)
     .maybeSingle();
+  if (!link) return { error: "Guardian link not found." };
+
+  const guard = await guardManageStudent(link.student_id);
+  if ("error" in guard) return guard;
 
   const { error } = await supabase
     .from("student_guardians")
     .delete()
     .eq("id", linkId)
-    .eq("school_id", guard.membership.schoolId);
+    .eq("school_id", membership.schoolId);
 
   if (error) return { error: error.message };
-  if (link) revalidatePath(`/students/${link.student_id}`);
+  revalidatePath(`/students/${link.student_id}`);
   return { error: undefined };
 }

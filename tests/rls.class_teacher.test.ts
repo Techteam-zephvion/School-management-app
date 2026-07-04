@@ -119,6 +119,42 @@ describe("Class-teacher student add", () => {
     expect(error).not.toBeNull();
   });
 
+  test("class teacher CAN link a guardian to a student in their own section", async () => {
+    const { data: student } = await insertStudent(ctx.teacher);
+    await admin.from("enrollments").insert({
+      school_id: ctx.schoolId,
+      student_id: student!.id,
+      section_id: ctx.ownSectionId,
+      academic_year_id: ctx.yearId,
+    });
+    const guardianId = await makeUser(`guard.${rand()}@t.local`, "password123");
+    const { error } = await ctx.teacher.from("student_guardians").insert({
+      school_id: ctx.schoolId,
+      student_id: student!.id,
+      guardian_user_id: guardianId,
+      relation: "mother",
+    });
+    expect(error).toBeNull();
+  });
+
+  test("class teacher CANNOT link a guardian to a student in another section", async () => {
+    const { data: student } = await insertStudent(ctx.teacher);
+    await admin.from("enrollments").insert({
+      school_id: ctx.schoolId,
+      student_id: student!.id,
+      section_id: ctx.otherSectionId, // not class-taught by this teacher
+      academic_year_id: ctx.yearId,
+    });
+    const guardianId = await makeUser(`guard.${rand()}@t.local`, "password123");
+    const { error } = await ctx.teacher.from("student_guardians").insert({
+      school_id: ctx.schoolId,
+      student_id: student!.id,
+      guardian_user_id: guardianId,
+      relation: "mother",
+    });
+    expect(error).not.toBeNull();
+  });
+
   test("class teacher CANNOT update/delete students (admin-only)", async () => {
     const { data: student } = await insertStudent(ctx.teacher);
     // RLS filters the row out of the write scope, so delete/update affect 0 rows
