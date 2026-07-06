@@ -31,22 +31,34 @@ export function TimetableGrid({
   sectionId,
   periods,
   subjects,
-  staff,
+  teachersBySubject,
   canEdit,
 }: {
   sectionId: string;
   periods: PeriodCell[];
   subjects: Option[];
-  staff: Option[];
+  teachersBySubject: Record<string, Option[]>;
   canEdit: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const [dialog, setDialog] = useState<{ weekday: number; periodNo: number } | null>(null);
   const [subjectId, setSubjectId] = useState("");
   const [staffId, setStaffId] = useState("");
+  const [extraRows, setExtraRows] = useState(0);
 
-  const maxPeriod = Math.max(6, ...periods.map((p) => p.periodNo));
-  const rows = Array.from({ length: maxPeriod }, (_, i) => i + 1);
+  const baseRows = Math.max(6, ...periods.map((p) => p.periodNo));
+  const totalRows = Math.min(12, baseRows + extraRows);
+  const rows = Array.from({ length: totalRows }, (_, i) => i + 1);
+
+  // Teachers that may take the currently chosen subject in this section (Roles).
+  const teacherChoices = subjectId ? teachersBySubject[subjectId] ?? [] : [];
+
+  function pickSubject(id: string) {
+    setSubjectId(id);
+    const choices = teachersBySubject[id] ?? [];
+    // auto-assign when exactly one teacher is assigned; otherwise clear
+    setStaffId(choices.length === 1 ? choices[0].id : "");
+  }
   const cellOf = (weekday: number, periodNo: number) =>
     periods.find((p) => p.weekday === weekday && p.periodNo === periodNo);
 
@@ -79,8 +91,7 @@ export function TimetableGrid({
 
   function openAdd(weekday: number, periodNo: number) {
     const existing = cellOf(weekday, periodNo);
-    setSubjectId(existing?.subjectId ?? "");
-    setStaffId("");
+    pickSubject(existing?.subjectId ?? "");
     setDialog({ weekday, periodNo });
   }
 
@@ -155,6 +166,18 @@ export function TimetableGrid({
             </tbody>
           </table>
         </div>
+        {canEdit && totalRows < 12 && (
+          <div className="border-t border-border/60 p-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setExtraRows((n) => n + 1)}
+              className="w-full gap-1.5 text-muted-foreground"
+            >
+              <Plus className="size-3.5" /> Add period row
+            </Button>
+          </div>
+        )}
       </CardContent>
 
       <Dialog open={dialog !== null} onOpenChange={(o) => !o && setDialog(null)}>
@@ -167,7 +190,7 @@ export function TimetableGrid({
           <form action={formAction} className="space-y-4">
             <div className="space-y-2">
               <Label className="text-sm font-medium text-foreground">Subject</Label>
-              <Select value={subjectId} onValueChange={setSubjectId}>
+              <Select value={subjectId} onValueChange={pickSubject}>
                 <SelectTrigger className="w-full rounded-lg">
                   <SelectValue placeholder={subjects.length === 0 ? "Map subjects to this class first" : "Choose subject"} />
                 </SelectTrigger>
@@ -181,19 +204,32 @@ export function TimetableGrid({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-sm font-medium text-foreground">Teacher (optional)</Label>
-              <Select value={staffId} onValueChange={setStaffId}>
+              <Label className="text-sm font-medium text-foreground">Teacher</Label>
+              <Select value={staffId} onValueChange={setStaffId} disabled={!subjectId || teacherChoices.length === 0}>
                 <SelectTrigger className="w-full rounded-lg">
-                  <SelectValue placeholder="Unassigned" />
+                  <SelectValue
+                    placeholder={
+                      !subjectId
+                        ? "Choose a subject first"
+                        : teacherChoices.length === 0
+                          ? "No teacher assigned — set in Roles"
+                          : "Choose teacher"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {staff.map((s) => (
+                  {teacherChoices.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {subjectId && teacherChoices.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Assign a subject teacher for this section in Roles to schedule them here.
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

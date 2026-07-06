@@ -11,11 +11,6 @@ async function requireAdmin(): Promise<{ membership: Membership } | { error: str
   if (membership.role !== "school_admin") return { error: "Only school admins can edit the timetable." };
   return { membership };
 }
-async function requireStaff(): Promise<{ membership: Membership } | { error: string }> {
-  const membership = await requireActiveMembership();
-  if (membership.role === "parent") return { error: "Not allowed." };
-  return { membership };
-}
 function firstError(e: z.ZodError) {
   return e.issues[0]?.message ?? "Invalid input.";
 }
@@ -59,6 +54,21 @@ export async function addPeriod(_prev: ActionState, formData: FormData): Promise
   const supabase = await createClient();
   const yearId = await activeYearId(supabase, guard.membership.schoolId);
   if (!yearId) return { error: "Set an active academic year first." };
+
+  // A teacher can only be scheduled for a subject they're assigned to teach in
+  // this section (set in Roles). Guard it server-side.
+  if (parsed.data.staffId) {
+    const { data: assignment } = await supabase
+      .from("teacher_assignments")
+      .select("id")
+      .eq("section_id", parsed.data.sectionId)
+      .eq("subject_id", parsed.data.subjectId)
+      .eq("staff_id", parsed.data.staffId)
+      .maybeSingle();
+    if (!assignment) {
+      return { error: "That teacher isn't assigned to this subject for this section (set it in Roles)." };
+    }
+  }
 
   const { error } = await supabase.from("periods").upsert(
     {
@@ -104,7 +114,7 @@ const eventSchema = z
   .refine((v) => v.endDate >= v.startDate, { error: "End date can't be before the start.", path: ["endDate"] });
 
 export async function addEvent(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const guard = await requireStaff();
+  const guard = await requireAdmin();
   if ("error" in guard) return guard;
   const parsed = eventSchema.safeParse({
     title: formData.get("title"),
@@ -135,7 +145,7 @@ export async function addEvent(_prev: ActionState, formData: FormData): Promise<
 }
 
 export async function deleteEvent(id: string): Promise<ActionState> {
-  const guard = await requireStaff();
+  const guard = await requireAdmin();
   if ("error" in guard) return guard;
   const supabase = await createClient();
   const { error } = await supabase.from("events").delete().eq("id", id).eq("school_id", guard.membership.schoolId);

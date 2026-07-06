@@ -90,6 +90,22 @@ export default async function TimetablePage({
   });
   const staffName = new Map(staff.map((s) => [s.id, s.name]));
 
+  // Teachers assignable to each subject IN THIS SECTION (from Roles). The period
+  // teacher can only be one of these.
+  const teachersBySubject: Record<string, Option[]> = {};
+  if (selectedId) {
+    const { data: assignments } = await supabase
+      .from("teacher_assignments")
+      .select("subject_id, staff_id, staff(profiles(full_name, email))")
+      .eq("section_id", selectedId)
+      .eq("academic_year_id", activeYear.id);
+    for (const a of assignments ?? []) {
+      const prof = (a.staff as { profiles: { full_name: string | null; email: string | null } | null } | null)?.profiles;
+      const name = prof?.full_name || prof?.email || "Teacher";
+      (teachersBySubject[a.subject_id] ??= []).push({ id: a.staff_id, name });
+    }
+  }
+
   let periods: PeriodCell[] = [];
   if (selectedId) {
     const { data } = await supabase
@@ -135,7 +151,7 @@ export default async function TimetablePage({
           sectionId={selectedId}
           periods={periods}
           subjects={subjectsForClass}
-          staff={staff}
+          teachersBySubject={teachersBySubject}
           canEdit={isAdmin}
         />
       ) : (
@@ -145,8 +161,8 @@ export default async function TimetablePage({
         </Alert>
       )}
 
-      {/* only staff reach this page; events are admin/teacher-writable */}
-      <EventsCard events={eventRows} sections={sectionOptions} canEdit />
+      {/* only the admin manages holidays/events; teachers read them */}
+      <EventsCard events={eventRows} sections={sectionOptions} canEdit={isAdmin} />
 
     </div>
   );

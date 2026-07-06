@@ -111,16 +111,21 @@ describe("Phase 11: leave + calendar", () => {
     expect((att ?? []).every((a) => a.status === "excused")).toBe(true);
   });
 
-  test("events: a teacher can add a holiday; a parent cannot", async () => {
+  test("events: only the admin adds holidays; teachers & parents read-only", async () => {
+    // a teacher (even a class teacher) cannot create an event...
     const { error: teacherErr } = await ctx.classTeacher
       .from("events")
       .insert({ school_id: ctx.schoolId, title: "Sports Day", start_date: "2025-10-01", end_date: "2025-10-01", is_holiday: true });
-    expect(teacherErr).toBeNull();
-
+    expect(teacherErr).not.toBeNull();
     const { error: parentErr } = await ctx.parentA
       .from("events")
       .insert({ school_id: ctx.schoolId, title: "hack", start_date: "2025-10-02", end_date: "2025-10-02" });
     expect(parentErr).not.toBeNull();
+
+    // ...but everyone in the school can read the admin's holiday
+    await admin.from("events").insert({ school_id: ctx.schoolId, title: "Republic Day", start_date: "2025-10-03", end_date: "2025-10-03", is_holiday: true });
+    const { data: seen } = await ctx.classTeacher.from("events").select("id").eq("title", "Republic Day");
+    expect((seen ?? []).length).toBe(1);
   });
 
   test("periods: a teacher (non-admin) cannot create; a parent sees them read-only via membership", async () => {
