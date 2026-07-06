@@ -468,6 +468,157 @@ export type Database = {
           },
         ]
       }
+      exam_subjects: {
+        Row: {
+          class_id: string
+          created_at: string
+          id: string
+          max_marks: number
+          school_id: string
+          subject_id: string
+          term_id: string
+          updated_at: string
+          weightage: number | null
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          id?: string
+          max_marks?: number
+          school_id: string
+          subject_id: string
+          term_id: string
+          updated_at?: string
+          weightage?: number | null
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          id?: string
+          max_marks?: number
+          school_id?: string
+          subject_id?: string
+          term_id?: string
+          updated_at?: string
+          weightage?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_subjects_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_subjects_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_subjects_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_subjects_term_id_fkey"
+            columns: ["term_id"]
+            isOneToOne: false
+            referencedRelation: "exam_terms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exam_terms: {
+        Row: {
+          academic_year_id: string
+          created_at: string
+          id: string
+          is_published: boolean
+          name: string
+          published_at: string | null
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          academic_year_id: string
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          name: string
+          published_at?: string | null
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          academic_year_id?: string
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          name?: string
+          published_at?: string | null
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_terms_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_terms_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grade_scales: {
+        Row: {
+          created_at: string
+          gpa: number | null
+          grade_label: string
+          id: string
+          max_percent: number
+          min_percent: number
+          school_id: string
+        }
+        Insert: {
+          created_at?: string
+          gpa?: number | null
+          grade_label: string
+          id?: string
+          max_percent: number
+          min_percent: number
+          school_id: string
+        }
+        Update: {
+          created_at?: string
+          gpa?: number | null
+          grade_label?: string
+          id?: string
+          max_percent?: number
+          min_percent?: number
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grade_scales_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       homework: {
         Row: {
           attachment_url: string | null
@@ -535,6 +686,81 @@ export type Database = {
             columns: ["subject_id"]
             isOneToOne: false
             referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marks: {
+        Row: {
+          created_at: string
+          entered_by: string | null
+          exam_subject_id: string
+          grade: string | null
+          id: string
+          marks_obtained: number
+          school_id: string
+          student_id: string
+          term_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entered_by?: string | null
+          exam_subject_id: string
+          grade?: string | null
+          id?: string
+          marks_obtained: number
+          school_id: string
+          student_id: string
+          term_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entered_by?: string | null
+          exam_subject_id?: string
+          grade?: string | null
+          id?: string
+          marks_obtained?: number
+          school_id?: string
+          student_id?: string
+          term_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marks_entered_by_fkey"
+            columns: ["entered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marks_exam_subject_id_fkey"
+            columns: ["exam_subject_id"]
+            isOneToOne: false
+            referencedRelation: "exam_subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marks_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marks_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marks_term_id_fkey"
+            columns: ["term_id"]
+            isOneToOne: false
+            referencedRelation: "exam_terms"
             referencedColumns: ["id"]
           },
         ]

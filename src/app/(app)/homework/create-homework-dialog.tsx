@@ -89,11 +89,11 @@ export function CreateHomeworkDialog({
           <DialogTitle>Assign homework</DialogTitle>
           <DialogDescription>Parents of the class will see this in their app.</DialogDescription>
         </DialogHeader>
-        <form action={formAction} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Class &amp; subject</Label>
+        <form action={formAction} className="space-y-5">
+          <div className="space-y-3">
+            <Label className="text-sm font-medium text-foreground">Class &amp; subject</Label>
             <Select value={targetKey} onValueChange={setTargetKey}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full rounded-lg">
                 <SelectValue placeholder="Choose a class and subject" />
               </SelectTrigger>
               <SelectContent>
@@ -105,24 +105,25 @@ export function CreateHomeworkDialog({
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
-            <Input id="title" name="title" placeholder="Chapter 4 exercises" required />
+          <div className="space-y-3">
+            <Label className="text-sm font-medium text-foreground" htmlFor="title">Title</Label>
+            <Input id="title" name="title" placeholder="Chapter 4 exercises" required className="rounded-lg" />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="description">Details (optional)</Label>
-            <Textarea id="description" name="description" rows={3} placeholder="Questions 1–10, show your working." />
+          <div className="space-y-3">
+            <Label className="text-sm font-medium text-foreground" htmlFor="description">Details (optional)</Label>
+            <Textarea id="description" name="description" rows={3} placeholder="Questions 1–10, show your working." className="rounded-lg" />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="dueDate">Due date</Label>
-            <Input id="dueDate" name="dueDate" type="date" defaultValue={tomorrowISO()} required />
+          <div className="space-y-3">
+            <Label className="text-sm font-medium text-foreground" htmlFor="dueDate">Due date</Label>
+            <Input id="dueDate" name="dueDate" type="date" defaultValue={tomorrowISO()} required className="rounded-lg" />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="file">Attachment (optional)</Label>
+          <div className="space-y-3">
+            <Label className="text-sm font-medium text-foreground" htmlFor="file">Attachment (optional)</Label>
             <Input
               id="file"
               type="file"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="rounded-lg"
             />
           </div>
           {state?.error && <p className="text-sm text-destructive">{state.error}</p>}

@@ -124,8 +124,8 @@ export default async function HomeworkPage() {
       />
 
       {targets.length === 0 && membership.role !== "school_admin" && (
-        <Alert>
-          <BookOpen className="size-4" />
+        <Alert className="border-amber-200/60 bg-amber-50/60 text-amber-900">
+          <BookOpen className="size-4 text-amber-600" />
           <AlertDescription>
             You have no classes to assign homework for. A class teacher or subject teacher can post
             homework once assigned in Roles.
@@ -133,12 +133,15 @@ export default async function HomeworkPage() {
         </Alert>
       )}
 
-      <Card>
-        <CardContent className="divide-y divide-border p-0">
+      <Card className="overflow-hidden border-0 shadow-md shadow-muted-foreground/5 ring-1 ring-border/50">
+        <CardContent className="divide-y divide-border/60 p-0">
           {!homework || homework.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-12 text-center">
-              <BookOpen className="size-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">No homework posted yet.</p>
+            <div className="flex flex-col items-center gap-3 py-16 text-center">
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-muted/60">
+                <BookOpen className="size-6 text-muted-foreground/70" />
+              </span>
+              <p className="text-sm font-medium text-muted-foreground">No homework posted yet.</p>
+              <p className="text-xs text-muted-foreground/70">Assignments will appear here once posted.</p>
             </div>
           ) : (
             homework.map((h) => {
@@ -148,22 +151,22 @@ export default async function HomeworkPage() {
                 <Link
                   key={h.id}
                   href={`/homework/${h.id}`}
-                  className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
+                  className="group flex items-center gap-4 px-5 py-4 transition-all hover:bg-muted/40"
                 >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
-                    <BookOpen className="size-4.5" />
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/15 group-hover:shadow-sm">
+                    <BookOpen className="size-5" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-1.5 truncate font-medium">
+                    <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
                       {h.title}
-                      {h.attachment_url && <Paperclip className="size-3.5 text-muted-foreground" />}
+                      {h.attachment_url && <Paperclip className="size-3.5 shrink-0 text-muted-foreground/60" />}
                     </p>
-                    <p className="truncate text-xs text-muted-foreground">
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
                       {section?.classes?.name} · {section?.name} ·{" "}
                       {(h.subjects as { name: string } | null)?.name}
                     </p>
                   </div>
-                  <Badge variant={overdue ? "destructive" : "secondary"} className="gap-1">
+                  <Badge variant={overdue ? "destructive" : "secondary"} className="gap-1.5 px-2.5 py-1 text-xs font-medium">
                     <CalendarClock className="size-3" />
                     {overdue ? "Overdue" : "Due"} {fmt(h.due_date)}
                   </Badge>

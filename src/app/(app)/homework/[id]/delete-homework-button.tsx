@@ -41,7 +41,7 @@ export function DeleteHomeworkButton({ id, title }: { id: string; title: string 
         <Button
           variant="outline"
           size="sm"
-          className="gap-1.5 text-destructive hover:text-destructive"
+          className="gap-1.5 border-destructive/30 text-destructive transition-all hover:bg-destructive/10 hover:border-destructive/50 hover:text-destructive"
         >
           <Trash2 className="size-4" />
           Delete

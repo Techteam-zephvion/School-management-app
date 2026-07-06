@@ -70,32 +70,35 @@ export default async function HomeworkDetailPage({
     <div className="mx-auto max-w-2xl space-y-6">
       <Link
         href="/homework"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        className="group inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
-        <ArrowLeft className="size-4" /> All homework
+        <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-0.5" /> All homework
       </Link>
 
-      <Card>
-        <CardHeader className="space-y-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <CardTitle className="text-xl">{hw.title}</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">
+      <Card className="overflow-hidden border-0 shadow-md shadow-muted-foreground/5 ring-1 ring-border/50">
+        <CardHeader className="space-y-4 pb-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <CardTitle className="text-xl font-semibold leading-tight">{hw.title}</CardTitle>
+              <p className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+                <span className="inline-flex size-1 rounded-full bg-muted-foreground/40" />
                 {section?.classes?.name} · {section?.name} ·{" "}
                 {(hw.subjects as { name: string } | null)?.name}
               </p>
             </div>
-            <Badge variant={overdue ? "destructive" : "secondary"} className="gap-1">
+            <Badge variant={overdue ? "destructive" : "secondary"} className="gap-1.5 px-2.5 py-1 text-xs font-medium">
               <CalendarClock className="size-3" />
               {overdue ? "Overdue" : "Due"} {fmt(hw.due_date)}
             </Badge>
           </div>
         </CardHeader>
-        <CardContent className="space-y-5">
+        <CardContent className="space-y-6">
           {hw.description ? (
-            <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
-              {hw.description}
-            </p>
+            <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
+              <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
+                {hw.description}
+              </p>
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">No further details.</p>
           )}
@@ -105,15 +108,17 @@ export default async function HomeworkDetailPage({
               href={attachmentUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+              className="inline-flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3 text-sm font-medium shadow-sm transition-all hover:bg-muted/30 hover:shadow"
             >
-              <Paperclip className="size-4 text-muted-foreground" />
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Paperclip className="size-4" />
+              </span>
               <span className="max-w-xs truncate">{attachmentName}</span>
-              <Download className="size-4 text-muted-foreground" />
+              <Download className="ml-auto size-4 text-muted-foreground" />
             </a>
           )}
 
-          <div className="flex items-center justify-between border-t border-border pt-4">
+          <div className="flex items-center justify-between border-t border-border/60 pt-5">
             <p className="text-xs text-muted-foreground">
               Posted by {(hw.profiles as { full_name: string | null } | null)?.full_name ?? "Staff"}
             </p>

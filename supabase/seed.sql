@@ -53,3 +53,16 @@ values
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000c1', 'A', '00000000-0000-0000-0000-0000000000a1'),
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000c1', 'B', '00000000-0000-0000-0000-0000000000a1')
 on conflict (class_id, name, academic_year_id) do nothing;
+
+-- Default grade scale (migrations backfill existing schools, but the seeded
+-- school is created here after migrations run, so seed it too).
+insert into public.grade_scales (school_id, min_percent, max_percent, grade_label)
+values
+  ('00000000-0000-0000-0000-000000000001', 90, 100, 'A+'),
+  ('00000000-0000-0000-0000-000000000001', 80, 89, 'A'),
+  ('00000000-0000-0000-0000-000000000001', 70, 79, 'B+'),
+  ('00000000-0000-0000-0000-000000000001', 60, 69, 'B'),
+  ('00000000-0000-0000-0000-000000000001', 50, 59, 'C'),
+  ('00000000-0000-0000-0000-000000000001', 40, 49, 'D'),
+  ('00000000-0000-0000-0000-000000000001', 0, 39, 'F')
+on conflict (school_id, grade_label) do nothing;
