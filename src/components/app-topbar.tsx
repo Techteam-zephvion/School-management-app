@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, Menu, MessagesSquare, Search } from "lucide-react";
+import Link from "next/link";
+import { Menu, MessagesSquare, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { NotificationBell, type AppNotification } from "@/components/notification-bell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -35,11 +37,15 @@ export function AppTopbar({
   avatarUrl,
   role,
   schoolName,
+  userId,
+  notifications,
 }: {
   fullName: string;
   avatarUrl: string | null;
   role: Role;
   schoolName: string;
+  userId?: string;
+  notifications?: AppNotification[];
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -70,11 +76,11 @@ export function AppTopbar({
       </div>
 
       <div className="ml-auto flex items-center gap-1 sm:gap-2">
-        <Button variant="ghost" size="icon" aria-label="Notifications">
-          <Bell className="size-5" />
-        </Button>
-        <Button variant="ghost" size="icon" aria-label="Messages">
-          <MessagesSquare className="size-5" />
+        {userId ? <NotificationBell userId={userId} initial={notifications ?? []} /> : null}
+        <Button variant="ghost" size="icon" aria-label="Messages" asChild>
+          <Link href="/messages">
+            <MessagesSquare className="size-5" />
+          </Link>
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted">

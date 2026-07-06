@@ -403,6 +403,38 @@ export type Database = {
           },
         ]
       }
+      devices: {
+        Row: {
+          expo_push_token: string
+          id: string
+          last_seen: string
+          platform: string | null
+          user_id: string
+        }
+        Insert: {
+          expo_push_token: string
+          id?: string
+          last_seen?: string
+          platform?: string | null
+          user_id: string
+        }
+        Update: {
+          expo_push_token?: string
+          id?: string
+          last_seen?: string
+          platform?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devices_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       enrollments: {
         Row: {
           academic_year_id: string
@@ -1062,6 +1094,57 @@ export type Database = {
             columns: ["thread_id"]
             isOneToOne: false
             referencedRelation: "message_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          deeplink: string | null
+          id: string
+          read_at: string | null
+          school_id: string
+          title: string
+          type: Database["public"]["Enums"]["notif_type"]
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          deeplink?: string | null
+          id?: string
+          read_at?: string | null
+          school_id: string
+          title: string
+          type: Database["public"]["Enums"]["notif_type"]
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          deeplink?: string | null
+          id?: string
+          read_at?: string | null
+          school_id?: string
+          title?: string
+          type?: Database["public"]["Enums"]["notif_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
