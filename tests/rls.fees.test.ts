@@ -141,6 +141,22 @@ describe("Phase 8: fees, invoices & payments", () => {
     expect(error!.message).toMatch(/exceeds the balance/i);
   });
 
+  test("adding a fee item after payment reopens the invoice with the new balance", async () => {
+    // A1 is fully paid (5000/5000, status paid). Add a 1500 item to the structure.
+    await admin.from("fee_items").insert({ school_id: ctx.schoolId, fee_structure_id: ctx.structureId, label: "Lab", amount: 1500 });
+    const inv = await invoiceFor(ctx.studentA1);
+    expect(Number(inv.amount_total)).toBe(6500); // 5000 + 1500
+    expect(Number(inv.amount_paid)).toBe(5000); // unchanged
+    expect(inv.status).toBe("partial"); // reopened -> 1500 still due
+    // and the new balance is now payable (was previously 0 / rejected)
+    const { error } = await ctx.adminClient
+      .from("payments")
+      .insert({ school_id: ctx.schoolId, invoice_id: inv.id, amount: 1500, method: "cash", status: "captured" });
+    expect(error).toBeNull();
+    const after = await invoiceFor(ctx.studentA1);
+    expect(after.status).toBe("paid");
+  });
+
   test("an invoice past its due date is overdue", async () => {
     const { data: inv } = await ctx.adminClient
       .from("invoices")
