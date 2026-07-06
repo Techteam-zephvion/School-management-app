@@ -43,3 +43,6 @@ next-env.d.ts
 # supabase local dev
 supabase/.branches
 supabase/.temp
+
+# editor backup folders
+**/.backup/
