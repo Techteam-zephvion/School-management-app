@@ -581,6 +581,106 @@ export type Database = {
           },
         ]
       }
+      fee_items: {
+        Row: {
+          amount: number
+          created_at: string
+          fee_structure_id: string
+          id: string
+          label: string
+          school_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          fee_structure_id: string
+          id?: string
+          label: string
+          school_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          fee_structure_id?: string
+          id?: string
+          label?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fee_items_fee_structure_id_fkey"
+            columns: ["fee_structure_id"]
+            isOneToOne: false
+            referencedRelation: "fee_structures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fee_items_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fee_structures: {
+        Row: {
+          academic_year_id: string
+          class_id: string | null
+          created_at: string
+          due_date: string
+          id: string
+          name: string
+          school_id: string
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          academic_year_id: string
+          class_id?: string | null
+          created_at?: string
+          due_date: string
+          id?: string
+          name: string
+          school_id: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          academic_year_id?: string
+          class_id?: string | null
+          created_at?: string
+          due_date?: string
+          id?: string
+          name?: string
+          school_id?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fee_structures_academic_year_id_fkey"
+            columns: ["academic_year_id"]
+            isOneToOne: false
+            referencedRelation: "academic_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fee_structures_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fee_structures_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grade_scales: {
         Row: {
           created_at: string
@@ -690,6 +790,67 @@ export type Database = {
           },
         ]
       }
+      invoices: {
+        Row: {
+          amount_paid: number
+          amount_total: number
+          created_at: string
+          due_date: string
+          fee_structure_id: string
+          id: string
+          school_id: string
+          status: Database["public"]["Enums"]["invoice_status"]
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_paid?: number
+          amount_total: number
+          created_at?: string
+          due_date: string
+          fee_structure_id: string
+          id?: string
+          school_id: string
+          status?: Database["public"]["Enums"]["invoice_status"]
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_paid?: number
+          amount_total?: number
+          created_at?: string
+          due_date?: string
+          fee_structure_id?: string
+          id?: string
+          school_id?: string
+          status?: Database["public"]["Enums"]["invoice_status"]
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_fee_structure_id_fkey"
+            columns: ["fee_structure_id"]
+            isOneToOne: false
+            referencedRelation: "fee_structures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marks: {
         Row: {
           created_at: string
@@ -761,6 +922,70 @@ export type Database = {
             columns: ["term_id"]
             isOneToOne: false
             referencedRelation: "exam_terms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          invoice_id: string
+          method: string
+          paid_at: string
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
+          recorded_by: string | null
+          school_id: string
+          status: Database["public"]["Enums"]["payment_status"]
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          invoice_id: string
+          method?: string
+          paid_at?: string
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          recorded_by?: string | null
+          school_id: string
+          status?: Database["public"]["Enums"]["payment_status"]
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          method?: string
+          paid_at?: string
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          recorded_by?: string | null
+          school_id?: string
+          status?: Database["public"]["Enums"]["payment_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
             referencedColumns: ["id"]
           },
         ]
