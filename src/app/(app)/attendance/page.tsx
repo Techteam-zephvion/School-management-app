@@ -115,9 +115,24 @@ export default async function AttendancePage({
   const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : todayISO();
   const selected = targets.find((t) => t.key === sp.target) ?? null;
 
+  // ---- Holiday? Block marking for that date/section ----
+  let holiday: string | null = null;
+  if (selected) {
+    const { data: hol } = await supabase
+      .from("events")
+      .select("title")
+      .eq("school_id", schoolId)
+      .eq("is_holiday", true)
+      .lte("start_date", date)
+      .gte("end_date", date)
+      .or(`section_id.is.null,section_id.eq.${selected.sectionId}`)
+      .limit(1);
+    holiday = hol?.[0]?.title ?? null;
+  }
+
   // ---- Load the roster + any existing marks for the selected cell ----
   let students: { id: string; name: string; status: AttendStatus | null }[] = [];
-  if (selected) {
+  if (selected && !holiday) {
     const [{ data: enrollments }, existing] = await Promise.all([
       supabase
         .from("enrollments")
@@ -169,7 +184,14 @@ export default async function AttendancePage({
           <AttendancePicker targets={targets} selectedKey={selected?.key ?? ""} date={date} />
 
           {selected ? (
-            students.length > 0 ? (
+            holiday ? (
+              <Alert className="border-amber-200/60 bg-amber-50/60 text-amber-900">
+                <ClipboardCheck className="size-4 text-amber-600" />
+                <AlertDescription>
+                  <span className="font-medium">Holiday: {holiday}.</span> Attendance can&apos;t be marked on this date.
+                </AlertDescription>
+              </Alert>
+            ) : students.length > 0 ? (
               <AttendanceGrid
                 key={`${selected.key}:${date}`}
                 sectionId={selected.sectionId}
