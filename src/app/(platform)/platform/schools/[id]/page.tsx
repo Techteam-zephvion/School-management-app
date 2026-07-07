@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SchoolStatusToggle } from "../school-status-toggle";
+import { DeleteSchoolDialog } from "../delete-school-dialog";
 
 function initials(name: string) {
   return name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "?";
@@ -55,7 +56,10 @@ export default async function PlatformSchoolDetailPage({ params }: { params: Pro
               {[school.city, school.state].filter(Boolean).join(", ") || school.slug}
             </p>
           </div>
-          <SchoolStatusToggle schoolId={school.id} suspended={suspended} name={school.name} />
+          <div className="flex items-center gap-2">
+            <SchoolStatusToggle schoolId={school.id} suspended={suspended} name={school.name} />
+            {suspended && <DeleteSchoolDialog schoolId={school.id} name={school.name} redirectAfter />}
+          </div>
         </CardContent>
       </Card>
 

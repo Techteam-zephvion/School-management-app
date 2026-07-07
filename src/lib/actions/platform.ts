@@ -90,3 +90,22 @@ export async function setSchoolStatus(schoolId: string, status: "active" | "susp
   revalidatePath(`/platform/schools/${schoolId}`);
   return { error: undefined };
 }
+
+/** Permanently delete a school and ALL its data (cascades). Only allowed once
+ *  the school is suspended, and the caller must confirm the exact name. */
+export async function deleteSchool(schoolId: string, confirmName: string): Promise<ActionState> {
+  const guard = await requirePlatformAdmin();
+  if (guard !== true) return guard;
+
+  const admin = createAdminClient();
+  const { data: school } = await admin.from("schools").select("name, status").eq("id", schoolId).maybeSingle();
+  if (!school) return { error: "School not found." };
+  if (school.status !== "suspended") return { error: "Suspend the school before deleting it." };
+  if (confirmName.trim() !== school.name) return { error: "The name you typed doesn't match." };
+
+  // ON DELETE CASCADE removes every dependent row for this tenant.
+  const { error } = await admin.from("schools").delete().eq("id", schoolId);
+  if (error) return { error: error.message };
+  revalidatePath("/platform/schools");
+  return { error: undefined };
+}

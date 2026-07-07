@@ -98,6 +98,23 @@ describe("Phase 12: audit logs + platform", () => {
     expect(adminErr).not.toBeNull();
   });
 
+  test("deleting a school cascades all its data; a school admin cannot delete", async () => {
+    // school admin cannot delete their own school
+    await ctx.adminA.from("schools").delete().eq("id", ctx.schoolAId);
+    const { data: still } = await admin.from("schools").select("id").eq("id", ctx.schoolAId);
+    expect(still ?? []).toHaveLength(1);
+
+    // create a throwaway school with a student, then delete via service role (as
+    // the platform action does) and confirm the student is gone (cascade)
+    const { data: tmp } = await admin.from("schools").insert({ name: `Tmp ${rand()}`, status: "suspended" }).select().single();
+    const { data: stu } = await admin.from("students").insert({ school_id: tmp!.id, admission_no: `T-${rand()}`, first_name: "Tmp" }).select().single();
+    await admin.from("schools").delete().eq("id", tmp!.id);
+    const { data: goneSchool } = await admin.from("schools").select("id").eq("id", tmp!.id);
+    const { data: goneStudent } = await admin.from("students").select("id").eq("id", stu!.id);
+    expect(goneSchool ?? []).toHaveLength(0);
+    expect(goneStudent ?? []).toHaveLength(0); // cascaded
+  });
+
   test("a platform admin can suspend a school; a school admin cannot touch another school", async () => {
     const { error } = await ctx.platform.from("schools").update({ status: "suspended" }).eq("id", ctx.schoolBId);
     expect(error).toBeNull();

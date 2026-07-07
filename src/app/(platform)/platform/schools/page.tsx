@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CreateSchoolDialog } from "./create-school-dialog";
 import { SchoolStatusToggle } from "./school-status-toggle";
+import { DeleteSchoolDialog } from "./delete-school-dialog";
 
 function fmt(d: string) {
   return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
@@ -75,6 +76,7 @@ export default async function PlatformSchoolsPage() {
                     </div>
                   </Link>
                   <SchoolStatusToggle schoolId={s.id} suspended={suspended} name={s.name} />
+                  {suspended && <DeleteSchoolDialog schoolId={s.id} name={s.name} />}
                   <Link href={`/platform/schools/${s.id}`} aria-label="Open school" className="text-muted-foreground hover:text-foreground">
                     <ChevronRight className="size-4" />
                   </Link>
