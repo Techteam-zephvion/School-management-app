@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveMembership } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/actions/auth";
+import { functionErrorMessage } from "@/lib/supabase/function-error";
 
 const inviteStaffSchema = z.object({
   fullName: z.string().min(2, { error: "Enter a full name." }),
@@ -40,8 +41,9 @@ export async function inviteStaffMember(
     },
   });
 
-  if (error || data?.error) {
-    return { error: data?.error ?? error?.message ?? "Could not send invite." };
+  const inviteError = await functionErrorMessage(data, error, "Could not send invite.");
+  if (inviteError) {
+    return { error: inviteError };
   }
 
   revalidatePath("/settings/staff");

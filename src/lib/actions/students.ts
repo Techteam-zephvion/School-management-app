@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveMembership, getAuthUser, type Membership } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/actions/auth";
+import { functionErrorMessage } from "@/lib/supabase/function-error";
 
 async function requireAdmin(): Promise<
   { membership: Membership } | { error: string }
@@ -324,8 +325,9 @@ export async function inviteGuardian(
       phone: parsed.data.phone || undefined,
     },
   });
-  if (error || data?.error || !data?.userId) {
-    return { error: data?.error ?? error?.message ?? "Could not invite guardian." };
+  const inviteError = await functionErrorMessage(data, error, "Could not invite guardian.");
+  if (inviteError || !data?.userId) {
+    return { error: inviteError ?? "Could not invite guardian." };
   }
 
   // First guardian for a student is primary by default.

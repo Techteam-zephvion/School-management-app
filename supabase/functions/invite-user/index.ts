@@ -23,6 +23,17 @@ const ROLE_LABELS: Record<InviteRole, string> = {
   parent: "Parent / Guardian",
 };
 
+// GoTrue serializes some upstream SMTP failures (e.g. Resend refusing a
+// recipient because the sending domain isn't verified) as an empty "{}" body,
+// which is useless to the admin. Turn those into an actionable message.
+function inviteEmailError(err: { message?: string } | null | undefined): string {
+  const raw = (err?.message ?? "").trim();
+  if (!raw || raw === "{}" || raw === "{}\n") {
+    return "Could not send the invitation email. If you use a custom SMTP provider (e.g. Resend), verify your sending domain and sender address, then try again.";
+  }
+  return raw;
+}
+
 // Readable one-time password for parent accounts (no ambiguous 0/O/1/l/I).
 function generatePassword(length = 10): string {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -157,7 +168,7 @@ export default {
         });
       if (inviteError || !invited?.user) {
         return Response.json(
-          { error: inviteError?.message ?? "Could not send invite." },
+          { error: inviteEmailError(inviteError) },
           { status: 400 }
         );
       }
@@ -183,7 +194,7 @@ export default {
         });
       if (inviteError || !invited?.user) {
         return Response.json(
-          { error: inviteError?.message ?? "Could not send invite." },
+          { error: inviteEmailError(inviteError) },
           { status: 400 }
         );
       }
