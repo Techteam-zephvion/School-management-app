@@ -60,6 +60,7 @@ export default async function FeesPage() {
       .select("id, name, class_id, total_amount, due_date, classes(name), fee_items(id, label, amount), invoices(id)")
       .eq("school_id", schoolId)
       .eq("academic_year_id", activeYear.id)
+      .eq("is_transport", false) // auto-managed transport container is hidden here
       .order("created_at", { ascending: false }),
     supabase
       .from("invoices")

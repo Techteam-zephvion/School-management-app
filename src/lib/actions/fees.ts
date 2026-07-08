@@ -117,6 +117,7 @@ export async function generateInvoices(structureId: string): Promise<ActionState
     .select("id, academic_year_id, class_id, total_amount, due_date")
     .eq("id", structureId)
     .eq("school_id", schoolId)
+    .eq("is_transport", false) // transport charges are managed by the transport module
     .maybeSingle();
   if (!structure) return { error: "Fee structure not found." };
   if (Number(structure.total_amount) <= 0) return { error: "Add at least one fee item first." };
