@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireActiveMembership, getAuthUser, type Membership } from "@/lib/auth/session";
 import type { ActionState } from "@/lib/actions/auth";
 
@@ -10,6 +11,41 @@ async function requireAdmin(): Promise<{ membership: Membership } | { error: str
   const membership = await requireActiveMembership();
   if (membership.role !== "school_admin") return { error: "Only school admins can manage transport." };
   return { membership };
+}
+
+/** Roster changes (assign/remove) are allowed for an admin of the student's
+ *  school, or the class teacher of the student's section — the latter only for
+ *  their own class's students. Reads use the caller's RLS-scoped client so the
+ *  class check can't be spoofed. */
+async function authorizeRoster(studentId: string): Promise<{ schoolId: string } | { error: string }> {
+  const membership = await requireActiveMembership();
+  const supabase = await createClient();
+  const { data: student } = await supabase.from("students").select("school_id").eq("id", studentId).maybeSingle();
+  if (!student || student.school_id !== membership.schoolId) return { error: "Student not found." };
+  if (membership.role === "school_admin") return { schoolId: membership.schoolId };
+  if (membership.role === "teacher") {
+    const user = await getAuthUser();
+    const { data: staff } = await supabase
+      .from("staff")
+      .select("id")
+      .eq("school_id", membership.schoolId)
+      .eq("user_id", user?.id ?? "")
+      .maybeSingle();
+    if (staff) {
+      const { data: sections } = await supabase.from("sections").select("id").eq("class_teacher_staff_id", staff.id);
+      const secIds = (sections ?? []).map((s) => s.id);
+      if (secIds.length) {
+        const { data: enr } = await supabase
+          .from("enrollments")
+          .select("student_id")
+          .in("section_id", secIds)
+          .eq("student_id", studentId)
+          .eq("status", "active");
+        if ((enr ?? []).length) return { schoolId: membership.schoolId };
+      }
+    }
+  }
+  return { error: "Only the class teacher or an admin can change this student's bus." };
 }
 async function requireStaff(): Promise<{ membership: Membership } | { error: string }> {
   const membership = await requireActiveMembership();
@@ -197,16 +233,18 @@ const assignSchema = z.object({
 });
 
 export async function assignStudentToBus(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const guard = await requireAdmin();
-  if ("error" in guard) return guard;
   const parsed = assignSchema.safeParse({
     studentId: formData.get("studentId"),
     routeId: formData.get("routeId"),
     stopId: formData.get("stopId") ?? "",
   });
   if (!parsed.success) return { error: firstError(parsed.error) };
-  const supabase = await createClient();
-  const schoolId = guard.membership.schoolId;
+  const auth = await authorizeRoster(parsed.data.studentId);
+  if ("error" in auth) return auth;
+  const schoolId = auth.schoolId;
+  // Authorized above; use the service role for the writes since the fee invoice
+  // and container are otherwise admin-only (a class teacher can't write them).
+  const supabase = createAdminClient();
 
   const { data: route } = await supabase
     .from("bus_routes")
@@ -216,6 +254,16 @@ export async function assignStudentToBus(_prev: ActionState, formData: FormData)
     .maybeSingle();
   if (!route) return { error: "Route not found." };
   const fee = Number(route.fee_amount);
+  // If a stop was chosen it must belong to this route.
+  if (parsed.data.stopId) {
+    const { data: stop } = await supabase
+      .from("bus_stops")
+      .select("id")
+      .eq("id", parsed.data.stopId)
+      .eq("route_id", parsed.data.routeId)
+      .maybeSingle();
+    if (!stop) return { error: "That stop isn't on this route." };
+  }
 
   const { error: assignErr } = await supabase.from("student_transport").upsert(
     {
@@ -266,12 +314,11 @@ async function removeTransportInvoice(supabase: Awaited<ReturnType<typeof create
 }
 
 export async function removeStudentFromBus(studentId: string): Promise<ActionState> {
-  const guard = await requireAdmin();
-  if ("error" in guard) return guard;
-  const supabase = await createClient();
-  const schoolId = guard.membership.schoolId;
+  const auth = await authorizeRoster(studentId);
+  if ("error" in auth) return auth;
+  const supabase = createAdminClient();
   await removeTransportInvoice(supabase, studentId);
-  const { error } = await supabase.from("student_transport").delete().eq("student_id", studentId).eq("school_id", schoolId);
+  const { error } = await supabase.from("student_transport").delete().eq("student_id", studentId).eq("school_id", auth.schoolId);
   if (error) return { error: error.message };
   revalidatePath("/transport");
   revalidatePath("/settings/fees");

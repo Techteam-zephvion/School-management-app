@@ -114,16 +114,29 @@ export default async function TransportPage() {
     }
   }
   const myRiders = riders.filter((r) => myStudentIds.has(r.studentId));
-  const myRouteIds = new Set(myRiders.map((r) => r.routeId));
-  const myRoutes = routeRows.filter((r) => myRouteIds.has(r.id));
-  const myLocs = locs.filter((l) => myRouteIds.has(l.route_id));
 
+  // Their class students (names) minus anyone already on a bus → the picker list.
+  let classStudents: { id: string; name: string; admissionNo: string }[] = [];
+  if (myStudentIds.size) {
+    const { data } = await supabase
+      .from("students")
+      .select("id, first_name, last_name, admission_no")
+      .in("id", [...myStudentIds])
+      .order("first_name");
+    classStudents = (data ?? []).map((s) => ({ id: s.id, name: fullName(s.first_name, s.last_name), admissionNo: s.admission_no }));
+  }
+  const riderIds = new Set(myRiders.map((r) => r.studentId));
+  const available = classStudents.filter((s) => !riderIds.has(s.id));
+
+  // All routes/stops are pickable; the map only shows buses the class rides
+  // (bus_locations is RLS-filtered to the teacher's trackable routes).
   return (
     <TransportClassTeacher
-      routes={myRoutes}
-      stops={stopRows.filter((s) => myRouteIds.has(s.route_id))}
+      routes={routeRows}
+      stops={stopRows}
       riders={myRiders}
-      locations={myLocs}
+      available={available}
+      locations={locs}
       userId={userId}
     />
   );
