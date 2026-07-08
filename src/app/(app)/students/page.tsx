@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, Users } from "lucide-react";
+import { ChevronRight, GraduationCap, Users } from "lucide-react";
 import { requireActiveMembership, getAuthUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -95,11 +96,14 @@ export default async function StudentsPage() {
     canAdd = mySectionIds.size > 0;
   }
 
+  const totalStudents = students?.length ?? 0;
+  const enrolledCount = enrollments?.length ?? 0;
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 pb-8">
       <PageHeader
         title="Students"
-        description={`${students?.length ?? 0} students at ${membership.schoolName}.`}
+        description={`${totalStudents} student${totalStudents !== 1 ? "s" : ""} enrolled at ${membership.schoolName}.`}
         action={
           canAdd ? (
             <AddStudentDialog
@@ -111,50 +115,115 @@ export default async function StudentsPage() {
         }
       />
 
-      <Card>
-        <CardContent className="divide-y divide-border p-0">
-          {!students || students.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-12 text-center">
-              <Users className="size-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                No students yet.{canAdd ? " Add your first student above." : ""}
+      {/* Summary stat cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm shadow-slate-950/5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Total students
+              </p>
+              <p className="mt-1 truncate text-2xl font-bold text-slate-950">{totalStudents}</p>
+              <p className="mt-1 truncate text-xs text-slate-500">Active school records</p>
+            </div>
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+              <GraduationCap className="size-5" />
+            </span>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm shadow-slate-950/5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Currently enrolled
+              </p>
+              <p className="mt-1 truncate text-2xl font-bold text-slate-950">{enrolledCount}</p>
+              <p className="mt-1 truncate text-xs text-slate-500">
+                {activeYear?.name ?? "No active year"}
               </p>
             </div>
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+              <Users className="size-5" />
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Students list */}
+      <Card className="overflow-hidden border border-slate-200/80 bg-white/95 shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+        <CardContent className="p-0">
+          {!students || students.length === 0 ? (
+            <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 px-4 py-12 text-center">
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-white text-slate-500 ring-1 ring-slate-200">
+                <Users className="size-5" />
+              </span>
+              <div>
+                <p className="text-sm font-medium text-slate-900">No students yet</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {canAdd ? "Add your first student to get started." : ""}
+                </p>
+              </div>
+            </div>
           ) : (
-            students.map((s) => {
-              const name = `${s.first_name} ${s.last_name ?? ""}`.trim();
-              const section = sectionByStudent.get(s.id);
-              const guardians = guardianCount.get(s.id) ?? 0;
-              return (
-                <Link
-                  key={s.id}
-                  href={`/students/${s.id}`}
-                  className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
-                >
-                  <Avatar className="size-9">
-                    <AvatarFallback>{initials(s.first_name, s.last_name)}</AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      #{s.admission_no}
-                      {section ? ` · ${section}` : " · Not enrolled"}
-                    </p>
-                  </div>
-                  {guardians > 0 && (
-                    <Badge variant="secondary" className="gap-1">
-                      <Users className="size-3" /> {guardians}
-                    </Badge>
-                  )}
-                  {s.status !== "active" && (
-                    <Badge variant="warning" className="capitalize">
-                      {s.status}
-                    </Badge>
-                  )}
-                  <ChevronRight className="size-4 text-muted-foreground" />
-                </Link>
-              );
-            })
+            <div className="divide-y divide-slate-100">
+              {students.map((s, idx) => {
+                const name = `${s.first_name} ${s.last_name ?? ""}`.trim();
+                const section = sectionByStudent.get(s.id);
+                const guardians = guardianCount.get(s.id) ?? 0;
+                return (
+                  <Link
+                    key={s.id}
+                    href={`/students/${s.id}`}
+                    className={cn(
+                      "flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-blue-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                      idx === 0 && "rounded-t-2xl"
+                    )}
+                  >
+                    <Avatar className="size-10 ring-1 ring-blue-100">
+                      <AvatarFallback className="bg-blue-50 text-sm font-semibold text-blue-700">
+                        {initials(s.first_name, s.last_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-slate-900">{name}</p>
+                        {s.status !== "active" && (
+                          <Badge variant="warning" className="shrink-0 text-[10px] capitalize">
+                            {s.status}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                        <span className="font-medium text-slate-600">#{s.admission_no}</span>
+                        {section ? (
+                          <>
+                            <span className="mx-1.5 text-slate-300">·</span>
+                            {section}
+                          </>
+                        ) : (
+                          <>
+                            <span className="mx-1.5 text-slate-300">·</span>
+                            <span className="text-amber-600">Not enrolled</span>
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                      {guardians > 0 && (
+                        <Badge
+                          variant="secondary"
+                          className="gap-1 border-slate-200 bg-slate-50 text-xs font-medium text-slate-600"
+                        >
+                          <Users className="size-3" />
+                          {guardians}
+                        </Badge>
+                      )}
+                      <ChevronRight className="size-4 text-slate-400" />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
           )}
         </CardContent>
       </Card>

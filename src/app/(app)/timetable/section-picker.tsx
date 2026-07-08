@@ -20,7 +20,7 @@ export function SectionPicker({ sections, selected }: { sections: SectionOption[
       onValueChange={(v) => startTransition(() => router.push(`/timetable?section=${v}`))}
       disabled={isPending || sections.length === 0}
     >
-      <SelectTrigger className="w-48 rounded-lg">
+      <SelectTrigger className="w-48 rounded-xl border-slate-200/80 bg-white shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
         <SelectValue placeholder="Choose section" />
       </SelectTrigger>
       <SelectContent>

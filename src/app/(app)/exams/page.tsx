@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CreateTermDialog } from "./create-term-dialog";
 
 function fmt(d: string) {
@@ -29,12 +28,16 @@ export default async function ExamsPage() {
 
   if (!activeYear) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6">
+      <div className="mx-auto max-w-7xl space-y-6 pb-8">
         <PageHeader title="Marks & Exams" description="Exam terms, mark entry and results." />
-        <Alert className="border-amber-200/60 bg-amber-50/60 text-amber-900">
-          <CalendarClock className="size-4 text-amber-600" />
-          <AlertDescription>Set an active academic year and create sections first.</AlertDescription>
-        </Alert>
+        <div className="flex min-h-[180px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center">
+          <span className="flex size-12 items-center justify-center rounded-2xl bg-white text-slate-500 ring-1 ring-slate-200">
+            <CalendarClock className="size-5" />
+          </span>
+          <p className="max-w-xs text-sm text-slate-500">
+            Set an active academic year and create sections first.
+          </p>
+        </div>
       </div>
     );
   }
@@ -47,58 +50,65 @@ export default async function ExamsPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 pb-8">
       <PageHeader
         title="Marks & Exams"
         description={`Exam terms for ${activeYear.name}.`}
         action={isAdmin ? <CreateTermDialog /> : undefined}
       />
 
-      <Card className="overflow-hidden border-0 shadow-md shadow-muted-foreground/5 ring-1 ring-border/50">
-        <CardContent className="divide-y divide-border/60 p-0">
+      <Card className="overflow-hidden border border-slate-200/80 bg-white/95 shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+        <CardContent className="p-0">
           {!terms || terms.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <span className="flex size-12 items-center justify-center rounded-2xl bg-muted/60">
-                <GraduationCap className="size-6 text-muted-foreground/70" />
+            <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 px-4 py-12 text-center">
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-white text-slate-500 ring-1 ring-slate-200">
+                <GraduationCap className="size-5" />
               </span>
-              <p className="text-sm font-medium text-muted-foreground">No exam terms yet.</p>
-              <p className="text-xs text-muted-foreground/70">
-                {isAdmin
-                  ? "Create a term to start setting up subjects and marks."
-                  : "Your admin will add exam terms here."}
-              </p>
+              <div>
+                <p className="text-sm font-medium text-slate-900">No exam terms yet</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {isAdmin
+                    ? "Create a term to start setting up subjects and marks."
+                    : "Your admin will add exam terms here."}
+                </p>
+              </div>
             </div>
           ) : (
-            terms.map((t) => {
-              const subjectCount = (t.exam_subjects as { id: string }[] | null)?.length ?? 0;
-              return (
-                <Link
-                  key={t.id}
-                  href={`/exams/${t.id}`}
-                  className="group flex items-center gap-4 px-5 py-4 transition-all hover:bg-muted/40"
-                >
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/15">
-                    <GraduationCap className="size-5" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{t.name}</p>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {subjectCount} {subjectCount === 1 ? "subject" : "subjects"} · created {fmt(t.created_at)}
-                    </p>
-                  </div>
-                  {t.is_published ? (
-                    <Badge variant="success" className="gap-1 px-2.5 py-1 text-xs font-medium">
-                      <CheckCircle2 className="size-3" /> Published
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary" className="gap-1 px-2.5 py-1 text-xs font-medium">
-                      <PencilLine className="size-3" /> Draft
-                    </Badge>
-                  )}
-                  <ChevronRight className="size-4 text-muted-foreground" />
-                </Link>
-              );
-            })
+            <div className="divide-y divide-slate-100">
+              {terms.map((t, idx) => {
+                const subjectCount = (t.exam_subjects as { id: string }[] | null)?.length ?? 0;
+                return (
+                  <Link
+                    key={t.id}
+                    href={`/exams/${t.id}`}
+                    className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-blue-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  >
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                      <GraduationCap className="size-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-slate-900">{t.name}</p>
+                        {t.is_published ? (
+                          <Badge variant="success" className="gap-1 text-[10px]">
+                            <CheckCircle2 className="size-3" /> Published
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="gap-1 text-[10px]">
+                            <PencilLine className="size-3" /> Draft
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                        {subjectCount} {subjectCount === 1 ? "subject" : "subjects"} · created{" "}
+                        {fmt(t.created_at)}
+                      </p>
+                    </div>
+                    <ChevronRight className="size-4 text-slate-400" />
+                  </Link>
+                );
+              })}
+            </div>
           )}
         </CardContent>
       </Card>

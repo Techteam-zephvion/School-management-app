@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CreateHomeworkDialog } from "./create-homework-dialog";
 
 export type HomeworkTarget = {
@@ -112,7 +111,7 @@ export default async function HomeworkPage() {
   const today = todayISO();
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6">
       <PageHeader
         title="Homework"
         description="Assignments for your classes."
@@ -124,24 +123,42 @@ export default async function HomeworkPage() {
       />
 
       {targets.length === 0 && membership.role !== "school_admin" && (
-        <Alert className="border-amber-200/60 bg-amber-50/60 text-amber-900">
-          <BookOpen className="size-4 text-amber-600" />
-          <AlertDescription>
-            You have no classes to assign homework for. A class teacher or subject teacher can post
-            homework once assigned in Roles.
-          </AlertDescription>
-        </Alert>
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200/60 bg-amber-50/60 p-4">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+            <BookOpen className="size-4.5" />
+          </span>
+          <div className="min-w-0 flex-1 pt-0.5">
+            <p className="text-sm font-medium text-amber-900">No classes assigned</p>
+            <p className="mt-0.5 text-xs text-amber-700/80">
+              You have no classes to assign homework for. A class teacher or subject teacher can post
+              homework once assigned in Roles.
+            </p>
+          </div>
+        </div>
       )}
 
-      <Card className="overflow-hidden border-0 shadow-md shadow-muted-foreground/5 ring-1 ring-border/50">
-        <CardContent className="divide-y divide-border/60 p-0">
+      <Card className="overflow-hidden border border-slate-200/80 bg-white shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+        <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+            <BookOpen className="size-4.5" />
+          </span>
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">All homework</h2>
+            <p className="text-xs text-slate-500">
+              {homework?.length ?? 0} assignment{(homework?.length ?? 0) !== 1 ? "s" : ""}
+            </p>
+          </div>
+        </div>
+        <CardContent className="divide-y divide-slate-100 p-0">
           {!homework || homework.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <span className="flex size-12 items-center justify-center rounded-2xl bg-muted/60">
-                <BookOpen className="size-6 text-muted-foreground/70" />
+            <div className="flex flex-col items-center gap-3 px-5 py-16 text-center">
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 ring-1 ring-slate-200">
+                <BookOpen className="size-6" />
               </span>
-              <p className="text-sm font-medium text-muted-foreground">No homework posted yet.</p>
-              <p className="text-xs text-muted-foreground/70">Assignments will appear here once posted.</p>
+              <div>
+                <p className="text-sm font-medium text-slate-700">No homework posted yet</p>
+                <p className="mt-0.5 text-xs text-slate-500">Assignments will appear here once posted.</p>
+              </div>
             </div>
           ) : (
             homework.map((h) => {
@@ -151,22 +168,25 @@ export default async function HomeworkPage() {
                 <Link
                   key={h.id}
                   href={`/homework/${h.id}`}
-                  className="group flex items-center gap-4 px-5 py-4 transition-all hover:bg-muted/40"
+                  className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-blue-50/60"
                 >
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/15 group-hover:shadow-sm">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100 transition-colors group-hover:bg-blue-100">
                     <BookOpen className="size-5" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
+                    <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-900">
                       {h.title}
-                      {h.attachment_url && <Paperclip className="size-3.5 shrink-0 text-muted-foreground/60" />}
+                      {h.attachment_url && <Paperclip className="size-3.5 shrink-0 text-slate-400" />}
                     </p>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
                       {section?.classes?.name} · {section?.name} ·{" "}
                       {(h.subjects as { name: string } | null)?.name}
                     </p>
                   </div>
-                  <Badge variant={overdue ? "destructive" : "secondary"} className="gap-1.5 px-2.5 py-1 text-xs font-medium">
+                  <Badge
+                    variant={overdue ? "destructive" : "secondary"}
+                    className="shrink-0 gap-1.5 px-2.5 py-1 text-xs font-medium"
+                  >
                     <CalendarClock className="size-3" />
                     {overdue ? "Overdue" : "Due"} {fmt(h.due_date)}
                   </Badge>

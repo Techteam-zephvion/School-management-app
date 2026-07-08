@@ -43,13 +43,13 @@ export function EditStudentDialog({ student }: { student: Tables<"students"> }) 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
+        <Button variant="outline" size="sm" className="gap-2 border-slate-200/80 text-slate-700 hover:bg-slate-50 hover:text-slate-900">
           <Pencil className="size-4" /> Edit
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl border-slate-200/80 shadow-xl shadow-slate-950/10">
         <DialogHeader>
-          <DialogTitle>Edit student</DialogTitle>
+          <DialogTitle className="text-xl font-bold tracking-tight text-slate-900">Edit student</DialogTitle>
         </DialogHeader>
         <form action={formAction} className="space-y-4">
           <input type="hidden" name="studentId" value={student.id} />
@@ -57,22 +57,22 @@ export function EditStudentDialog({ student }: { student: Tables<"students"> }) 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="firstName">First name</Label>
-              <Input id="firstName" name="firstName" defaultValue={student.first_name} required />
+              <Input id="firstName" name="firstName" defaultValue={student.first_name} required className="border-slate-200/80 focus-visible:ring-blue-500" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lastName">Last name</Label>
-              <Input id="lastName" name="lastName" defaultValue={student.last_name ?? ""} />
+              <Input id="lastName" name="lastName" defaultValue={student.last_name ?? ""} className="border-slate-200/80 focus-visible:ring-blue-500" />
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="dob">Date of birth</Label>
-              <Input id="dob" name="dob" type="date" defaultValue={student.dob ?? ""} />
+              <Input id="dob" name="dob" type="date" defaultValue={student.dob ?? ""} className="border-slate-200/80 focus-visible:ring-blue-500" />
             </div>
             <div className="space-y-2">
               <Label>Gender</Label>
               <Select value={gender} onValueChange={setGender}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full border-slate-200/80 focus-visible:ring-blue-500">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
@@ -86,16 +86,21 @@ export function EditStudentDialog({ student }: { student: Tables<"students"> }) 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="bloodGroup">Blood group</Label>
-              <Input id="bloodGroup" name="bloodGroup" defaultValue={student.blood_group ?? ""} placeholder="O+" />
+              <Input id="bloodGroup" name="bloodGroup" defaultValue={student.blood_group ?? ""} placeholder="O+" className="border-slate-200/80 focus-visible:ring-blue-500" />
             </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="address">Address</Label>
-            <Input id="address" name="address" defaultValue={student.address ?? ""} />
+            <Input id="address" name="address" defaultValue={student.address ?? ""} className="border-slate-200/80 focus-visible:ring-blue-500" />
           </div>
-          {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
+          {state?.error && (
+            <p className="rounded-lg border border-red-100 bg-red-50/80 px-3 py-2 text-sm text-red-700">
+              {state.error}
+            </p>
+          )}
           <DialogFooter>
-            <Button type="submit" disabled={pending} className="gap-2">
+            <Button              type="submit" disabled={pending} className="gap-2 bg-[#10203f] text-white hover:bg-[#1b2d5e]"
+            >
               {pending && <Loader2 className="size-4 animate-spin" />}
               {pending ? "Saving…" : "Save changes"}
             </Button>

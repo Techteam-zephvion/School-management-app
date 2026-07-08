@@ -56,14 +56,14 @@ export function AddStudentDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
+        <Button className="gap-2 bg-[#10203f] text-white hover:bg-[#1b2d5e]">
           <UserPlus className="size-4" /> Add student
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl border-slate-200/80 shadow-xl shadow-slate-950/10">
         <DialogHeader>
-          <DialogTitle>Add a student</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-xl font-bold tracking-tight text-slate-900">Add a student</DialogTitle>
+          <DialogDescription className="text-slate-500">
             Enrolment and guardians can be added afterwards too.
           </DialogDescription>
         </DialogHeader>
@@ -74,34 +74,34 @@ export function AddStudentDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="admissionNo">Admission no.</Label>
-              <Input id="admissionNo" name="admissionNo" placeholder="ADM-2025-001" required />
+              <Input id="admissionNo" name="admissionNo" placeholder="ADM-2025-001" required className="border-slate-200/80 focus-visible:ring-blue-500" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="rollNo">Roll no. (optional)</Label>
-              <Input id="rollNo" name="rollNo" placeholder="12" />
+              <Input id="rollNo" name="rollNo" placeholder="12" className="border-slate-200/80 focus-visible:ring-blue-500" />
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="firstName">First name</Label>
-              <Input id="firstName" name="firstName" required />
+              <Input id="firstName" name="firstName" required className="border-slate-200/80 focus-visible:ring-blue-500" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lastName">Last name</Label>
-              <Input id="lastName" name="lastName" />
+              <Input id="lastName" name="lastName" className="border-slate-200/80 focus-visible:ring-blue-500" />
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="dob">Date of birth</Label>
-              <Input id="dob" name="dob" type="date" />
+              <Input id="dob" name="dob" type="date" className="border-slate-200/80 focus-visible:ring-blue-500" />
             </div>
             <div className="space-y-2">
               <Label>Gender</Label>
               <Select value={gender} onValueChange={setGender}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full border-slate-200/80 focus-visible:ring-blue-500">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
@@ -120,7 +120,7 @@ export function AddStudentDialog({
               onValueChange={setSectionId}
               disabled={!hasActiveYear || sections.length === 0}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full border-slate-200/80 focus-visible:ring-blue-500">
                 <SelectValue
                   placeholder={
                     !hasActiveYear
@@ -141,13 +141,17 @@ export function AddStudentDialog({
             </Select>
           </div>
 
-          {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
+          {state?.error && (
+            <p className="rounded-lg border border-red-100 bg-red-50/80 px-3 py-2 text-sm text-red-700">
+              {state.error}
+            </p>
+          )}
 
           <DialogFooter>
             <Button
               type="submit"
               disabled={pending || (sectionRequired && !sectionId)}
-              className="gap-2"
+              className="gap-2 bg-[#10203f] text-white hover:bg-[#1b2d5e]"
             >
               {pending && <Loader2 className="size-4 animate-spin" />}
               {pending ? "Adding…" : "Add student"}

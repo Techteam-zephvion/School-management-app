@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Cake, Droplet, MapPin, IdCard } from "lucide-react";
+import { ArrowLeft, Cake, Droplet, MapPin, IdCard, GraduationCap } from "lucide-react";
 import { requireActiveMembership, getAuthUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -130,43 +130,60 @@ export default async function StudentProfilePage({
   const name = `${student.first_name} ${student.last_name ?? ""}`.trim();
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6 pb-8">
+      {/* Back link */}
       <Link
         href="/students"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
       >
         <ArrowLeft className="size-4" /> All students
       </Link>
 
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-4 py-5">
-          <Avatar className="size-16">
-            <AvatarFallback className="text-lg">
+      {/* Profile hero card */}
+      <Card className="overflow-hidden border border-slate-200/80 bg-white/95 shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+        <div className="h-1.5 bg-gradient-to-r from-blue-500/60 via-blue-400/40 to-transparent" />
+        <CardContent className="flex flex-wrap items-center gap-5 py-6">
+          <Avatar className="size-16 ring-2 ring-blue-100">
+            <AvatarFallback className="bg-blue-50 text-lg font-bold text-blue-700">
               {`${student.first_name[0] ?? ""}${student.last_name?.[0] ?? ""}`.toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight">{name}</h1>
+              <h1 className="text-xl font-bold tracking-tight text-slate-900">{name}</h1>
               {student.status !== "active" && (
-                <Badge variant="warning" className="capitalize">{student.status}</Badge>
+                <Badge variant="warning" className="shrink-0 capitalize">{student.status}</Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">
-              #{student.admission_no}
-              {enrolled?.sections
-                ? ` · ${enrolled.sections.classes?.name ?? ""} · ${enrolled.sections.name}`
-                : " · Not enrolled"}
+            <p className="mt-1 text-sm text-slate-500">
+              <span className="font-medium text-slate-600">#{student.admission_no}</span>
+              {enrolled?.sections ? (
+                <>
+                  <span className="mx-1.5 text-slate-300">·</span>
+                  {enrolled.sections.classes?.name ?? ""} · {enrolled.sections.name}
+                </>
+              ) : (
+                <>
+                  <span className="mx-1.5 text-slate-300">·</span>
+                  <span className="text-amber-600">Not enrolled</span>
+                </>
+              )}
             </p>
           </div>
           {canManageStudent && <EditStudentDialog student={student} />}
         </CardContent>
       </Card>
 
+      {/* Details and Enrollment */}
       <div className="grid gap-6 sm:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Details</CardTitle>
+        <Card className="border border-slate-200/80 bg-white/95 shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+              <span className="flex size-8 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                <IdCard className="size-4" />
+              </span>
+              Details
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <Detail icon={IdCard} label="Gender" value={student.gender ?? "—"} />
@@ -206,11 +223,13 @@ function Detail({
   value: string;
 }) {
   return (
-    <div className="flex items-start gap-2.5">
-      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-      <div>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="font-medium capitalize">{value}</p>
+    <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3.5 py-3">
+      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-white text-slate-500 ring-1 ring-slate-200">
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+        <p className="mt-0.5 font-medium text-slate-900 capitalize">{value}</p>
       </div>
     </div>
   );

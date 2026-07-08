@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, CalendarClock, Paperclip, Download } from "lucide-react";
+import { ArrowLeft, CalendarClock, Paperclip, Download, BookOpen } from "lucide-react";
 import { requireActiveMembership, getAuthUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DeleteHomeworkButton } from "./delete-homework-button";
 
@@ -67,65 +66,90 @@ export default async function HomeworkDetailPage({
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <Link
         href="/homework"
-        className="group inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="group inline-flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-900"
       >
         <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-0.5" /> All homework
       </Link>
 
-      <Card className="overflow-hidden border-0 shadow-md shadow-muted-foreground/5 ring-1 ring-border/50">
-        <CardHeader className="space-y-4 pb-5">
+      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+
+        <div className="space-y-6 p-6">
+          {/* Header */}
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <CardTitle className="text-xl font-semibold leading-tight">{hw.title}</CardTitle>
-              <p className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
-                <span className="inline-flex size-1 rounded-full bg-muted-foreground/40" />
-                {section?.classes?.name} · {section?.name} ·{" "}
-                {(hw.subjects as { name: string } | null)?.name}
-              </p>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                  <BookOpen className="size-5" />
+                </span>
+                <div>
+                  <h1 className="text-lg font-bold tracking-tight text-slate-900">{hw.title}</h1>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {section?.classes?.name} · {section?.name} ·{" "}
+                    {(hw.subjects as { name: string } | null)?.name}
+                  </p>
+                </div>
+              </div>
             </div>
-            <Badge variant={overdue ? "destructive" : "secondary"} className="gap-1.5 px-2.5 py-1 text-xs font-medium">
-              <CalendarClock className="size-3" />
+            <Badge
+              variant={overdue ? "destructive" : "secondary"}
+              className="shrink-0 gap-1.5 px-3 py-1.5 text-xs font-medium"
+            >
+              <CalendarClock className="size-3.5" />
               {overdue ? "Overdue" : "Due"} {fmt(hw.due_date)}
             </Badge>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {hw.description ? (
-            <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
-              <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
+
+          {/* Description */}
+          <div className="rounded-xl border border-slate-200/60 bg-slate-50/60 p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="flex size-6 items-center justify-center rounded-lg bg-blue-100 text-blue-700 ring-1 ring-blue-200">
+                <BookOpen className="size-3" />
+              </span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">Details</span>
+            </div>
+            {hw.description ? (
+              <p className="text-sm leading-relaxed whitespace-pre-wrap text-slate-700">
                 {hw.description}
               </p>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No further details.</p>
-          )}
+            ) : (
+              <p className="text-sm italic text-slate-400">No further details provided.</p>
+            )}
+          </div>
 
+          {/* Attachment */}
           {attachmentUrl && (
             <a
               href={attachmentUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3 text-sm font-medium shadow-sm transition-all hover:bg-muted/30 hover:shadow"
+              className="group flex items-center gap-3 rounded-xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm transition-all hover:border-blue-200 hover:shadow-md"
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Paperclip className="size-4" />
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                <Paperclip className="size-4.5" />
               </span>
-              <span className="max-w-xs truncate">{attachmentName}</span>
-              <Download className="ml-auto size-4 text-muted-foreground" />
+              <span className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-slate-900">{attachmentName}</p>
+                <p className="text-xs text-slate-500">Click to download</p>
+              </span>
+              <span className="flex size-8 items-center justify-center rounded-lg bg-slate-50 text-slate-400 ring-1 ring-slate-200 transition-colors group-hover:bg-blue-50 group-hover:text-blue-600 group-hover:ring-blue-100">
+                <Download className="size-4" />
+              </span>
             </a>
           )}
 
-          <div className="flex items-center justify-between border-t border-border/60 pt-5">
-            <p className="text-xs text-muted-foreground">
+          {/* Footer */}
+          <div className="flex items-center justify-between border-t border-slate-100 pt-5">
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span className="inline-flex size-1.5 rounded-full bg-slate-300" />
               Posted by {(hw.profiles as { full_name: string | null } | null)?.full_name ?? "Staff"}
-            </p>
+            </div>
             {canManage && <DeleteHomeworkButton id={hw.id} title={hw.title} />}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

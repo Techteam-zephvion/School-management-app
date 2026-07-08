@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
@@ -35,16 +34,18 @@ export function AttendancePicker({
   }
 
   return (
-    <Card>
-      <CardContent className="grid gap-3 py-4 sm:grid-cols-[1fr_auto] sm:items-end">
+    <div className="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02] sm:p-5">
+      <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
         <div className="space-y-1.5">
-          <Label>Class / session</Label>
+          <Label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Class / session
+          </Label>
           <Select
             value={selectedKey}
             onValueChange={(v) => go(v, date)}
             disabled={isPending}
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full border-slate-200/80 focus-visible:ring-blue-500">
               <SelectValue placeholder="Choose what to mark" />
             </SelectTrigger>
             <SelectContent>
@@ -57,7 +58,12 @@ export function AttendancePicker({
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="att-date">Date</Label>
+          <Label
+            htmlFor="att-date"
+            className="text-xs font-semibold uppercase tracking-wide text-slate-500"
+          >
+            Date
+          </Label>
           <Input
             id="att-date"
             type="date"
@@ -65,10 +71,10 @@ export function AttendancePicker({
             max={new Date().toISOString().slice(0, 10)}
             onChange={(e) => go(selectedKey, e.target.value)}
             disabled={isPending}
-            className="w-full sm:w-44"
+            className="w-full border-slate-200/80 focus-visible:ring-blue-500 sm:w-44"
           />
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

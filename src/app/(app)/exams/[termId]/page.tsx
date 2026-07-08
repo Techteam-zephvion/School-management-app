@@ -142,17 +142,17 @@ export default async function ExamTermPage({ params }: { params: Promise<{ termI
     subjectsByClass.set(cs.class_id, [...(subjectsByClass.get(cs.class_id) ?? []), cs.subject_id]);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6 pb-8">
       <Link
         href="/exams"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
       >
         <ArrowLeft className="size-4" /> All terms
       </Link>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold tracking-tight">{term.name}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{term.name}</h1>
           <Badge variant={term.is_published ? "success" : "secondary"}>
             {term.is_published ? "Published" : "Draft"}
           </Badge>
@@ -170,58 +170,69 @@ export default async function ExamTermPage({ params }: { params: Promise<{ termI
         />
       )}
 
-      <Card className="overflow-hidden border-0 shadow-md shadow-muted-foreground/5 ring-1 ring-border/50">
-        <CardHeader>
-          <CardTitle className="text-base">Enter marks</CardTitle>
-          <CardDescription>
+      <Card className="overflow-hidden border border-slate-200/80 bg-white/95 shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+            <span className="flex size-8 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+              <ClipboardList className="size-4" />
+            </span>
+            Enter marks
+          </CardTitle>
+          <CardDescription className="text-slate-500">
             {isAdmin
               ? "Every section × subject in this term."
               : "The sections and subjects you teach."}
           </CardDescription>
         </CardHeader>
-        <CardContent className="divide-y divide-border/60 p-0">
+        <CardContent className="p-0">
           {targets.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <span className="flex size-12 items-center justify-center rounded-2xl bg-muted/60">
-                <ClipboardList className="size-6 text-muted-foreground/70" />
+            <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 px-4 py-12 text-center">
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-white text-slate-500 ring-1 ring-slate-200">
+                <ClipboardList className="size-5" />
               </span>
-              <p className="text-sm font-medium text-muted-foreground">Nothing to mark yet.</p>
-              <p className="text-xs text-muted-foreground/70">
-                {isAdmin
-                  ? "Add subjects with max marks above to open mark entry."
-                  : "Marks entry appears once your admin adds your subject to this term."}
-              </p>
+              <div>
+                <p className="text-sm font-medium text-slate-900">Nothing to mark yet</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {isAdmin
+                    ? "Add subjects with max marks above to open mark entry."
+                    : "Marks entry appears once your admin adds your subject to this term."}
+                </p>
+              </div>
             </div>
           ) : (
-            targets.map((t) => {
-              const complete = t.total > 0 && t.entered >= t.total;
-              return (
-                <Link
-                  key={`${t.sectionId}:${t.subjectId}`}
-                  href={`/exams/${term.id}/marks/${t.sectionId}/${t.subjectId}`}
-                  className="group flex items-center gap-4 px-5 py-4 transition-all hover:bg-muted/40"
-                >
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/15">
-                    <ClipboardList className="size-5" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">
-                      {t.sectionLabel} · {t.subjectName}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      Max {t.maxMarks} · {t.entered}/{t.total} entered
-                    </p>
-                  </div>
-                  <Badge
-                    variant={complete ? "success" : t.entered > 0 ? "warning" : "secondary"}
-                    className="px-2.5 py-1 text-xs font-medium"
+            <div className="divide-y divide-slate-100">
+              {targets.map((t) => {
+                const complete = t.total > 0 && t.entered >= t.total;
+                return (
+                  <Link
+                    key={`${t.sectionId}:${t.subjectId}`}
+                    href={`/exams/${term.id}/marks/${t.sectionId}/${t.subjectId}`}
+                    className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-blue-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   >
-                    {complete ? "Complete" : t.entered > 0 ? "In progress" : "Not started"}
-                  </Badge>
-                  <ChevronRight className="size-4 text-muted-foreground" />
-                </Link>
-              );
-            })
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                      <ClipboardList className="size-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-slate-900">
+                          {t.sectionLabel} · {t.subjectName}
+                        </p>
+                        <Badge
+                          variant={complete ? "success" : t.entered > 0 ? "warning" : "secondary"}
+                          className="shrink-0 text-[10px]"
+                        >
+                          {complete ? "Complete" : t.entered > 0 ? "In progress" : "Not started"}
+                        </Badge>
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                        Max {t.maxMarks} · {t.entered}/{t.total} entered
+                      </p>
+                    </div>
+                    <ChevronRight className="size-4 text-slate-400" />
+                  </Link>
+                );
+              })}
+            </div>
           )}
         </CardContent>
       </Card>

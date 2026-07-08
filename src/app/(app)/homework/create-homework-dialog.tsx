@@ -80,20 +80,22 @@ export function CreateHomeworkDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
+        <Button className="gap-2 bg-[#10203f] text-white hover:bg-[#1b2d5e]">
           <Plus className="size-4" /> Assign homework
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Assign homework</DialogTitle>
-          <DialogDescription>Parents of the class will see this in their app.</DialogDescription>
+          <DialogDescription>
+            Parents of the class will see this in their app.
+          </DialogDescription>
         </DialogHeader>
         <form action={formAction} className="space-y-5">
-          <div className="space-y-3">
-            <Label className="text-sm font-medium text-foreground">Class &amp; subject</Label>
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Class &amp; subject</Label>
             <Select value={targetKey} onValueChange={setTargetKey}>
-              <SelectTrigger className="w-full rounded-lg">
+              <SelectTrigger className="w-full rounded-xl border-slate-200/80 bg-white shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
                 <SelectValue placeholder="Choose a class and subject" />
               </SelectTrigger>
               <SelectContent>
@@ -105,30 +107,34 @@ export function CreateHomeworkDialog({
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-3">
-            <Label className="text-sm font-medium text-foreground" htmlFor="title">Title</Label>
-            <Input id="title" name="title" placeholder="Chapter 4 exercises" required className="rounded-lg" />
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="title">Title</Label>
+            <Input id="title" name="title" placeholder="Chapter 4 exercises" required className="rounded-xl border-slate-200/80 bg-white shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
           </div>
-          <div className="space-y-3">
-            <Label className="text-sm font-medium text-foreground" htmlFor="description">Details (optional)</Label>
-            <Textarea id="description" name="description" rows={3} placeholder="Questions 1–10, show your working." className="rounded-lg" />
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="description">Details (optional)</Label>
+            <Textarea id="description" name="description" rows={3} placeholder="Questions 1–10, show your working." className="rounded-xl border-slate-200/80 bg-white shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
           </div>
-          <div className="space-y-3">
-            <Label className="text-sm font-medium text-foreground" htmlFor="dueDate">Due date</Label>
-            <Input id="dueDate" name="dueDate" type="date" defaultValue={tomorrowISO()} required className="rounded-lg" />
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="dueDate">Due date</Label>
+            <Input id="dueDate" name="dueDate" type="date" defaultValue={tomorrowISO()} required className="rounded-xl border-slate-200/80 bg-white shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
           </div>
-          <div className="space-y-3">
-            <Label className="text-sm font-medium text-foreground" htmlFor="file">Attachment (optional)</Label>
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="file">Attachment (optional)</Label>
             <Input
               id="file"
               type="file"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="rounded-lg"
+              className="rounded-xl border-slate-200/80 bg-white shadow-sm file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-blue-700 hover:file:bg-blue-100 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             />
           </div>
-          {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
+          {state?.error && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-red-200/60 bg-red-50/60 p-3">
+              <p className="text-xs font-medium text-red-700">{state.error}</p>
+            </div>
+          )}
           <DialogFooter>
-            <Button type="submit" disabled={busy || !targetKey} className="gap-2">
+            <Button type="submit" disabled={busy || !targetKey} className="gap-2 bg-[#10203f] text-white hover:bg-[#1b2d5e]">
               {busy && <Loader2 className="size-4 animate-spin" />}
               {uploading ? "Uploading…" : pending ? "Posting…" : "Post homework"}
             </Button>

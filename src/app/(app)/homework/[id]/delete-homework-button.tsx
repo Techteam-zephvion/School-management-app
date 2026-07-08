@@ -41,13 +41,13 @@ export function DeleteHomeworkButton({ id, title }: { id: string; title: string 
         <Button
           variant="outline"
           size="sm"
-          className="gap-1.5 border-destructive/30 text-destructive transition-all hover:bg-destructive/10 hover:border-destructive/50 hover:text-destructive"
+          className="gap-1.5 border-red-200/60 text-red-600 transition-all hover:border-red-300 hover:bg-red-50 hover:text-red-700"
         >
           <Trash2 className="size-4" />
           Delete
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Delete homework?</DialogTitle>
           <DialogDescription>
@@ -55,9 +55,17 @@ export function DeleteHomeworkButton({ id, title }: { id: string; title: string 
             undone.
           </DialogDescription>
         </DialogHeader>
+        <div className="flex items-start gap-3 rounded-xl border border-red-200/60 bg-red-50/60 p-3">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+            <Trash2 className="size-3.5" />
+          </span>
+          <p className="text-xs text-red-700">
+            This action is permanent and cannot be reversed. All data will be lost.
+          </p>
+        </div>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline" disabled={isPending}>
+            <Button variant="outline" disabled={isPending} className="border-slate-200/80 text-slate-700 hover:bg-slate-50 hover:text-slate-900">
               Cancel
             </Button>
           </DialogClose>

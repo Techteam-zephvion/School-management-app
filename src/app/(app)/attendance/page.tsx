@@ -4,7 +4,6 @@ import { requireActiveMembership, getAuthUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AttendancePicker } from "./attendance-picker";
 import { AttendanceGrid } from "./attendance-grid";
 import type { AttendStatus } from "@/lib/actions/attendance";
@@ -36,12 +35,16 @@ export default async function AttendancePage({
 
   if (!activeYear) {
     return (
-      <div className="mx-auto max-w-4xl space-y-6">
+      <div className="mx-auto max-w-7xl space-y-6 pb-8">
         <PageHeader title="Attendance" description="Mark daily and subject-wise attendance." />
-        <Alert>
-          <CalendarClock className="size-4" />
-          <AlertDescription>Set an active academic year and create sections first.</AlertDescription>
-        </Alert>
+        <div className="flex min-h-[180px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center">
+          <span className="flex size-12 items-center justify-center rounded-2xl bg-white text-slate-500 ring-1 ring-slate-200">
+            <CalendarClock className="size-5" />
+          </span>
+          <p className="max-w-xs text-sm text-slate-500">
+            Set an active academic year and create sections first.
+          </p>
+        </div>
       </div>
     );
   }
@@ -168,29 +171,39 @@ export default async function AttendancePage({
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 pb-8">
       <PageHeader title="Attendance" description="Mark daily and subject-wise attendance." />
 
       {targets.length === 0 ? (
-        <Alert>
-          <ClipboardCheck className="size-4" />
-          <AlertDescription>
-            You have no classes to mark attendance for. A class teacher marks daily attendance; a
-            subject teacher marks their subject. Ask your admin to assign you in Roles.
-          </AlertDescription>
-        </Alert>
+        <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center">
+          <span className="flex size-12 items-center justify-center rounded-2xl bg-white text-slate-500 ring-1 ring-slate-200">
+            <ClipboardCheck className="size-5" />
+          </span>
+          <div className="max-w-sm">
+            <p className="text-sm font-medium text-slate-900">No classes to mark</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              A class teacher marks daily attendance; a subject teacher marks their subject. Ask your
+              admin to assign you in Roles.
+            </p>
+          </div>
+        </div>
       ) : (
         <>
           <AttendancePicker targets={targets} selectedKey={selected?.key ?? ""} date={date} />
 
           {selected ? (
             holiday ? (
-              <Alert className="border-amber-200/60 bg-amber-50/60 text-amber-900">
-                <ClipboardCheck className="size-4 text-amber-600" />
-                <AlertDescription>
-                  <span className="font-medium">Holiday: {holiday}.</span> Attendance can&apos;t be marked on this date.
-                </AlertDescription>
-              </Alert>
+              <div className="flex items-start gap-3 rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 to-white px-5 py-4 shadow-sm shadow-slate-950/5">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+                  <CalendarClock className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-amber-900">Holiday today</p>
+                  <p className="mt-0.5 text-sm text-amber-700">
+                    <span className="font-medium">{holiday}.</span> Attendance can&apos;t be marked on this date.
+                  </p>
+                </div>
+              </div>
             ) : students.length > 0 ? (
               <AttendanceGrid
                 key={`${selected.key}:${date}`}
@@ -201,16 +214,27 @@ export default async function AttendancePage({
                 students={students}
               />
             ) : (
-              <Card>
-                <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                  No students are enrolled in this section yet.
+              <Card className="border border-slate-200/80 bg-white/95 shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+                <CardContent className="flex min-h-[180px] flex-col items-center justify-center gap-3 py-10 text-center">
+                  <span className="flex size-12 items-center justify-center rounded-2xl bg-white text-slate-500 ring-1 ring-slate-200">
+                    <ClipboardCheck className="size-5" />
+                  </span>
+                  <p className="text-sm text-slate-500">No students are enrolled in this section yet.</p>
                 </CardContent>
               </Card>
             )
           ) : (
-            <Card>
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                Choose a class and date above to start marking.
+            <Card className="border border-slate-200/80 bg-white/95 shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+              <CardContent className="flex min-h-[220px] flex-col items-center justify-center gap-3 py-10 text-center">
+                <span className="flex size-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                  <ClipboardCheck className="size-5" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Choose a class</p>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Select a class and date above to start marking attendance.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           )}

@@ -4,7 +4,6 @@ import { ArrowLeft, Info } from "lucide-react";
 import { requireActiveMembership, getAuthUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MarksGrid } from "./marks-grid";
 
 export default async function MarksEntryPage({
@@ -66,7 +65,7 @@ export default async function MarksEntryPage({
   const backLink = (
     <Link
       href={`/exams/${termId}`}
-      className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+      className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
     >
       <ArrowLeft className="size-4" /> {term.name}
     </Link>
@@ -74,15 +73,20 @@ export default async function MarksEntryPage({
 
   if (!examSubject) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6">
+      <div className="mx-auto max-w-4xl space-y-6 pb-8">
         {backLink}
-        <Alert className="border-amber-200/60 bg-amber-50/60 text-amber-900">
-          <Info className="size-4 text-amber-600" />
-          <AlertDescription>
-            {subject?.name ?? "This subject"} isn&apos;t set up for this class in {term.name} yet.
-            {isAdmin ? " Add it (with its max marks) on the term page." : " Ask your admin to add it."}
-          </AlertDescription>
-        </Alert>
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 to-white px-5 py-4 shadow-sm shadow-slate-950/5">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+            <Info className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-amber-900">Subject not set up</p>
+            <p className="mt-0.5 text-sm text-amber-700">
+              {subject?.name ?? "This subject"} isn&apos;t set up for this class in {term.name} yet.
+              {isAdmin ? " Add it (with its max marks) on the term page." : " Ask your admin to add it."}
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -116,15 +120,16 @@ export default async function MarksEntryPage({
         : null;
     })
     .filter((s): s is NonNullable<typeof s> => s !== null)
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    .sort((a, b) => a.name.localeCompare(b.name));    return (
+    <div className="mx-auto max-w-4xl space-y-6 pb-8">
       {backLink}
       {students.length === 0 ? (
-        <Card className="border-0 shadow-md shadow-muted-foreground/5 ring-1 ring-border/50">
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            No students are enrolled in this section yet.
+        <Card className="border border-slate-200/80 bg-white/95 shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+          <CardContent className="flex min-h-[180px] flex-col items-center justify-center gap-3 py-12 text-center">
+            <span className="flex size-12 items-center justify-center rounded-2xl bg-white text-slate-500 ring-1 ring-slate-200">
+              <Info className="size-5" />
+            </span>
+            <p className="text-sm text-slate-500">No students are enrolled in this section yet.</p>
           </CardContent>
         </Card>
       ) : (

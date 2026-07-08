@@ -44,8 +44,8 @@ export default async function TimetablePage({
     return (
       <div className="mx-auto max-w-4xl space-y-6">
         <PageHeader title="Timetable" description="Weekly schedule, holidays and events." />
-        <Alert className="border-amber-200/60 bg-amber-50/60 text-amber-900">
-          <CalendarClock className="size-4 text-amber-600" />
+        <Alert className="border-blue-200/60 bg-blue-50/60 text-blue-900">
+          <CalendarClock className="size-4 text-blue-600" />
           <AlertDescription>Set an active academic year and create sections first.</AlertDescription>
         </Alert>
       </div>
@@ -155,8 +155,8 @@ export default async function TimetablePage({
           canEdit={isAdmin}
         />
       ) : (
-        <Alert>
-          <CalendarClock className="size-4" />
+        <Alert className="border-blue-200/60 bg-blue-50/60 text-blue-900">
+          <CalendarClock className="size-4 text-blue-600" />
           <AlertDescription>Create a section in Classes &amp; subjects to build a timetable.</AlertDescription>
         </Alert>
       )}

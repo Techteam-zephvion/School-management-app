@@ -147,9 +147,9 @@ export function TimetableGrid({
   }
 
   return (
-    <Card className="overflow-hidden border-0 shadow-md shadow-muted-foreground/5 ring-1 ring-border/50">
+    <Card className="overflow-hidden border-0 bg-white shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
       <CardHeader>
-        <CardTitle className="text-base">Weekly schedule</CardTitle>
+        <CardTitle className="text-base text-slate-900">Weekly schedule</CardTitle>
         <CardDescription>
           {canEdit ? "Tap a cell to assign a subject and teacher." : "Read-only. Ask your admin to edit."}
         </CardDescription>
@@ -159,11 +159,11 @@ export function TimetableGrid({
           <table className="w-full min-w-[640px] border-separate border-spacing-0 text-sm">
             <thead>
               <tr>
-                <th className="sticky left-0 z-10 w-14 bg-card px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
+                <th className="sticky left-0 z-10 w-14 bg-white px-3 py-2 text-left text-xs font-semibold text-slate-500">
                   #
                 </th>
                 {DAYS.map((d) => (
-                  <th key={d} className="px-2 py-2 text-center text-xs font-semibold text-muted-foreground">
+                  <th key={d} className="px-2 py-2 text-center text-xs font-semibold text-slate-500">
                     {d}
                   </th>
                 ))}
@@ -172,23 +172,23 @@ export function TimetableGrid({
             <tbody>
               {rows.map((periodNo) => (
                 <tr key={periodNo}>
-                  <td className="sticky left-0 z-10 border-t border-border/60 bg-card px-3 py-2 text-xs font-medium text-muted-foreground">
+                  <td className="sticky left-0 z-10 border-t border-slate-200/60 bg-white px-3 py-2 text-xs font-medium text-slate-500">
                     {periodNo}
                   </td>
                   {DAYS.map((_, weekday) => {
                     const cell = cellOf(weekday, periodNo);
                     return (
-                      <td key={weekday} className="border-t border-l border-border/60 p-1 align-top">
+                      <td key={weekday} className="border-t border-l border-slate-200/60 p-1 align-top">
                         {cell ? (
-                          <div className="group relative rounded-lg bg-primary/5 px-2 py-1.5">
+                          <div className="group relative rounded-lg bg-blue-50/60 px-2 py-1.5 ring-1 ring-blue-100/50">
                             {cell.startTime && cell.endTime && (
-                              <p className="truncate text-[10px] font-medium text-primary/70 tabular-nums">
+                              <p className="truncate text-[10px] font-medium text-blue-600/70 tabular-nums">
                                 {toInput(cell.startTime)}–{toInput(cell.endTime)}
                               </p>
                             )}
-                            <p className="truncate text-xs font-semibold text-foreground">{cell.subjectName}</p>
+                            <p className="truncate text-xs font-semibold text-slate-900">{cell.subjectName}</p>
                             {cell.staffName && (
-                              <p className="truncate text-[11px] text-muted-foreground">{cell.staffName}</p>
+                              <p className="truncate text-[11px] text-slate-500">{cell.staffName}</p>
                             )}
                             {canEdit && (
                               <button
@@ -196,7 +196,7 @@ export function TimetableGrid({
                                 disabled={isPending}
                                 onClick={() => remove(cell.id)}
                                 aria-label="Remove period"
-                                className="absolute top-0.5 right-0.5 hidden size-4 items-center justify-center rounded text-muted-foreground group-hover:flex hover:bg-destructive/10 hover:text-destructive"
+                                className="absolute top-0.5 right-0.5 hidden size-4 items-center justify-center rounded text-slate-400 group-hover:flex hover:bg-red-50 hover:text-red-600"
                               >
                                 <X className="size-3" />
                               </button>
@@ -207,7 +207,7 @@ export function TimetableGrid({
                             type="button"
                             onClick={() => openAdd(weekday, periodNo)}
                             aria-label={`Add ${DAYS[weekday]} period ${periodNo}`}
-                            className="flex h-11 w-full items-center justify-center rounded-lg text-muted-foreground/40 transition-colors hover:bg-muted/60 hover:text-muted-foreground"
+                            className="flex h-11 w-full items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-blue-50/60 hover:text-blue-500"
                           >
                             <Plus className="size-3.5" />
                           </button>
@@ -223,12 +223,12 @@ export function TimetableGrid({
           </table>
         </div>
         {canEdit && totalRows < 12 && (
-          <div className="border-t border-border/60 p-2">
+          <div className="border-t border-slate-200/60 p-2">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setExtraRows((n) => n + 1)}
-              className="w-full gap-1.5 text-muted-foreground"
+              className="w-full gap-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
             >
               <Plus className="size-3.5" /> Add period row
             </Button>
@@ -245,9 +245,9 @@ export function TimetableGrid({
           </DialogHeader>
           <form action={formAction} className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-sm font-medium text-foreground">Subject</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Subject</Label>
               <Select value={subjectId} onValueChange={pickSubject}>
-                <SelectTrigger className="w-full rounded-lg">
+                <SelectTrigger className="w-full rounded-xl border-slate-200/80 bg-white shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
                   <SelectValue placeholder={subjects.length === 0 ? "Map subjects to this class first" : "Choose subject"} />
                 </SelectTrigger>
                 <SelectContent>
@@ -260,9 +260,9 @@ export function TimetableGrid({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-sm font-medium text-foreground">Teacher</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Teacher</Label>
               <Select value={staffId} onValueChange={setStaffId} disabled={!subjectId || teacherChoices.length === 0}>
-                <SelectTrigger className="w-full rounded-lg">
+                <SelectTrigger className="w-full rounded-xl border-slate-200/80 bg-white shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
                   <SelectValue
                     placeholder={
                       !subjectId
@@ -282,14 +282,14 @@ export function TimetableGrid({
                 </SelectContent>
               </Select>
               {subjectId && teacherChoices.length === 0 && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-slate-500">
                   Assign a subject teacher for this section in Roles to schedule them here.
                 </p>
               )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="startTime" className="text-sm font-medium text-foreground">Starts</Label>
+                <Label htmlFor="startTime" className="text-xs font-semibold uppercase tracking-wide text-slate-600">Starts</Label>
                 <Input
                   id="startTime"
                   name="startTime"
@@ -297,11 +297,11 @@ export function TimetableGrid({
                   required
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  className="rounded-lg"
+                  className="rounded-xl border-slate-200/80 bg-white shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="endTime" className="text-sm font-medium text-foreground">Ends</Label>
+                <Label htmlFor="endTime" className="text-xs font-semibold uppercase tracking-wide text-slate-600">Ends</Label>
                 <Input
                   id="endTime"
                   name="endTime"
@@ -309,16 +309,16 @@ export function TimetableGrid({
                   required
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  className="rounded-lg"
+                  className="rounded-xl border-slate-200/80 bg-white shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-slate-500">
               The next period should start after the previous one ends — periods on the same day can&apos;t overlap.
             </p>
-            {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
+            {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
             <DialogFooter>
-              <Button type="submit" disabled={saving || !subjectId || !startTime || !endTime} className={cn("gap-2")}>
+              <Button type="submit" disabled={saving || !subjectId || !startTime || !endTime} className="gap-2 bg-[#10203f] text-white hover:bg-[#1b2d5e]">
                 {saving && <Loader2 className="size-4 animate-spin" />}
                 <CalendarClock className="size-4" /> Save period
               </Button>
