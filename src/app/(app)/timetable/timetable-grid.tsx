@@ -27,6 +27,17 @@ import { cn } from "@/lib/utils";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+/** DB times come back as "HH:MM:SS"; <input type=time> and the UI want "HH:MM". */
+function toInput(t: string | null): string {
+  if (!t) return "";
+  const [h, m] = t.split(":");
+  return `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
+}
+function toMin(t: string): number {
+  const [h, m] = t.split(":");
+  return Number(h) * 60 + Number(m);
+}
+
 export function TimetableGrid({
   sectionId,
   periods,
@@ -44,6 +55,8 @@ export function TimetableGrid({
   const [dialog, setDialog] = useState<{ weekday: number; periodNo: number } | null>(null);
   const [subjectId, setSubjectId] = useState("");
   const [staffId, setStaffId] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [extraRows, setExtraRows] = useState(0);
 
   const baseRows = Math.max(6, ...periods.map((p) => p.periodNo));
@@ -65,6 +78,24 @@ export function TimetableGrid({
   const [state, formAction, saving] = useActionState(
     async (prev: Awaited<ReturnType<typeof addPeriod>>, fd: FormData) => {
       if (!dialog) return prev;
+      // Instant feedback before hitting the server (which re-validates).
+      if (!startTime || !endTime) return { error: "Set the period's start and end time." };
+      if (toMin(endTime) <= toMin(startTime)) return { error: "The end time must be after the start time." };
+      const clash = periods.find(
+        (p) =>
+          p.weekday === dialog.weekday &&
+          p.periodNo !== dialog.periodNo &&
+          p.startTime &&
+          p.endTime &&
+          toMin(startTime) < toMin(p.endTime) &&
+          toMin(p.startTime) < toMin(endTime)
+      );
+      if (clash) {
+        return {
+          error: `These timings clash with period ${clash.periodNo} (${toInput(clash.startTime)}–${toInput(clash.endTime)}). Periods on the same day can't overlap.`,
+        };
+      }
+
       fd.set("sectionId", sectionId);
       fd.set("weekday", String(dialog.weekday));
       fd.set("periodNo", String(dialog.periodNo));
@@ -76,6 +107,8 @@ export function TimetableGrid({
         setDialog(null);
         setSubjectId("");
         setStaffId("");
+        setStartTime("");
+        setEndTime("");
       }
       return result;
     },
@@ -92,6 +125,24 @@ export function TimetableGrid({
   function openAdd(weekday: number, periodNo: number) {
     const existing = cellOf(weekday, periodNo);
     pickSubject(existing?.subjectId ?? "");
+
+    // Prefill timings so periods chain without collisions: use this cell's own
+    // times if editing, else keep the period consistent with the same period on
+    // another day, else start right after the previous period ends.
+    let start = existing?.startTime ?? "";
+    let end = existing?.endTime ?? "";
+    if (!start) {
+      const sameNoOtherDay = periods.find((p) => p.periodNo === periodNo && p.startTime && p.endTime);
+      const prev = cellOf(weekday, periodNo - 1);
+      if (sameNoOtherDay) {
+        start = sameNoOtherDay.startTime!;
+        end = sameNoOtherDay.endTime!;
+      } else if (prev?.endTime) {
+        start = prev.endTime;
+      }
+    }
+    setStartTime(toInput(start || null));
+    setEndTime(toInput(end || null));
     setDialog({ weekday, periodNo });
   }
 
@@ -130,6 +181,11 @@ export function TimetableGrid({
                       <td key={weekday} className="border-t border-l border-border/60 p-1 align-top">
                         {cell ? (
                           <div className="group relative rounded-lg bg-primary/5 px-2 py-1.5">
+                            {cell.startTime && cell.endTime && (
+                              <p className="truncate text-[10px] font-medium text-primary/70 tabular-nums">
+                                {toInput(cell.startTime)}–{toInput(cell.endTime)}
+                              </p>
+                            )}
                             <p className="truncate text-xs font-semibold text-foreground">{cell.subjectName}</p>
                             {cell.staffName && (
                               <p className="truncate text-[11px] text-muted-foreground">{cell.staffName}</p>
@@ -233,17 +289,36 @@ export function TimetableGrid({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="startTime" className="text-sm font-medium text-foreground">Start (optional)</Label>
-                <Input id="startTime" name="startTime" type="time" className="rounded-lg" />
+                <Label htmlFor="startTime" className="text-sm font-medium text-foreground">Starts</Label>
+                <Input
+                  id="startTime"
+                  name="startTime"
+                  type="time"
+                  required
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="rounded-lg"
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="endTime" className="text-sm font-medium text-foreground">End (optional)</Label>
-                <Input id="endTime" name="endTime" type="time" className="rounded-lg" />
+                <Label htmlFor="endTime" className="text-sm font-medium text-foreground">Ends</Label>
+                <Input
+                  id="endTime"
+                  name="endTime"
+                  type="time"
+                  required
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="rounded-lg"
+                />
               </div>
             </div>
+            <p className="text-xs text-muted-foreground">
+              The next period should start after the previous one ends — periods on the same day can&apos;t overlap.
+            </p>
             {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
             <DialogFooter>
-              <Button type="submit" disabled={saving || !subjectId} className={cn("gap-2")}>
+              <Button type="submit" disabled={saving || !subjectId || !startTime || !endTime} className={cn("gap-2")}>
                 {saving && <Loader2 className="size-4 animate-spin" />}
                 <CalendarClock className="size-4" /> Save period
               </Button>

@@ -33,9 +33,19 @@ const periodSchema = z.object({
   periodNo: z.coerce.number().int().min(1).max(12),
   subjectId: z.string().uuid({ error: "Choose a subject." }),
   staffId: z.string().uuid().optional().or(z.literal("")),
-  startTime: z.string().optional(),
-  endTime: z.string().optional(),
+  startTime: z.string().regex(/^\d{1,2}:\d{2}/, { error: "Set a start time." }),
+  endTime: z.string().regex(/^\d{1,2}:\d{2}/, { error: "Set an end time." }),
 });
+
+/** "HH:MM[:SS]" -> minutes since midnight, for ordering/overlap checks. */
+function toMinutes(t: string): number {
+  const [h, m] = t.split(":");
+  return Number(h) * 60 + Number(m);
+}
+function fmtTime(t: string): string {
+  const [h, m] = t.split(":");
+  return `${h.padStart(2, "0")}:${m}`;
+}
 
 export async function addPeriod(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const guard = await requireAdmin();
@@ -67,6 +77,32 @@ export async function addPeriod(_prev: ActionState, formData: FormData): Promise
       .maybeSingle();
     if (!assignment) {
       return { error: "That teacher isn't assigned to this subject for this section (set it in Roles)." };
+    }
+  }
+
+  // Timings must be a real interval and must not collide with another period on
+  // the same weekday (a class can't be in two places at once). The upsert key is
+  // (section, year, weekday, period_no), so exclude the row being written.
+  const startMin = toMinutes(parsed.data.startTime);
+  const endMin = toMinutes(parsed.data.endTime);
+  if (endMin <= startMin) {
+    return { error: "The end time must be after the start time." };
+  }
+  const { data: siblings } = await supabase
+    .from("periods")
+    .select("period_no, start_time, end_time")
+    .eq("section_id", parsed.data.sectionId)
+    .eq("academic_year_id", yearId)
+    .eq("weekday", parsed.data.weekday)
+    .neq("period_no", parsed.data.periodNo);
+  for (const s of siblings ?? []) {
+    if (!s.start_time || !s.end_time) continue;
+    const os = toMinutes(s.start_time);
+    const oe = toMinutes(s.end_time);
+    if (startMin < oe && os < endMin) {
+      return {
+        error: `These timings clash with period ${s.period_no} (${fmtTime(s.start_time)}–${fmtTime(s.end_time)}). Periods on the same day can't overlap.`,
+      };
     }
   }
 
