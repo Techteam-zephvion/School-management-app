@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, MessagesSquare, Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { usePathname } from "next/navigation";
+import { Menu, MessagesSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SearchCommand } from "@/components/search-command";
 import { NotificationBell, type AppNotification } from "@/components/notification-bell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -48,6 +49,7 @@ export function AppTopbar({
   notifications?: AppNotification[];
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const pathname = usePathname();
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-card px-4 sm:px-6">
@@ -66,14 +68,7 @@ export function AppTopbar({
         </SheetContent>
       </Sheet>
 
-      <div className="relative hidden max-w-sm flex-1 sm:block">
-        <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search students, classes, or exams…"
-          className="pl-9"
-          disabled
-        />
-      </div>
+      <SearchCommand key={pathname} />
 
       <div className="ml-auto flex items-center gap-1 sm:gap-2">
         {userId ? <NotificationBell userId={userId} initial={notifications ?? []} /> : null}
