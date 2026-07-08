@@ -105,7 +105,9 @@ export default function TransportMap({ routes, initial, userId, height = 360 }: 
   }
 
   return (
-    <div style={{ height }} className="overflow-hidden rounded-xl ring-1 ring-border/50">
+    // `isolate` keeps Leaflet's internal z-indexes (panes/controls go up to 1000)
+    // in their own stacking context, so dialogs/menus still render above the map.
+    <div style={{ height }} className="relative isolate z-0 overflow-hidden rounded-xl ring-1 ring-border/50">
       <MapContainer center={center} zoom={14} style={{ height: "100%", width: "100%" }} scrollWheelZoom>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
