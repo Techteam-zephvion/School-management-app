@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { toast } from "sonner";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Loader2 } from "lucide-react";
 import { inviteStaffMember } from "@/lib/actions/staff";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,29 +41,36 @@ export function InviteStaffForm() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
+        <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/80">
           <UserPlus className="size-4" />
           Invite staff
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Invite a staff member</DialogTitle>
-          <DialogDescription>
-            They&apos;ll get an email to set their password and sign in.
-          </DialogDescription>
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+              <UserPlus className="size-4.5" />
+            </span>
+            <div>
+              <DialogTitle>Invite a staff member</DialogTitle>
+              <DialogDescription>
+                They&apos;ll get an email to set their password and sign in.
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
-        <form action={formAction} className="space-y-4">
+        <form action={formAction} className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="fullName">Full name</Label>
+            <Label htmlFor="fullName" className="text-xs font-semibold text-slate-600">Full name</Label>
             <Input id="fullName" name="fullName" required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" className="text-xs font-semibold text-slate-600">Email</Label>
             <Input id="email" name="email" type="email" required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="role">Role</Label>
+            <Label htmlFor="role" className="text-xs font-semibold text-slate-600">Role</Label>
             <Select name="role" defaultValue="teacher">
               <SelectTrigger id="role" className="w-full">
                 <SelectValue />
@@ -75,11 +82,13 @@ export function InviteStaffForm() {
             </Select>
           </div>
           {state?.error && (
-            <p className="text-sm text-destructive">{state.error}</p>
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {state.error}
+            </div>
           )}
-          <DialogFooter>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Sending…" : "Send invite"}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="submit" disabled={pending} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/80">
+              {pending ? <><Loader2 className="size-4 animate-spin" /> Sending…</> : "Send invite"}
             </Button>
           </DialogFooter>
         </form>

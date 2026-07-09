@@ -49,3 +49,52 @@ export async function inviteStaffMember(
   revalidatePath("/settings/staff");
   return { error: undefined };
 }
+
+export async function removeStaffMember(
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const membership = await requireActiveMembership();
+  if (membership.role !== "school_admin") {
+    return { error: "Only school admins can remove staff." };
+  }
+
+  const memberId = formData.get("memberId");
+  if (typeof memberId !== "string" || !memberId) {
+    return { error: "Missing member ID." };
+  }
+
+  const supabase = await createClient();
+
+  // Prevent self-deletion: check if the target belongs to the current user.
+  const { data: target } = await supabase
+    .from("school_members")
+    .select("user_id")
+    .eq("id", memberId)
+    .eq("school_id", membership.schoolId)
+    .maybeSingle();
+
+  if (!target) {
+    return { error: "Staff member not found." };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user && target.user_id === user.id) {
+    return { error: "You cannot remove yourself." };
+  }
+
+  const { error } = await supabase
+    .from("school_members")
+    .delete()
+    .eq("id", memberId)
+    .eq("school_id", membership.schoolId);
+
+  if (error) {
+    return { error: "Could not remove staff member." };
+  }
+
+  revalidatePath("/settings/staff");
+  return { error: undefined };
+}
