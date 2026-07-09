@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireActiveMembership } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/page-header";
 import { ReportsView } from "./reports-view";
 
 function todayISO() {
@@ -64,6 +63,15 @@ export default async function ReportsPage() {
   }
   const todayRec = byDate.get(today);
   const attendancePct = todayRec && todayRec.total > 0 ? Math.round((todayRec.present / todayRec.total) * 100) : null;
+  let attSum = 0;
+  let attDays = 0;
+  for (const rec of byDate.values()) {
+    if (rec.total > 0) {
+      attSum += (rec.present / rec.total) * 100;
+      attDays += 1;
+    }
+  }
+  const attendanceAvg = attDays > 0 ? Math.round(attSum / attDays) : null;
 
   // ---- fees: status breakdown + collection ----
   const invoiceCsv = (invoices ?? []).map((i) => {
@@ -139,20 +147,40 @@ export default async function ReportsPage() {
     at: a.created_at,
   }));
 
+  // ---- enrollment by class (active year) ----
+  let enrollmentByClass: { className: string; count: number }[] = [];
+  if (activeYear) {
+    const { data: enr } = await supabase
+      .from("enrollments")
+      .select("sections(classes(name))")
+      .eq("school_id", schoolId)
+      .eq("academic_year_id", activeYear.id)
+      .eq("status", "active");
+    const map = new Map<string, number>();
+    for (const e of enr ?? []) {
+      const nm = (e.sections as { classes: { name: string } | null } | null)?.classes?.name ?? "Unassigned";
+      map.set(nm, (map.get(nm) ?? 0) + 1);
+    }
+    enrollmentByClass = [...map.entries()].map(([className, count]) => ({ className, count })).sort((a, b) => b.count - a.count);
+  }
+
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <PageHeader title="Reports" description={`Overview for ${membership.schoolName}${activeYear ? ` · ${activeYear.name}` : ""}.`} />
+    <div className="mx-auto max-w-7xl space-y-6">
       <ReportsView
+        schoolName={membership.schoolName}
+        yearName={activeYear?.name ?? null}
         stats={{
           students: studentCount ?? 0,
           teachers: teacherCount ?? 0,
           attendancePct,
+          attendanceAvg,
           collected,
           billed,
         }}
         attendanceTrend={attendanceTrend}
         feeStatus={feeStatus}
         examOverview={examOverview}
+        enrollmentByClass={enrollmentByClass}
         activity={activity}
         invoiceCsv={invoiceCsv}
       />
