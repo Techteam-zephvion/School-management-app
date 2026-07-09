@@ -3,11 +3,11 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Bus, MapPin, Clock, UserPlus, X, Loader2 } from "lucide-react";
+import { Bus, Navigation, MapPin, Clock, UserPlus, X, Loader2 } from "lucide-react";
 import { assignStudentToBus, removeStudentFromBus } from "@/lib/actions/transport";
 import type { RouteRow, StopRow, RiderRow, BusLoc } from "./page";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -66,51 +66,72 @@ export function TransportClassTeacher({
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6 pb-8">
       <PageHeader
         title="Transport"
         description="Track your class's buses and add students to a route."
         action={
-          <Button onClick={() => setOpen(true)} disabled={routes.length === 0 || available.length === 0} className="gap-2">
+          <Button onClick={() => setOpen(true)} disabled={routes.length === 0 || available.length === 0} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/80">
             <UserPlus className="size-4" /> Add student to a bus
           </Button>
         }
       />
 
-      <Card className="overflow-hidden border-0 shadow-md shadow-muted-foreground/5 ring-1 ring-border/50">
-        <CardHeader>
-          <CardTitle className="text-base">Live map</CardTitle>
-          <CardDescription>Buses carrying students from your class.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      {/* Live map card */}
+      <Card className="overflow-hidden border border-slate-200/80 bg-white shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+        <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+            <Navigation className="size-4.5" />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Live map</h2>
+            <p className="text-xs text-slate-500">Buses carrying students from your class.</p>
+          </div>
+        </div>
+        <CardContent className="p-5">
           <LiveMap routes={routes.map((r) => ({ id: r.id, name: r.name }))} initial={locations} userId={userId} />
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden border-0 shadow-md shadow-muted-foreground/5 ring-1 ring-border/50">
-        <CardHeader>
-          <CardTitle className="text-base">Bus riders in your class</CardTitle>
-          <CardDescription>You can add or remove your own students; routes and stops are set by the admin.</CardDescription>
-        </CardHeader>
-        <CardContent className="divide-y divide-border/60 p-0">
+      {/* Bus riders card */}
+      <Card className="overflow-hidden border border-slate-200/80 bg-white shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+        <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+            <Bus className="size-4.5" />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Bus riders in your class</h2>
+            <p className="text-xs text-slate-500">You can add or remove your own students; routes and stops are set by the admin.</p>
+          </div>
+        </div>
+
+        <CardContent className="divide-y divide-slate-100 p-0">
           {riders.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-12 text-center">
-              <span className="flex size-12 items-center justify-center rounded-2xl bg-muted/60">
-                <Bus className="size-6 text-muted-foreground/70" />
+            <div className="flex flex-col items-center gap-4 px-5 py-14 text-center">
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 ring-1 ring-slate-200">
+                <Bus className="size-5" />
               </span>
-              <p className="text-sm font-medium text-muted-foreground">No students in your class take the bus yet.</p>
+              <div>
+                <p className="text-sm font-medium text-slate-700">No students in your class take the bus yet.</p>
+              </div>
               {routes.length > 0 && available.length > 0 && (
-                <Button size="sm" variant="outline" className="mt-1 gap-1.5" onClick={() => setOpen(true)}>
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setOpen(true)}>
                   <UserPlus className="size-4" /> Add a student
                 </Button>
               )}
             </div>
           ) : (
             riders.map((r) => (
-              <div key={r.studentId} className="flex items-center gap-3 px-5 py-3">
+              <div
+                key={r.studentId}
+                className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-blue-50/50"
+              >
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                  <Bus className="size-5" />
+                </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{r.studentName}</p>
-                  <p className="truncate text-xs text-muted-foreground">{r.admissionNo}</p>
+                  <p className="truncate text-sm font-semibold text-slate-900">{r.studentName}</p>
+                  <p className="truncate text-xs text-slate-500">{r.admissionNo}</p>
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <Badge variant="secondary" className="gap-1">
@@ -131,7 +152,7 @@ export function TransportClassTeacher({
                     disabled={isPending}
                     onClick={() => run(() => removeStudentFromBus(r.studentId), "Removed from bus.")}
                     aria-label={`Remove ${r.studentName}`}
-                    className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    className="flex size-7 items-center justify-center rounded text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
                   >
                     <X className="size-3.5" />
                   </button>
@@ -142,11 +163,19 @@ export function TransportClassTeacher({
         </CardContent>
       </Card>
 
+      {/* Assign dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add a student to a bus</DialogTitle>
-            <DialogDescription>Only students from your class, on a route the admin has created.</DialogDescription>
+            <div className="flex items-center gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                <UserPlus className="size-4.5" />
+              </span>
+              <div>
+                <DialogTitle>Add a student to a bus</DialogTitle>
+                <DialogDescription>Only students from your class, on a route the admin has created.</DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
           <AssignForm
             routes={routes}
@@ -188,12 +217,12 @@ function AssignForm({
         fd.set("stopId", stopId);
         onSubmit(fd);
       }}
-      className="space-y-4"
+      className="space-y-5"
     >
-      <div className="space-y-1.5">
-        <Label className="text-sm font-medium text-foreground">Student (your class)</Label>
+      <div className="space-y-2">
+        <Label className="text-xs font-semibold text-slate-600">Student (your class)</Label>
         <Select value={studentId} onValueChange={setStudentId}>
-          <SelectTrigger className="w-full rounded-lg">
+          <SelectTrigger className="w-full">
             <SelectValue placeholder={available.length === 0 ? "All your students are assigned" : "Choose a student"} />
           </SelectTrigger>
           <SelectContent>
@@ -203,8 +232,8 @@ function AssignForm({
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-1.5">
-        <Label className="text-sm font-medium text-foreground">Route</Label>
+      <div className="space-y-2">
+        <Label className="text-xs font-semibold text-slate-600">Route</Label>
         <Select
           value={routeId}
           onValueChange={(v) => {
@@ -212,7 +241,7 @@ function AssignForm({
             setStopId("");
           }}
         >
-          <SelectTrigger className="w-full rounded-lg">
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="Choose a route" />
           </SelectTrigger>
           <SelectContent>
@@ -222,10 +251,10 @@ function AssignForm({
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-1.5">
-        <Label className="text-sm font-medium text-foreground">Stop (optional)</Label>
+      <div className="space-y-2">
+        <Label className="text-xs font-semibold text-slate-600">Stop (optional)</Label>
         <Select value={stopId} onValueChange={setStopId} disabled={!routeId || routeStops.length === 0}>
-          <SelectTrigger className="w-full rounded-lg">
+          <SelectTrigger className="w-full">
             <SelectValue placeholder={!routeId ? "Choose a route first" : routeStops.length === 0 ? "No stops on this route" : "Choose a stop"} />
           </SelectTrigger>
           <SelectContent>
@@ -236,15 +265,15 @@ function AssignForm({
         </Select>
       </div>
       {route && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-slate-500">
           {formatMoney(route.fee_amount)} bus fee will be added to this student&apos;s fees.
         </p>
       )}
-      <DialogFooter>
+      <DialogFooter className="gap-2 sm:gap-0">
         <DialogClose asChild>
           <Button type="button" variant="outline" disabled={pending}>Cancel</Button>
         </DialogClose>
-        <Button type="submit" disabled={pending || !studentId || !routeId} className="gap-2">
+        <Button type="submit" disabled={pending || !studentId || !routeId} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/80">
           {pending && <Loader2 className="size-4 animate-spin" />} Add to bus
         </Button>
       </DialogFooter>

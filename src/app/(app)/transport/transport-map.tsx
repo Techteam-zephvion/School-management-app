@@ -93,11 +93,13 @@ export default function TransportMap({ routes, initial, userId, height = 360 }: 
     return (
       <div
         style={{ height }}
-        className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/60 bg-muted/30 text-center"
+        className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 text-center"
       >
-        <span className="text-3xl">🚌</span>
-        <p className="text-sm font-medium text-muted-foreground">No bus is sharing its location yet.</p>
-        <p className="max-w-xs text-xs text-muted-foreground/70">
+        <span className="flex size-12 items-center justify-center rounded-2xl bg-white text-slate-400 ring-1 ring-slate-200">
+          <span className="text-2xl">🚌</span>
+        </span>
+        <p className="text-sm font-medium text-slate-600">No bus is sharing its location yet.</p>
+        <p className="max-w-xs text-xs text-slate-400">
           When a driver starts sharing from the bus, it appears here live.
         </p>
       </div>
