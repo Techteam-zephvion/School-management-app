@@ -73,8 +73,7 @@ export function SearchCommand() {
     return { indexed, flat };
   }, [groups]);
 
-  // Debounced, route-aware search. All setState happens inside the async
-  // timeout callback (not synchronously in the effect body).
+  // Debounced, route-aware search.
   useEffect(() => {
     const term = q.trim();
     const h = setTimeout(() => {
@@ -145,7 +144,7 @@ export function SearchCommand() {
 
   return (
     <div ref={boxRef} className="relative hidden max-w-sm flex-1 sm:block">
-      <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+      <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
       <Input
         ref={inputRef}
         value={q}
@@ -153,23 +152,28 @@ export function SearchCommand() {
         onFocus={() => q.trim().length >= 2 && setOpen(true)}
         onKeyDown={onKeyDown}
         placeholder={placeholderFor(pathname)}
-        className="pl-9"
+        className="pl-9 bg-slate-50/60 border-slate-200"
         aria-label="Search"
         autoComplete="off"
       />
-      {pending && <Loader2 className="absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />}
+      {pending && <Loader2 className="absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin text-slate-400" />}
 
       {showPanel && (
-        <div className="absolute top-full left-0 z-50 mt-2 w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border/60 bg-popover shadow-lg">
+        <div className="absolute top-full left-0 z-50 mt-2 w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
           {flat.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-              {pending ? "Searching…" : "No results"}
-            </p>
+            <div className="flex flex-col items-center gap-3 px-5 py-8 text-center">
+              <span className="flex size-10 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 ring-1 ring-slate-200">
+                <Search className="size-4.5" />
+              </span>
+              <p className="text-sm text-slate-500">
+                {pending ? "Searching…" : "No results found"}
+              </p>
+            </div>
           ) : (
-            <div className="max-h-[22rem] overflow-y-auto py-1.5">
+            <div className="max-h-[22rem] overflow-y-auto py-2">
               {indexed.map((g) => (
-                <div key={g.title} className="px-1.5 pb-1">
-                  <p className="px-2.5 py-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                <div key={g.title} className="px-2 pb-1">
+                  <p className="px-2 py-1.5 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
                     {g.title}
                   </p>
                   {g.items.map(({ item, i }) => {
@@ -181,18 +185,25 @@ export function SearchCommand() {
                         onMouseEnter={() => setActive(i)}
                         onClick={() => go(item.href)}
                         className={cn(
-                          "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left",
-                          active === i ? "bg-accent text-accent-foreground" : "hover:bg-muted/60"
+                          "flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left transition-colors",
+                          active === i
+                            ? "bg-blue-50 text-blue-700"
+                            : "text-slate-700 hover:bg-slate-50"
                         )}
                       >
-                        <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                        <span className={cn(
+                          "flex size-8 shrink-0 items-center justify-center rounded-lg ring-1 transition-colors",
+                          active === i
+                            ? "bg-blue-100 text-blue-700 ring-blue-200"
+                            : "bg-slate-100 text-slate-500 ring-slate-200"
+                        )}>
                           <Icon className="size-4" />
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium">{item.label}</span>
-                          {item.sub && <span className="block truncate text-xs text-muted-foreground">{item.sub}</span>}
+                          {item.sub && <span className="block truncate text-xs text-slate-400">{item.sub}</span>}
                         </span>
-                        {active === i && <CornerDownLeft className="size-3.5 shrink-0 text-muted-foreground" />}
+                        {active === i && <CornerDownLeft className="size-3.5 shrink-0 text-blue-400" />}
                       </button>
                     );
                   })}
