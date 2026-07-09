@@ -10,7 +10,7 @@ import { ComposeNoticeDialog } from "./compose-notice-dialog";
 
 export type ClassOption = { id: string; name: string };
 export type SectionOption = { id: string; label: string };
-export type StudentOption = { id: string; label: string };
+export type StudentOption = { id: string; label: string; sectionId: string };
 
 function fmt(d: string) {
   return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
@@ -103,6 +103,7 @@ export default async function NoticesPage() {
         return st
           ? {
               id: st.id,
+              sectionId: e.section_id,
               label: `${st.first_name} ${st.last_name ?? ""}`.trim() + ` — ${sectionLabelById.get(e.section_id) ?? ""}`,
             }
           : null;

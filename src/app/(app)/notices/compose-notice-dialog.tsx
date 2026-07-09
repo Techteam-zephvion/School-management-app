@@ -45,6 +45,7 @@ export function ComposeNoticeDialog({
   const [open, setOpen] = useState(false);
   const [audience, setAudience] = useState<Audience>(isAdmin ? "school" : "section");
   const [targetId, setTargetId] = useState("");
+  const [sectionFilter, setSectionFilter] = useState(""); // used only when audience === "individual"
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -61,13 +62,29 @@ export function ComposeNoticeDialog({
       ];
 
   const needsTarget = audience !== "school";
+
+  // For "individual", filter students by the selected section
+  const filteredStudents = audience === "individual" && sectionFilter
+    ? students.filter((s) => s.sectionId === sectionFilter)
+    : students;
+
   const targetItems =
     audience === "class" ? classes.map((c) => ({ id: c.id, label: c.name }))
     : audience === "section" ? sections
-    : audience === "individual" ? students
+    : audience === "individual" ? filteredStudents
     : [];
+
   const targetLabel =
     audience === "class" ? "Class" : audience === "section" ? "Section" : "Student";
+
+  const canSubmit = !needsTarget || Boolean(targetId);
+
+  // Reset filters when audience changes
+  function onAudienceChange(v: string) {
+    setAudience(v as Audience);
+    setTargetId("");
+    setSectionFilter("");
+  }
 
   const [state, formAction, pending] = useActionState(
     async (prev: Awaited<ReturnType<typeof createAnnouncement>>, fd: FormData) => {
@@ -91,6 +108,7 @@ export function ComposeNoticeDialog({
         toast.success("Announcement posted.");
         setOpen(false);
         setTargetId("");
+        setSectionFilter("");
         setFile(null);
       }
       return result;
@@ -99,7 +117,6 @@ export function ComposeNoticeDialog({
   );
 
   const busy = pending || uploading;
-  const canSubmit = !needsTarget || Boolean(targetId);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -124,15 +141,13 @@ export function ComposeNoticeDialog({
           </div>
         </DialogHeader>
         <form action={formAction} className="space-y-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2 mt-4">
-              <Label className="text-xs  font-semibold text-slate-600 ml-2">Send to</Label>
+          <div className={`grid gap-4 ${audience === "individual" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+            {/* Audience selector */}
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold text-slate-600">Send to</Label>
               <Select
                 value={audience}
-                onValueChange={(v) => {
-                  setAudience(v as Audience);
-                  setTargetId("");
-                }}
+                onValueChange={onAudienceChange}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -146,17 +161,53 @@ export function ComposeNoticeDialog({
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Section filter -- shown only when audience is "individual" */}
+            {audience === "individual" && (
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-slate-600">Section</Label>
+                <Select
+                  value={sectionFilter}
+                  onValueChange={(v) => {
+                    setSectionFilter(v);
+                    setTargetId("");
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Choose section" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sections.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Target selector */}
             {needsTarget && (
-              <div className="space-y-2 mt-4 ">
-                <Label className="text-xs font-semibold text-slate-600 ml-2">{targetLabel}</Label>
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-slate-600">{targetLabel}</Label>
                 <Select
                   value={targetId}
                   onValueChange={setTargetId}
-                  disabled={targetItems.length === 0}
+                  disabled={
+                    (audience === "individual" && !sectionFilter) ||
+                    targetItems.length === 0
+                  }
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue
-                      placeholder={targetItems.length === 0 ? `No ${targetLabel.toLowerCase()}s` : `Choose ${targetLabel.toLowerCase()}`}
+                      placeholder={
+                        audience === "individual" && !sectionFilter
+                          ? "Pick a section first"
+                          : targetItems.length === 0
+                            ? `No ${targetLabel.toLowerCase()}s`
+                            : `Choose ${targetLabel.toLowerCase()}`
+                      }
                     />
                   </SelectTrigger>
                   <SelectContent>
@@ -172,15 +223,15 @@ export function ComposeNoticeDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="title" className="ml-2 text-xs font-semibold text-slate-600">Title</Label>
+            <Label htmlFor="title" className="text-xs font-semibold text-slate-600">Title</Label>
             <Input id="title" name="title" placeholder="Parent–teacher meeting" required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="body" className="ml-2 text-xs font-semibold text-slate-600">Message</Label>
+            <Label htmlFor="body" className="text-xs font-semibold text-slate-600">Message</Label>
             <Textarea id="body" name="body" rows={4} placeholder="Write your notice…" required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="file" className="ml-2 text-xs font-semibold text-slate-600">Attachment (optional)</Label>
+            <Label htmlFor="file" className="text-xs font-semibold text-slate-600">Attachment (optional)</Label>
             <Input id="file" type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           </div>
 
