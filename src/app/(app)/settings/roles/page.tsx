@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { requireActiveMembership } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CalendarClock } from "lucide-react";
 import { ClassTeachers } from "./class-teachers";
 import { SubjectTeachers } from "./subject-teachers";
@@ -35,17 +34,22 @@ export default async function RolesPage() {
 
   if (!activeYear) {
     return (
-      <div className="mx-auto max-w-4xl space-y-6">
+      <div className="mx-auto max-w-5xl space-y-6 pb-8">
         <PageHeader
           title="Roles"
           description="Assign class teachers and subject teachers."
         />
-        <Alert>
-          <CalendarClock className="size-4" />
-          <AlertDescription>
-            Set an active academic year and create sections first.
-          </AlertDescription>
-        </Alert>
+        <div className="flex items-start gap-4 rounded-2xl border border-amber-200/60 bg-amber-50/60 px-5 py-4">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+            <CalendarClock className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1 pt-0.5">
+            <p className="text-sm font-semibold text-amber-900">No active academic year</p>
+            <p className="mt-0.5 text-xs text-amber-700/80">
+              Set an active academic year and create sections first.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -83,7 +87,6 @@ export default async function RolesPage() {
   ]);
 
   // Only teachers are assignable as class/subject teachers -- exclude admins
-  // (they get a staff row too, but shouldn't appear in the teacher pickers).
   const { data: teacherMembers } = await supabase
     .from("school_members")
     .select("user_id")
@@ -113,7 +116,7 @@ export default async function RolesPage() {
   });
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6 pb-8">
       <PageHeader
         title="Roles"
         description={`Class & subject teacher assignments for ${activeYear.name}.`}
