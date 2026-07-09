@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { requireActiveMembership } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CalendarClock } from "lucide-react";
 import { SubjectsPanel } from "./subjects-panel";
 import { ClassesPanel } from "./classes-panel";
@@ -46,23 +45,28 @@ export default async function ClassesPage() {
     ]);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6 pb-8">
       <PageHeader
         title="Classes & subjects"
         description="Build your grade → section → subject structure."
       />
 
       {!activeYear && (
-        <Alert>
-          <CalendarClock className="size-4" />
-          <AlertDescription>
-            Set an active academic year in{" "}
-            <a href="/settings/school" className="font-medium text-accent underline">
-              School profile
-            </a>{" "}
-            before adding sections.
-          </AlertDescription>
-        </Alert>
+        <div className="flex items-start gap-4 rounded-2xl border border-amber-200/60 bg-amber-50/60 px-5 py-4">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+            <CalendarClock className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1 pt-0.5">
+            <p className="text-sm font-semibold text-amber-900">No active academic year</p>
+            <p className="mt-0.5 text-xs text-amber-700/80">
+              Set an active academic year in{" "}
+            <a href="/settings/school" className="font-medium text-amber-800 underline">
+                School profile
+              </a>{" "}
+              before adding sections.
+            </p>
+          </div>
+        </div>
       )}
 
       <SubjectsPanel subjects={subjects ?? []} />

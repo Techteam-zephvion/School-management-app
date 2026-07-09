@@ -2,7 +2,7 @@
 
 import { useActionState, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Plus, X, Trash2, BookOpen, ChevronDown } from "lucide-react";
+import { Plus, X, Trash2, BookOpen, ChevronDown, GraduationCap } from "lucide-react";
 import {
   createClass,
   deleteClass,
@@ -13,9 +13,6 @@ import {
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +24,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
@@ -68,31 +66,41 @@ export function ClassesPanel({
   );
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-start justify-between space-y-0">
-        <div>
-          <CardTitle>Classes</CardTitle>
-          <CardDescription>
-            Each class has sections and a set of subjects.
-          </CardDescription>
+    <Card className="overflow-hidden border border-slate-200/80 bg-white shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+      {/* Card header */}
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <div className="flex items-center gap-3">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+            <GraduationCap className="size-4.5" />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Classes</h2>
+            <p className="text-xs text-slate-500">Each class has sections and a set of subjects.</p>
+          </div>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/80">
               <Plus className="size-4" /> Add class
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle>Add a class</DialogTitle>
+              <div className="flex items-center gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                  <GraduationCap className="size-4.5" />
+                </span>
+                <div>
+                  <DialogTitle>Add a class</DialogTitle>
+                  <DialogDescription>Create a new grade for the school.</DialogDescription>
+                </div>
+              </div>
             </DialogHeader>
-            <form action={formAction} className="space-y-4">
+            <form action={formAction} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="class-grade">Grade number</Label>
+                <Label htmlFor="class-grade" className="text-xs font-semibold text-slate-600">Grade number</Label>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-muted-foreground">
-                    Grade
-                  </span>
+                  <span className="text-sm font-medium text-slate-500">Grade</span>
                   <Input
                     id="class-grade"
                     name="gradeNumber"
@@ -106,27 +114,36 @@ export function ClassesPanel({
                     required
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-slate-400">
                   Saved as &ldquo;Grade 5&rdquo;. Numbers only.
                 </p>
               </div>
               {state?.error && (
-                <p className="text-sm text-destructive">{state.error}</p>
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {state.error}
+                </div>
               )}
-              <DialogFooter>
-                <Button type="submit" disabled={pending}>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button type="submit" disabled={pending} className="bg-primary text-primary-foreground hover:bg-primary/80">
                   {pending ? "Adding…" : "Add class"}
                 </Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
-      </CardHeader>
-      <CardContent className="space-y-3">
+      </div>
+
+      <CardContent className="space-y-4 px-5 py-5">
         {classes.length === 0 ? (
-          <p className="py-2 text-sm text-muted-foreground">
-            No classes yet. Add your first grade to get started.
-          </p>
+          <div className="flex flex-col items-center gap-4 py-8 text-center">
+            <span className="flex size-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 ring-1 ring-slate-200">
+              <GraduationCap className="size-5" />
+            </span>
+            <div>
+              <p className="text-sm font-medium text-slate-700">No classes yet</p>
+              <p className="mt-0.5 text-xs text-slate-500">Add your first grade to get started.</p>
+            </div>
+          </div>
         ) : (
           classes.map((c) => (
             <ClassCard
@@ -162,6 +179,7 @@ function ClassCard({
   const [isPending, startTransition] = useTransition();
   const [enabled, setEnabled] = useState<Set<string>>(new Set(enabledSubjectIds));
   const [addingSection, setAddingSection] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   function toggleSubject(subjectId: string, checked: boolean) {
     const next = new Set(enabled);
@@ -196,29 +214,55 @@ function ClassCard({
   const enabledSubjects = subjects.filter((s) => enabled.has(s.id));
 
   return (
-    <div className="rounded-xl border border-border p-4">
+    <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 transition-colors hover:border-slate-200">
+      {/* Class header */}
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold">{klass.name}</h3>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          disabled={isPending}
-          onClick={removeClass}
-          aria-label={`Delete ${klass.name}`}
-          className="text-muted-foreground hover:text-destructive"
-        >
-          <Trash2 className="size-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+            <GraduationCap className="size-4" />
+          </span>
+          <h3 className="text-sm font-semibold text-slate-900">{klass.name}</h3>
+        </div>
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled={isPending}
+              aria-label={`Delete ${klass.name}`}
+              className="text-slate-400 hover:text-red-600"
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete {klass.name}?</DialogTitle>
+              <DialogDescription>
+                This will permanently delete {klass.name} and all its sections, subject mappings, and
+                enrollments. This can&apos;t be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isPending}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={removeClass} disabled={isPending} className="gap-2">
+                <Trash2 className="size-4" /> Delete class
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {/* sections */}
-      <div className="mt-3">
-        <p className="mb-1.5 text-xs font-medium text-muted-foreground">Sections</p>
+      {/* Sections */}
+      <div className="mt-4">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Sections</p>
         <div className="flex flex-wrap items-center gap-2">
           {sections.map((s) => (
             <span
               key={s.id}
-              className="group inline-flex items-center gap-1 rounded-md border border-border bg-secondary/60 py-1 pl-2.5 pr-1 text-sm font-medium"
+              className="group inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white py-1 pl-2.5 pr-1 text-sm font-medium shadow-sm"
             >
               {klass.name} · {s.name}
               <button
@@ -226,7 +270,7 @@ function ClassCard({
                 disabled={isPending}
                 onClick={() => removeSection(s.id, s.name)}
                 aria-label={`Remove section ${s.name}`}
-                className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                className="flex size-5 items-center justify-center rounded text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
               >
                 <X className="size-3.5" />
               </button>
@@ -249,19 +293,19 @@ function ClassCard({
               </Button>
             )
           ) : (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-slate-400">
               Set an active year to add sections
             </span>
           )}
         </div>
       </div>
 
-      {/* subjects mapping */}
-      <div className="mt-3">
-        <p className="mb-1.5 text-xs font-medium text-muted-foreground">Subjects</p>
+      {/* Subjects mapping */}
+      <div className="mt-4">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Subjects</p>
         <div className="flex flex-wrap items-center gap-2">
           {enabledSubjects.map((s) => (
-            <Badge key={s.id} variant="secondary">
+            <Badge key={s.id} variant="secondary" className="font-medium">
               {s.name}
             </Badge>
           ))}
@@ -275,9 +319,7 @@ function ClassCard({
             </PopoverTrigger>
             <PopoverContent align="start" className="w-56">
               {subjects.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Add subjects above first.
-                </p>
+                <p className="text-sm text-slate-500">Add subjects above first.</p>
               ) : (
                 <div className="space-y-1.5">
                   {subjects.map((s) => (
@@ -334,7 +376,7 @@ function AddSectionForm({
           required
           className="h-8 w-16"
         />
-        <Button type="submit" size="sm" disabled={pending}>
+        <Button type="submit" size="sm" disabled={pending} className="bg-primary text-primary-foreground hover:bg-primary/80">
           {pending ? "…" : "Add"}
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={onDone}>
@@ -342,7 +384,7 @@ function AddSectionForm({
         </Button>
       </form>
       {state?.error ? (
-        <span className="text-xs text-destructive">{state.error}</span>
+        <span className="text-xs text-red-600">{state.error}</span>
       ) : null}
     </span>
   );
