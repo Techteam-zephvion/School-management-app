@@ -16,8 +16,8 @@ function fmt(d: string) {
   return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-const AUDIENCE_BADGE: Record<string, { label: string; variant: "secondary" | "warning" | "success" }> = {
-  school: { label: "Whole school", variant: "warning" },
+const AUDIENCE_BADGE: Record<string, { label: string; variant: "secondary" | "warning" | "success" | "info" }> = {
+  school: { label: "Whole school", variant: "info" },
   class: { label: "Class", variant: "secondary" },
   section: { label: "Section", variant: "secondary" },
   individual: { label: "Individual", variant: "success" },
@@ -134,7 +134,7 @@ export default async function NoticesPage() {
   const canCompose = isAdmin || sections.length > 0;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6 pb-8">
       <PageHeader
         title="Announcements"
         description="Notices for the whole school, a class, a section, or a single student."
@@ -151,14 +151,32 @@ export default async function NoticesPage() {
         }
       />
 
-      <Card>
-        <CardContent className="divide-y divide-border p-0">
+      <Card className="overflow-hidden border border-slate-200/80 bg-white shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+        {/* Card header */}
+        <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+            <Megaphone className="size-4.5" />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">All announcements</h2>
+            <p className="text-xs text-slate-500">
+              {notices?.length ?? 0} notice{(notices?.length ?? 0) !== 1 ? "s" : ""}
+            </p>
+          </div>
+        </div>
+
+        <CardContent className="divide-y divide-slate-100 p-0">
           {!notices || notices.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-12 text-center">
-              <Megaphone className="size-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                No announcements yet.{canCompose ? " Post your first notice above." : ""}
-              </p>
+            <div className="flex flex-col items-center gap-4 px-5 py-16 text-center">
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 ring-1 ring-slate-200">
+                <Megaphone className="size-5" />
+              </span>
+              <div>
+                <p className="text-sm font-medium text-slate-700">No announcements yet</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {canCompose ? "Post your first notice above." : "Announcements will appear here once posted."}
+                </p>
+              </div>
             </div>
           ) : (
             notices.map((n) => {
@@ -168,23 +186,25 @@ export default async function NoticesPage() {
                 <Link
                   key={n.id}
                   href={`/notices/${n.id}`}
-                  className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
+                  className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-blue-50/50"
                 >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
-                    <Megaphone className="size-4.5" />
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 ring-1 ring-blue-100 transition-colors group-hover:bg-blue-100">
+                    <Megaphone className="size-5" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-1.5 truncate font-medium">
+                    <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-900">
                       {n.title}
-                      {n.attachment_url && <Paperclip className="size-3.5 text-muted-foreground" />}
+                      {n.attachment_url && <Paperclip className="size-3.5 shrink-0 text-slate-400" />}
                     </p>
-                    <p className="truncate text-xs text-muted-foreground">
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
                       {fmt(n.published_at)}
-                      {reads > 0 ? ` · ${reads} read` : ""}
+                      {reads > 0 ? ` · ${reads} read` : " · Unread"}
                     </p>
                   </div>
-                  <Badge variant={badge.variant}>{badge.label}</Badge>
-                  <ChevronRight className="size-4 text-muted-foreground" />
+                  <Badge variant={badge.variant} className="shrink-0">
+                    {badge.label}
+                  </Badge>
+                  <ChevronRight className="size-4 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500" />
                 </Link>
               );
             })

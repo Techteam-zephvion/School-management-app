@@ -104,19 +104,29 @@ export function ComposeNoticeDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
-          <Megaphone className="size-4" /> New announcement
+        <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/80">
+          <Megaphone className="size-4" />
+          New announcement
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>New announcement</DialogTitle>
-          <DialogDescription>Reaches the guardians you target, in their app.</DialogDescription>
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+              <Megaphone className="size-4.5" />
+            </span>
+            <div>
+              <DialogTitle>New announcement</DialogTitle>
+              <DialogDescription>
+                Reaches the guardians you target, in their app.
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
-        <form action={formAction} className="space-y-4">
+        <form action={formAction} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Send to</Label>
+            <div className="space-y-2 mt-4">
+              <Label className="text-xs  font-semibold text-slate-600 ml-2">Send to</Label>
               <Select
                 value={audience}
                 onValueChange={(v) => {
@@ -137,8 +147,8 @@ export function ComposeNoticeDialog({
               </Select>
             </div>
             {needsTarget && (
-              <div className="space-y-2">
-                <Label>{targetLabel}</Label>
+              <div className="space-y-2 mt-4 ">
+                <Label className="text-xs font-semibold text-slate-600 ml-2">{targetLabel}</Label>
                 <Select
                   value={targetId}
                   onValueChange={setTargetId}
@@ -162,22 +172,30 @@ export function ComposeNoticeDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="title" className="ml-2 text-xs font-semibold text-slate-600">Title</Label>
             <Input id="title" name="title" placeholder="Parent–teacher meeting" required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="body">Message</Label>
+            <Label htmlFor="body" className="ml-2 text-xs font-semibold text-slate-600">Message</Label>
             <Textarea id="body" name="body" rows={4} placeholder="Write your notice…" required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="file">Attachment (optional)</Label>
+            <Label htmlFor="file" className="ml-2 text-xs font-semibold text-slate-600">Attachment (optional)</Label>
             <Input id="file" type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           </div>
 
-          {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
+          {state?.error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {state.error}
+            </div>
+          )}
 
-          <DialogFooter>
-            <Button type="submit" disabled={busy || !canSubmit} className="gap-2">
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="submit"
+              disabled={busy || !canSubmit}
+              className="gap-2 bg-primary text-primary-foreground hover:bg-primary/80"
+            >
               {busy && <Loader2 className="size-4 animate-spin" />}
               {uploading ? "Uploading…" : pending ? "Posting…" : "Post announcement"}
             </Button>

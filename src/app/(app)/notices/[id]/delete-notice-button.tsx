@@ -41,7 +41,7 @@ export function DeleteNoticeButton({ id, title }: { id: string; title: string })
         <Button
           variant="outline"
           size="sm"
-          className="gap-1.5 text-destructive hover:text-destructive"
+          className="gap-1.5 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
         >
           <Trash2 className="size-4" />
           Delete
@@ -54,13 +54,18 @@ export function DeleteNoticeButton({ id, title }: { id: string; title: string })
             &ldquo;{title}&rdquo; will be permanently removed for everyone. This can&apos;t be undone.
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:gap-0">
           <DialogClose asChild>
             <Button variant="outline" disabled={isPending}>
               Cancel
             </Button>
           </DialogClose>
-          <Button variant="destructive" onClick={remove} disabled={isPending} className="gap-2">
+          <Button
+            variant="destructive"
+            onClick={remove}
+            disabled={isPending}
+            className="gap-2"
+          >
             {isPending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
             Delete announcement
           </Button>

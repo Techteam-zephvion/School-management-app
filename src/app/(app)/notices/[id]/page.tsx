@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Paperclip, Download, Eye, Users } from "lucide-react";
+import { ArrowLeft, Megaphone, Paperclip, Download, Eye, Users, Calendar } from "lucide-react";
 import { requireActiveMembership, getAuthUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DeleteNoticeButton } from "./delete-notice-button";
 
@@ -16,8 +15,8 @@ function fmt(d: string) {
   });
 }
 
-const AUDIENCE_BADGE: Record<string, { label: string; variant: "secondary" | "warning" | "success" }> = {
-  school: { label: "Whole school", variant: "warning" },
+const AUDIENCE_BADGE: Record<string, { label: string; variant: "secondary" | "warning" | "success" | "info" }> = {
+  school: { label: "Whole school", variant: "info" },
   class: { label: "Class", variant: "secondary" },
   section: { label: "Section", variant: "secondary" },
   individual: { label: "Individual", variant: "success" },
@@ -82,54 +81,89 @@ export default async function NoticeDetailPage({
   const badge = AUDIENCE_BADGE[notice.audience] ?? AUDIENCE_BADGE.section;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6 pb-8">
       <Link
         href="/notices"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        className="group inline-flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-900"
       >
-        <ArrowLeft className="size-4" /> All announcements
+        <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-0.5" /> All announcements
       </Link>
 
-      <Card>
-        <CardHeader className="space-y-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <CardTitle className="text-xl">{notice.title}</CardTitle>
-            <Badge variant={badge.variant}>{badge.label}</Badge>
+      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+        {/* Header with icon */}
+        <div className="border-b border-slate-100 px-6 pt-6 pb-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-4">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                <Megaphone className="size-6" />
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-3">
+                  <h1 className="truncate text-xl font-bold tracking-tight text-slate-900">
+                    {notice.title}
+                  </h1>
+                  <Badge variant={badge.variant} className="shrink-0">
+                    {badge.label}
+                  </Badge>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-slate-500">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Users className="size-3.5" />
+                    {targetText}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Eye className="size-3.5" />
+                    {readCount ?? 0} read
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Calendar className="size-3.5" />
+                    {fmt(notice.published_at)}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5">
-              <Users className="size-3.5" /> {targetText}
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Eye className="size-3.5" /> {readCount ?? 0} read
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">{notice.body}</p>
+        </div>
 
+        {/* Body */}
+        <div className="px-6 py-6">
+          <div className="rounded-xl border border-slate-200/60 bg-slate-50/60 p-5">
+            <p className="text-sm leading-relaxed whitespace-pre-wrap text-slate-700">
+              {notice.body}
+            </p>
+          </div>
+
+          {/* Attachment */}
           {attachmentUrl && (
             <a
               href={attachmentUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+              className="group mt-5 flex items-center gap-3 rounded-xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm transition-all hover:border-blue-200 hover:shadow-md"
             >
-              <Paperclip className="size-4 text-muted-foreground" />
-              <span className="max-w-xs truncate">{attachmentName}</span>
-              <Download className="size-4 text-muted-foreground" />
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                <Paperclip className="size-4.5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-slate-900">{attachmentName}</p>
+                <p className="text-xs text-slate-500">Click to download</p>
+              </span>
+              <span className="flex size-8 items-center justify-center rounded-lg bg-slate-50 text-slate-400 ring-1 ring-slate-200 transition-colors group-hover:bg-blue-50 group-hover:text-blue-600 group-hover:ring-blue-100">
+                <Download className="size-4" />
+              </span>
             </a>
           )}
+        </div>
 
-          <div className="flex items-center justify-between border-t border-border pt-4">
-            <p className="text-xs text-muted-foreground">
-              {fmt(notice.published_at)} · by{" "}
-              {(notice.profiles as { full_name: string | null } | null)?.full_name ?? "Staff"}
-            </p>
-            {canManage && <DeleteNoticeButton id={notice.id} title={notice.title} />}
+        {/* Footer */}
+        <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span className="inline-flex size-1.5 rounded-full bg-slate-300" />
+            Posted by {(notice.profiles as { full_name: string | null } | null)?.full_name ?? "Staff"}
           </div>
-        </CardContent>
-      </Card>
+          {canManage && <DeleteNoticeButton id={notice.id} title={notice.title} />}
+        </div>
+      </div>
     </div>
   );
 }
