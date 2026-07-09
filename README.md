@@ -27,6 +27,7 @@ The Parent mobile app (Expo / React Native) lives in the sibling
 
 - Node 20+ and npm
 - Docker (for the local Supabase stack)
+- NOTHING ELSE
 
 ## Local setup
 
