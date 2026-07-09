@@ -47,20 +47,29 @@ export function CreateLeaveDialog({ students }: { students: StudentPick[] }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
+        <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/80">
           <CalendarPlus className="size-4" /> Record leave
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Record a leave request</DialogTitle>
-          <DialogDescription>For a leave a parent has phoned in. Approve it to mark the days excused.</DialogDescription>
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+              <CalendarPlus className="size-4.5" />
+            </span>
+            <div>
+              <DialogTitle>Record a leave request</DialogTitle>
+              <DialogDescription>
+                For a leave a parent has phoned in. Approve it to mark the days excused.
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
-        <form action={formAction} className="space-y-4">
+        <form action={formAction} className="space-y-5">
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-foreground">Student</Label>
+            <Label className="text-xs font-semibold text-slate-600">Student</Label>
             <Select value={studentId} onValueChange={setStudentId}>
-              <SelectTrigger className="w-full rounded-lg">
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Choose a student" />
               </SelectTrigger>
               <SelectContent>
@@ -74,21 +83,25 @@ export function CreateLeaveDialog({ students }: { students: StudentPick[] }) {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="fromDate" className="text-sm font-medium text-foreground">From</Label>
-              <Input id="fromDate" name="fromDate" type="date" required className="rounded-lg" />
+              <Label htmlFor="fromDate" className="text-xs font-semibold text-slate-600">From</Label>
+              <Input id="fromDate" name="fromDate" type="date" required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="toDate" className="text-sm font-medium text-foreground">To</Label>
-              <Input id="toDate" name="toDate" type="date" required className="rounded-lg" />
+              <Label htmlFor="toDate" className="text-xs font-semibold text-slate-600">To</Label>
+              <Input id="toDate" name="toDate" type="date" required />
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="reason" className="text-sm font-medium text-foreground">Reason (optional)</Label>
-            <Textarea id="reason" name="reason" rows={2} placeholder="Fever, family function…" className="rounded-lg" />
+            <Label htmlFor="reason" className="text-xs font-semibold text-slate-600">Reason (optional)</Label>
+            <Textarea id="reason" name="reason" rows={2} placeholder="Fever, family function…" />
           </div>
-          {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
-          <DialogFooter>
-            <Button type="submit" disabled={pending || !studentId} className="gap-2">
+          {state?.error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {state.error}
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="submit" disabled={pending || !studentId} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/80">
               {pending && <Loader2 className="size-4 animate-spin" />}
               Record leave
             </Button>

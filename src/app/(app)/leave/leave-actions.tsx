@@ -24,11 +24,16 @@ export function LeaveActions({ id, student }: { id: string; student: string }) {
         variant="outline"
         disabled={isPending}
         onClick={() => review(false)}
-        className="gap-1 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+        className="gap-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
       >
         <X className="size-4" /> Reject
       </Button>
-      <Button size="sm" disabled={isPending} onClick={() => review(true)} className="gap-1">
+      <Button
+        size="sm"
+        disabled={isPending}
+        onClick={() => review(true)}
+        className="gap-1 bg-primary text-primary-foreground hover:bg-primary/80"
+      >
         {isPending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Approve
       </Button>
     </div>

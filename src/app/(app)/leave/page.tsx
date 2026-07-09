@@ -104,36 +104,60 @@ export default async function LeavePage() {
   });
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6 pb-8">
       <PageHeader
         title="Leave"
         description="Approve leave and it's marked excused on attendance."
         action={pickerStudents.length > 0 ? <CreateLeaveDialog students={pickerStudents} /> : undefined}
       />
 
-      <Card className="overflow-hidden border-0 shadow-md shadow-muted-foreground/5 ring-1 ring-border/50">
-        <CardContent className="divide-y divide-border/60 p-0">
+      <Card className="overflow-hidden border border-slate-200/80 bg-white shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+        {/* Card header */}
+        <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+            <CalendarX2 className="size-4.5" />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Leave requests</h2>
+            <p className="text-xs text-slate-500">
+              {items.length} request{items.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+        </div>
+
+        <CardContent className="divide-y divide-slate-100 p-0">
           {items.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <span className="flex size-12 items-center justify-center rounded-2xl bg-muted/60">
-                <CalendarX2 className="size-6 text-muted-foreground/70" />
+            <div className="flex flex-col items-center gap-4 px-5 py-16 text-center">
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 ring-1 ring-slate-200">
+                <CalendarX2 className="size-5" />
               </span>
-              <p className="text-sm font-medium text-muted-foreground">No leave requests.</p>
-              <p className="text-xs text-muted-foreground/70">Parents file leave from their app; you can record and approve here.</p>
+              <div>
+                <p className="text-sm font-medium text-slate-700">No leave requests</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Parents file leave from their app; you can record and approve here.
+                </p>
+              </div>
             </div>
           ) : (
             items.map((l) => {
               const badge = STATUS[l.status] ?? STATUS.pending;
               return (
-                <div key={l.id} className="flex items-center gap-3 px-5 py-3.5">
+                <div
+                  key={l.id}
+                  className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-blue-50/50"
+                >
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                    <CalendarX2 className="size-5" />
+                  </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{l.student}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {fmt(l.fromDate)}{l.toDate !== l.fromDate ? ` – ${fmt(l.toDate)}` : ""}
+                    <p className="truncate text-sm font-semibold text-slate-900">{l.student}</p>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                      {fmt(l.fromDate)}
+                      {l.toDate !== l.fromDate ? ` — ${fmt(l.toDate)}` : ""}
                       {l.reason ? ` · ${l.reason}` : ""}
                     </p>
                   </div>
-                  <Badge variant={badge.variant} className="px-2.5 py-1 text-xs font-medium">
+                  <Badge variant={badge.variant} className="shrink-0">
                     {badge.label}
                   </Badge>
                   {l.status === "pending" && l.canReview && <LeaveActions id={l.id} student={l.student} />}
