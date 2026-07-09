@@ -128,54 +128,73 @@ export default async function MessagesPage() {
   });
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6 pb-8">
       <PageHeader
         title="Messages"
         description="Private conversations with parents."
         action={students.length > 0 ? <NewMessageDialog students={students} /> : undefined}
       />
 
-      <Card className="overflow-hidden border-0 shadow-md shadow-muted-foreground/5 ring-1 ring-border/50">
-        <CardContent className="divide-y divide-border/60 p-0">
+      <Card className="overflow-hidden border border-slate-200/80 bg-white shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+        {/* Card header */}
+        <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+            <MessagesSquare className="size-4.5" />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Conversations</h2>
+            <p className="text-xs text-slate-500">
+              {rows.length} thread{rows.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+        </div>
+
+        <CardContent className="divide-y divide-slate-100 p-0">
           {rows.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <span className="flex size-12 items-center justify-center rounded-2xl bg-muted/60">
-                <MessagesSquare className="size-6 text-muted-foreground/70" />
+            <div className="flex flex-col items-center gap-4 px-5 py-16 text-center">
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 ring-1 ring-slate-200">
+                <MessagesSquare className="size-5" />
               </span>
-              <p className="text-sm font-medium text-muted-foreground">No conversations yet.</p>
-              <p className="text-xs text-muted-foreground/70">Start a message to a parent above.</p>
+              <div>
+                <p className="text-sm font-medium text-slate-700">No conversations yet</p>
+                <p className="mt-0.5 text-xs text-slate-500">Start a message to a parent above.</p>
+              </div>
             </div>
           ) : (
             rows.map((r) => (
               <Link
                 key={r.id}
                 href={`/messages/${r.id}`}
-                className="group flex items-center gap-4 px-5 py-4 transition-all hover:bg-muted/40"
+                className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-blue-50/50"
               >
                 <Avatar className="size-10 shrink-0">
-                  <AvatarFallback className={r.unread > 0 ? "bg-primary/10 text-primary" : ""}>
+                  <AvatarFallback className={r.unread > 0 ? "bg-blue-50 text-blue-700 ring-1 ring-blue-100" : "bg-slate-100 text-slate-500"}>
                     {initials(r.title)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className={`truncate text-sm ${r.unread > 0 ? "font-bold" : "font-semibold"}`}>{r.title}</p>
+                    <p className={`truncate text-sm ${r.unread > 0 ? "font-bold text-slate-900" : "font-semibold text-slate-900"}`}>
+                      {r.title}
+                    </p>
                     {r.studentName && (
-                      <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
+                      <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 ring-1 ring-blue-100">
                         re: {r.studentName}
                       </span>
                     )}
                   </div>
-                  <p className={`mt-0.5 truncate text-xs ${r.unread > 0 ? "font-medium text-foreground" : "text-muted-foreground"}`}>
+                  <p className={`mt-0.5 truncate text-xs ${r.unread > 0 ? "font-medium text-slate-700" : "text-slate-500"}`}>
                     {r.preview}
                   </p>
                 </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span className="text-xs text-muted-foreground">{timeago(r.at)}</span>
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <span className="text-xs text-slate-400">{timeago(r.at)}</span>
                   {r.unread > 0 ? (
-                    <Badge className="h-5 min-w-5 justify-center rounded-full px-1.5 text-xs">{r.unread}</Badge>
+                    <Badge variant="default" className="h-5 min-w-5 justify-center rounded-full px-1.5 text-xs">
+                      {r.unread}
+                    </Badge>
                   ) : (
-                    <ChevronRight className="size-4 text-muted-foreground" />
+                    <ChevronRight className="size-4 text-slate-300 transition-colors group-hover:text-slate-500" />
                   )}
                 </div>
               </Link>

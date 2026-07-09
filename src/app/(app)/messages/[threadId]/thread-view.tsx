@@ -43,9 +43,7 @@ export function ThreadView({
   const add = (m: Message) =>
     setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
 
-  // Realtime: append new messages for this thread as they arrive. With
-  // cookie-based SSR auth the realtime socket isn't authenticated by default, so
-  // we set the access token before subscribing (RLS gates postgres_changes).
+  // Realtime: append new messages for this thread as they arrive.
   useEffect(() => {
     const supabase = createClient();
     let channel: ReturnType<typeof supabase.channel> | null = null;
@@ -90,7 +88,7 @@ export function ThreadView({
     });
   }
 
-  // Precompute which messages start a new day (avoid mutating during render).
+  // Precompute which messages start a new day.
   const dayDividers = new Set<string>();
   {
     let prev = "";
@@ -105,24 +103,28 @@ export function ThreadView({
 
   return (
     <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-2xl flex-col gap-4">
+      {/* Header */}
       <div className="flex items-center gap-3">
         <Link
           href="/messages"
           aria-label="Back to messages"
-          className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex size-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
         >
           <ArrowLeft className="size-4" />
         </Link>
         <div className="min-w-0">
-          <p className="truncate font-semibold">{title}</p>
-          {studentName && <p className="truncate text-xs text-muted-foreground">re: {studentName}</p>}
+          <p className="truncate text-sm font-semibold text-slate-900">{title}</p>
+          {studentName && <p className="truncate text-xs text-slate-500">re: {studentName}</p>}
         </div>
       </div>
 
-      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden border-0 shadow-md shadow-muted-foreground/5 ring-1 ring-border/50">
-        <div className="flex-1 space-y-1 overflow-y-auto p-4">
+      {/* Chat card */}
+      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden border border-slate-200/80 bg-white shadow-sm shadow-slate-950/5 ring-1 ring-slate-900/[0.02]">
+        <div className="flex-1 space-y-1 overflow-y-auto p-5">
           {messages.length === 0 && (
-            <p className="py-8 text-center text-sm text-muted-foreground">No messages yet. Say hello.</p>
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+              <p className="text-sm text-slate-400">No messages yet. Say hello.</p>
+            </div>
           )}
           {messages.map((m) => {
             const mine = m.sender_id === me;
@@ -130,8 +132,8 @@ export function ThreadView({
             return (
               <div key={m.id}>
                 {showDay && (
-                  <div className="my-3 flex items-center justify-center">
-                    <span className="rounded-full bg-muted px-3 py-0.5 text-xs text-muted-foreground">
+                  <div className="my-4 flex items-center justify-center">
+                    <span className="rounded-full bg-slate-100 px-3 py-0.5 text-xs font-medium text-slate-500">
                       {dayLabel(m.created_at)}
                     </span>
                   </div>
@@ -139,19 +141,19 @@ export function ThreadView({
                 <div className={cn("flex", mine ? "justify-end" : "justify-start")}>
                   <div
                     className={cn(
-                      "max-w-[78%] rounded-2xl px-3.5 py-2 text-sm",
+                      "max-w-[78%] rounded-2xl px-3.5 py-2.5 text-sm",
                       mine
-                        ? "rounded-br-sm bg-accent text-accent-foreground"
-                        : "rounded-bl-sm bg-muted text-foreground"
+                        ? "rounded-br-sm bg-blue-600 text-white"
+                        : "rounded-bl-sm bg-slate-100 text-slate-900"
                     )}
                   >
                     {!mine && (
-                      <p className="mb-0.5 text-xs font-semibold text-muted-foreground">
+                      <p className="mb-0.5 text-xs font-semibold text-slate-500">
                         {nameByUser[m.sender_id] ?? "Guardian"}
                       </p>
                     )}
-                    <p className="whitespace-pre-wrap wrap-break-word">{m.body}</p>
-                    <p className={cn("mt-0.5 text-right text-[10px]", mine ? "text-accent-foreground/70" : "text-muted-foreground")}>
+                    <p className="whitespace-pre-wrap break-words leading-relaxed">{m.body}</p>
+                    <p className={cn("mt-0.5 text-right text-[10px]", mine ? "text-blue-200" : "text-slate-400")}>
                       {fmtTime(m.created_at)}
                     </p>
                   </div>
@@ -162,7 +164,8 @@ export function ThreadView({
           <div ref={bottomRef} />
         </div>
 
-        <div className="flex items-end gap-2 border-t border-border bg-card/95 p-3">
+        {/* Composer */}
+        <div className="flex items-end gap-2 border-t border-slate-100 bg-white p-4">
           <Textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
@@ -175,14 +178,14 @@ export function ThreadView({
             rows={1}
             placeholder="Write a message…  (Enter to send)"
             aria-label="Message"
-            className="max-h-32 min-h-10 flex-1 resize-none rounded-xl"
+            className="max-h-32 min-h-10 flex-1 resize-none rounded-xl border-slate-200 bg-slate-50/60"
           />
           <Button
             onClick={send}
             disabled={isPending || body.trim().length === 0}
             size="icon"
             aria-label="Send message"
-            className="size-10 shrink-0 rounded-xl"
+            className="size-10 shrink-0 rounded-xl bg-primary text-primary-foreground hover:bg-primary/80"
           >
             {isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
           </Button>

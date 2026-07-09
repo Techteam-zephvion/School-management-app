@@ -53,20 +53,27 @@ export function NewMessageDialog({ students }: { students: StudentPick[] }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
+        <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/80">
           <MessageSquarePlus className="size-4" /> New message
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Message a parent</DialogTitle>
-          <DialogDescription>Goes to the student&apos;s linked guardian(s) in their app.</DialogDescription>
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+              <MessageSquarePlus className="size-4.5" />
+            </span>
+            <div>
+              <DialogTitle>Message a parent</DialogTitle>
+              <DialogDescription>Goes to the student&apos;s linked guardian(s) in their app.</DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-foreground">About student</Label>
+            <Label className="text-xs font-semibold text-slate-600">About student</Label>
             <Select value={studentId} onValueChange={setStudentId}>
-              <SelectTrigger className="w-full rounded-lg">
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Choose a student" />
               </SelectTrigger>
               <SelectContent>
@@ -79,20 +86,23 @@ export function NewMessageDialog({ students }: { students: StudentPick[] }) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="body" className="text-sm font-medium text-foreground">Message</Label>
+            <Label htmlFor="body" className="text-xs font-semibold text-slate-600">Message</Label>
             <Textarea
               id="body"
               rows={4}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="Hello, I wanted to share an update about…"
-              className="rounded-lg"
             />
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
         </div>
-        <DialogFooter>
-          <Button onClick={submit} disabled={isPending || !studentId || body.trim().length === 0} className="gap-2">
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button onClick={submit} disabled={isPending || !studentId || body.trim().length === 0} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/80">
             {isPending && <Loader2 className="size-4 animate-spin" />}
             Send
           </Button>
