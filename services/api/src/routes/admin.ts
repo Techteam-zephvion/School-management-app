@@ -1,0 +1,103 @@
+import { zValidator } from '@hono/zod-validator';
+import { Hono } from 'hono';
+import { createDb } from '../db/client';
+import { requireRole } from '../http/auth';
+import { createSchoolRepository } from '../repositories/school-repository';
+import type { AppBindings } from '../types';
+import {
+  createAcademicYearSchema,
+  createClassSchema,
+  createSectionSchema,
+  createStaffSchema,
+  createStudentSchema,
+  createSubjectSchema,
+  createTeacherAssignmentSchema,
+  createUserSchema,
+} from '../http/validation';
+
+export const adminRoutes = new Hono<AppBindings>();
+
+adminRoutes.use('*', async (c, next) => {
+  requireRole(c.get('authUser'), ['admin']);
+  await next();
+});
+
+adminRoutes.get('/overview', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.overview(c.get('authUser')));
+});
+
+adminRoutes.post('/users', zValidator('json', createUserSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createUser(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+adminRoutes
+  .get('/academic-years', async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listAcademicYears(c.get('authUser')));
+  })
+  .post('/academic-years', zValidator('json', createAcademicYearSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createAcademicYear(c.get('authUser'), c.req.valid('json')), 201);
+  });
+
+adminRoutes
+  .get('/classes', async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listClasses(c.get('authUser')));
+  })
+  .post('/classes', zValidator('json', createClassSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createClass(c.get('authUser'), c.req.valid('json')), 201);
+  });
+
+adminRoutes
+  .get('/sections', async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listSections(c.get('authUser')));
+  })
+  .post('/sections', zValidator('json', createSectionSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createSection(c.get('authUser'), c.req.valid('json')), 201);
+  });
+
+adminRoutes
+  .get('/subjects', async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listSubjects(c.get('authUser')));
+  })
+  .post('/subjects', zValidator('json', createSubjectSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createSubject(c.get('authUser'), c.req.valid('json')), 201);
+  });
+
+adminRoutes
+  .get('/staff', async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listStaff(c.get('authUser')));
+  })
+  .post('/staff', zValidator('json', createStaffSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createStaff(c.get('authUser'), c.req.valid('json')), 201);
+  });
+
+adminRoutes
+  .get('/students', async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listStudents(c.get('authUser')));
+  })
+  .post('/students', zValidator('json', createStudentSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createStudent(c.get('authUser'), c.req.valid('json')), 201);
+  });
+
+adminRoutes
+  .get('/teacher-assignments', async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listTeacherAssignments(c.get('authUser')));
+  })
+  .post('/teacher-assignments', zValidator('json', createTeacherAssignmentSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createTeacherAssignment(c.get('authUser'), c.req.valid('json')), 201);
+  });

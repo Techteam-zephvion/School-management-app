@@ -1,0 +1,29 @@
+{
+  "name": "@schoolic/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev src/index.ts --local --persist-to .wrangler/state",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.7.5",
+    "@neondatabase/serverless": "^1.0.2",
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.13",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.10.2",
+    "@cloudflare/workers-types": "^5.20261009.1",
+    "drizzle-kit": "^0.31.7",
+    "tsx": "^4.20.6",
+    "vitest": "^4.0.0",
+    "wrangler": "^4.149.0"
+  }
+}

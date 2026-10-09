@@ -1,0 +1,17 @@
+{
+  "name": "schoolic",
+  "private": true,
+  "packageManager": "pnpm@12.10.1",
+  "scripts": {
+    "api:dev": "pnpm --filter @schoolic/api dev",
+    "api:test": "pnpm --filter @schoolic/api test",
+    "api:typecheck": "pnpm --filter @schoolic/api typecheck",
+    "api:deploy": "pnpm --filter @schoolic/api deploy",
+    "db:generate": "pnpm --filter @schoolic/api db:generate",
+    "flutter:test": "cd apps/flutter_app && flutter test",
+    "flutter:build:web": "cd apps/flutter_app && flutter build web --release"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

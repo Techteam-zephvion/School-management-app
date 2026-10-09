@@ -1,0 +1,9 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+node_modules/
+.wrangler/
+dist/
+coverage/
+apps/flutter_app/build/
