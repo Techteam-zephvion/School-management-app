@@ -13,17 +13,38 @@ const bootstrapSchema = z.object({
   }),
   admin: z.object({
     neonUserId: z.string().min(1),
-    email: z.email(),
+    email: z.string().email(),
     displayName: z.string().min(2),
   }),
 });
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
 
 export const bootstrapRoutes = new Hono<AppBindings>();
 
 bootstrapRoutes.post('/school', zValidator('json', bootstrapSchema), async (c) => {
   const token = c.req.header('x-bootstrap-token');
-  if (c.env.APP_ENV === 'production' && (!c.env.BOOTSTRAP_TOKEN || token !== c.env.BOOTSTRAP_TOKEN)) {
-    throw new ApiError(403, 'Bootstrap token required');
+  const isProduction = c.env.APP_ENV === 'production';
+
+  if (isProduction) {
+    if (!c.env.BOOTSTRAP_TOKEN) {
+      throw new ApiError(500, 'Bootstrap token is not configured on the server');
+    }
+    if (!token || !timingSafeEqual(token, c.env.BOOTSTRAP_TOKEN)) {
+      throw new ApiError(403, 'Invalid or missing bootstrap token');
+    }
+  } else if (c.env.BOOTSTRAP_TOKEN) {
+    // If a bootstrap token is configured in non-production, enforce it
+    if (!token || !timingSafeEqual(token, c.env.BOOTSTRAP_TOKEN)) {
+      throw new ApiError(403, 'Invalid or missing bootstrap token');
+    }
   }
 
   const input = c.req.valid('json');

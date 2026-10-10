@@ -1,5 +1,6 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { createDb } from '../db/client';
 import { requireRole } from '../http/auth';
 import { createSchoolRepository } from '../repositories/school-repository';
@@ -21,6 +22,24 @@ adminRoutes.use('*', async (c, next) => {
   requireRole(c.get('authUser'), ['admin']);
   await next();
 });
+
+const attendanceSummaryQuerySchema = z.object({
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid startDate format (expected YYYY-MM-DD)').optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid endDate format (expected YYYY-MM-DD)').optional(),
+  classId: z.string().uuid().optional(),
+  sectionId: z.string().uuid().optional(),
+  format: z.enum(['json', 'csv']).optional(),
+});
+
+function sanitizeCsvValue(val: unknown): string {
+  if (val === null || val === undefined) return '""';
+  let str = String(val);
+  // CWE-1236: Prevent CSV formula injection if cell begins with =, +, -, @, \t, or \r
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`;
+  }
+  return `"${str.replace(/"/g, '""')}"`;
+}
 
 adminRoutes.get('/overview', async (c) => {
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
@@ -102,28 +121,28 @@ adminRoutes
     return c.json(await repo.createTeacherAssignment(c.get('authUser'), c.req.valid('json')), 201);
   });
 
-adminRoutes.get('/attendance-summary', async (c) => {
+adminRoutes.get('/attendance-summary', zValidator('query', attendanceSummaryQuerySchema), async (c) => {
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
-  const { startDate, endDate, classId, sectionId, format } = c.req.query();
+  const query = c.req.valid('query');
   const summary = await repo.attendanceSummary(c.get('authUser'), {
-    startDate,
-    endDate,
-    classId,
-    sectionId,
+    startDate: query.startDate,
+    endDate: query.endDate,
+    classId: query.classId,
+    sectionId: query.sectionId,
   });
 
-  if (format === 'csv') {
+  if (query.format === 'csv') {
     const headers = ['attendanceDate', 'className', 'sectionName', 'kind', 'periodNumber', 'staffName'];
     const csvLines = [
       headers.join(','),
       ...summary.sessions.map((s) =>
         [
           s.attendanceDate ?? '',
-          `"${(s.className ?? '').replace(/"/g, '""')}"`,
-          `"${(s.sectionName ?? '').replace(/"/g, '""')}"`,
+          sanitizeCsvValue(s.className),
+          sanitizeCsvValue(s.sectionName),
           s.kind ?? '',
           s.periodNumber ?? '',
-          `"${(s.staffName ?? '').replace(/"/g, '""')}"`,
+          sanitizeCsvValue(s.staffName),
         ].join(','),
       ),
     ];
@@ -138,7 +157,12 @@ adminRoutes.get('/attendance-summary', async (c) => {
   return c.json(summary);
 });
 
-adminRoutes.get('/students/:id/attendance-summary', async (c) => {
-  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
-  return c.json(await repo.studentAttendanceSummary(c.get('authUser'), c.req.param('id')));
-});
+adminRoutes.get(
+  '/students/:id/attendance-summary',
+  zValidator('param', z.object({ id: z.string().uuid('Invalid student ID format') })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    const param = c.req.valid('param');
+    return c.json(await repo.studentAttendanceSummary(c.get('authUser'), param.id));
+  },
+);

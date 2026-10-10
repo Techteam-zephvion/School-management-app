@@ -4,15 +4,42 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-09",
   "workers_dev": true,
-  "routes": [
-    {
-      "pattern": "api-school.zephvion.com",
-      "custom_domain": true
-    }
-  ],
   "vars": {
     "APP_ENV": "development",
-    "CORS_ORIGIN": "http://localhost:8080",
-    "NEON_AUTH_URL": "https://replace-with-neon-auth-url"
+    "CORS_ORIGIN": "http://localhost:8080,http://127.0.0.1:8080",
+    "NEON_AUTH_URL": "http://localhost:8787"
+  },
+  "env": {
+    "staging": {
+      "name": "schoolic-api-staging",
+      "routes": [
+        {
+          "pattern": "staging-api-school.zephvion.com",
+          "zone_name": "zephvion.com",
+          "custom_domain": true
+        }
+      ],
+      "vars": {
+        "APP_ENV": "staging",
+        "CORS_ORIGIN": "https://staging.schoolic.zephvion.com",
+        "NEON_AUTH_URL": "https://staging-auth.schoolic.zephvion.com"
+      }
+    },
+    "production": {
+      "name": "schoolic-api",
+      "workers_dev": false,
+      "routes": [
+        {
+          "pattern": "api-school.zephvion.com",
+          "zone_name": "zephvion.com",
+          "custom_domain": true
+        }
+      ],
+      "vars": {
+        "APP_ENV": "production",
+        "CORS_ORIGIN": "https://schoolic.zephvion.com",
+        "NEON_AUTH_URL": "https://auth.schoolic.zephvion.com"
+      }
+    }
   }
 }

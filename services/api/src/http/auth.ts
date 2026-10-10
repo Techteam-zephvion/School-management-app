@@ -12,25 +12,39 @@ type NeonSessionResponse = {
   };
 };
 
-async function readNeonSession(authUrl: string, credential: { bearer?: string; cookie?: string }): Promise<{ id: string; email: string }> {
-  const response = await fetch(`${authUrl.replace(/\/$/, '')}/auth/session`, {
-    headers: {
-      ...(credential.bearer ? { authorization: `Bearer ${credential.bearer}` } : {}),
-      ...(credential.cookie ? { cookie: credential.cookie } : {}),
-      accept: 'application/json',
-    },
-  });
+async function readNeonSession(
+  authUrl: string,
+  credential: { bearer?: string; cookie?: string },
+): Promise<{ id: string; email: string }> {
+  try {
+    const url = `${authUrl.replace(/\/$/, '')}/auth/session`;
+    const response = await fetch(url, {
+      headers: {
+        ...(credential.bearer ? { authorization: `Bearer ${credential.bearer}` } : {}),
+        ...(credential.cookie ? { cookie: credential.cookie } : {}),
+        accept: 'application/json',
+      },
+    });
 
-  if (!response.ok) {
-    throw new ApiError(401, 'Invalid or expired session');
+    if (response.status === 401 || response.status === 403) {
+      throw new ApiError(401, 'Invalid or expired session');
+    }
+
+    if (!response.ok) {
+      throw new ApiError(401, 'Authentication verification failed');
+    }
+
+    const body = (await response.json()) as NeonSessionResponse;
+    if (!body.user?.id || !body.user.email) {
+      throw new ApiError(401, 'Auth session did not include a valid user');
+    }
+
+    return { id: body.user.id, email: body.user.email };
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    console.error('Error verifying session with authentication service:', error);
+    throw new ApiError(401, 'Unable to verify authentication credentials');
   }
-
-  const body = (await response.json()) as NeonSessionResponse;
-  if (!body.user?.id || !body.user.email) {
-    throw new ApiError(401, 'Auth session did not include a usable user');
-  }
-
-  return { id: body.user.id, email: body.user.email };
 }
 
 export const authenticate = createMiddleware<AppBindings>(async (c, next) => {
@@ -39,15 +53,25 @@ export const authenticate = createMiddleware<AppBindings>(async (c, next) => {
   const bearer = c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   const cookie = c.req.header('cookie');
 
+  const isProduction = c.env.APP_ENV === 'production';
+  const isDevelopmentOrTest = c.env.APP_ENV === 'development' || c.env.APP_ENV === 'test';
+
   let sessionUser: { id: string; email: string };
-  if (c.env.APP_ENV !== 'production' && devUserId && devEmail) {
-    sessionUser = { id: devUserId, email: devEmail };
-  } else if (bearer || cookie) {
+
+  if (bearer || cookie) {
+    if (!c.env.NEON_AUTH_URL) {
+      console.error('NEON_AUTH_URL configuration missing on server');
+      throw new ApiError(500, 'Authentication service misconfigured');
+    }
     sessionUser = await readNeonSession(c.env.NEON_AUTH_URL, {
       ...(bearer ? { bearer } : {}),
       ...(cookie ? { cookie } : {}),
     });
+  } else if (!isProduction && isDevelopmentOrTest && devUserId && devEmail) {
+    // Development authentication bypass: STRICTLY allowed only in local development/test environments
+    sessionUser = { id: devUserId, email: devEmail };
   } else {
+    // In production, or whenever credentials are not supplied, fail closed with 401
     throw new ApiError(401, 'Authentication required');
   }
 

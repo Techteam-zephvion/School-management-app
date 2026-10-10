@@ -115,16 +115,27 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     }
   }
 
+  String _sanitizeCsvCell(Object? value) {
+    if (value == null) return '""';
+    var str = value.toString().trim();
+    if (str.startsWith('=') ||
+        str.startsWith('+') ||
+        str.startsWith('-') ||
+        str.startsWith('@') ||
+        str.startsWith('\t') ||
+        str.startsWith('\r')) {
+      str = "'$str";
+    }
+    return '"${str.replaceAll('"', '""')}"';
+  }
+
   void _exportSummariesCsv() {
     if (_summaries.isEmpty) return;
     final headers = ['Date', 'Class', 'Section', 'Kind', 'Period', 'Teacher'];
     final keys = ['attendanceDate', 'className', 'sectionName', 'kind', 'periodNumber', 'staffName'];
     final buffer = StringBuffer()..writeln(headers.join(','));
     for (final row in _summaries) {
-      final line = keys.map((k) {
-        final val = '${row[k] ?? ''}'.replaceAll('"', '""');
-        return '"$val"';
-      }).join(',');
+      final line = keys.map((k) => _sanitizeCsvCell(row[k])).join(',');
       buffer.writeln(line);
     }
     final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());

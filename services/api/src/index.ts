@@ -13,8 +13,28 @@ export function createApp() {
 
   app.use('*', logger());
   app.use('*', async (c, next) => {
+    const isProduction = c.env.APP_ENV === 'production';
+    const configuredOrigins = (c.env.CORS_ORIGIN || '')
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean);
+
+    const defaultDevOrigins = ['http://localhost:8080', 'http://127.0.0.1:8080', 'http://localhost:3000'];
+    const allowedOrigins = configuredOrigins.length > 0 ? configuredOrigins : isProduction ? [] : defaultDevOrigins;
+
     const middleware = cors({
-      origin: c.env.CORS_ORIGIN || '*',
+      origin: (requestOrigin) => {
+        if (!requestOrigin) {
+          return allowedOrigins[0] ?? '';
+        }
+        if (allowedOrigins.includes(requestOrigin)) {
+          return requestOrigin;
+        }
+        if (!isProduction && (requestOrigin.startsWith('http://localhost:') || requestOrigin.startsWith('http://127.0.0.1:'))) {
+          return requestOrigin;
+        }
+        return '';
+      },
       allowHeaders: ['content-type', 'authorization', 'x-dev-neon-user-id', 'x-dev-email', 'x-bootstrap-token'],
       allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       credentials: true,

@@ -16,7 +16,7 @@ import {
   userRoles,
 } from '../db/schema';
 import { ApiError } from '../http/errors';
-import type { AuthUser, Role } from '../types';
+import type { AuthUser } from '../types';
 import type {
   createAcademicYearSchema,
   createClassSchema,
@@ -68,7 +68,12 @@ export function createSchoolRepository(db: Db) {
     },
 
     async listAcademicYears(user: AuthUser) {
-      return db.select().from(academicYears).where(eq(academicYears.schoolId, user.schoolId));
+      return db
+        .select()
+        .from(academicYears)
+        .where(eq(academicYears.schoolId, user.schoolId))
+        .orderBy(desc(academicYears.startsOn))
+        .limit(100);
     },
 
     async createAcademicYear(user: AuthUser, input: z.infer<typeof createAcademicYearSchema>) {
@@ -77,7 +82,12 @@ export function createSchoolRepository(db: Db) {
     },
 
     async listClasses(user: AuthUser) {
-      return db.select().from(classes).where(eq(classes.schoolId, user.schoolId));
+      return db
+        .select()
+        .from(classes)
+        .where(eq(classes.schoolId, user.schoolId))
+        .orderBy(classes.sortOrder)
+        .limit(200);
     },
 
     async createClass(user: AuthUser, input: z.infer<typeof createClassSchema>) {
@@ -86,7 +96,11 @@ export function createSchoolRepository(db: Db) {
     },
 
     async listSections(user: AuthUser) {
-      return db.select().from(sections).where(eq(sections.schoolId, user.schoolId));
+      return db
+        .select()
+        .from(sections)
+        .where(eq(sections.schoolId, user.schoolId))
+        .limit(300);
     },
 
     async createSection(user: AuthUser, input: z.infer<typeof createSectionSchema>) {
@@ -95,7 +109,11 @@ export function createSchoolRepository(db: Db) {
     },
 
     async listSubjects(user: AuthUser) {
-      return db.select().from(subjects).where(eq(subjects.schoolId, user.schoolId));
+      return db
+        .select()
+        .from(subjects)
+        .where(eq(subjects.schoolId, user.schoolId))
+        .limit(200);
     },
 
     async createSubject(user: AuthUser, input: z.infer<typeof createSubjectSchema>) {
@@ -104,7 +122,11 @@ export function createSchoolRepository(db: Db) {
     },
 
     async listStaff(user: AuthUser) {
-      return db.select().from(staff).where(eq(staff.schoolId, user.schoolId));
+      return db
+        .select()
+        .from(staff)
+        .where(eq(staff.schoolId, user.schoolId))
+        .limit(300);
     },
 
     async createStaff(user: AuthUser, input: z.infer<typeof createStaffSchema>) {
@@ -127,7 +149,8 @@ export function createSchoolRepository(db: Db) {
         })
         .from(students)
         .leftJoin(studentEnrollments, eq(studentEnrollments.studentId, students.id))
-        .where(eq(students.schoolId, user.schoolId));
+        .where(eq(students.schoolId, user.schoolId))
+        .limit(500);
     },
 
     async createStudent(user: AuthUser, input: z.infer<typeof createStudentSchema>) {
@@ -156,7 +179,11 @@ export function createSchoolRepository(db: Db) {
     },
 
     async listTeacherAssignments(user: AuthUser) {
-      return db.select().from(teacherAssignments).where(eq(teacherAssignments.schoolId, user.schoolId));
+      return db
+        .select()
+        .from(teacherAssignments)
+        .where(eq(teacherAssignments.schoolId, user.schoolId))
+        .limit(500);
     },
 
     async createTeacherAssignment(user: AuthUser, input: z.infer<typeof createTeacherAssignmentSchema>) {
@@ -182,9 +209,10 @@ export function createSchoolRepository(db: Db) {
         .from(teacherAssignments)
         .innerJoin(classes, eq(teacherAssignments.classId, classes.id))
         .innerJoin(sections, eq(teacherAssignments.sectionId, sections.id))
-        .where(and(eq(teacherAssignments.schoolId, user.schoolId), eq(teacherAssignments.staffId, user.staffId)));
-        
-      return rows.map(r => ({
+        .where(and(eq(teacherAssignments.schoolId, user.schoolId), eq(teacherAssignments.staffId, user.staffId)))
+        .limit(100);
+
+      return rows.map((r) => ({
         ...r.assignment,
         className: r.className,
         sectionName: r.sectionName,
@@ -192,6 +220,29 @@ export function createSchoolRepository(db: Db) {
     },
 
     async rosterForSection(user: AuthUser, sectionId: string, academicYearId: string) {
+      const isAdmin = user.roles.includes('admin');
+      if (!isAdmin) {
+        if (!user.staffId) {
+          throw new ApiError(403, 'Only assigned teachers can access class rosters');
+        }
+        const [assigned] = await db
+          .select({ id: teacherAssignments.id })
+          .from(teacherAssignments)
+          .where(
+            and(
+              eq(teacherAssignments.schoolId, user.schoolId),
+              eq(teacherAssignments.staffId, user.staffId),
+              eq(teacherAssignments.sectionId, sectionId),
+              eq(teacherAssignments.academicYearId, academicYearId),
+            ),
+          )
+          .limit(1);
+
+        if (!assigned) {
+          throw new ApiError(403, 'Teacher is not assigned to this class section');
+        }
+      }
+
       return db
         .select({
           id: students.id,
@@ -207,11 +258,31 @@ export function createSchoolRepository(db: Db) {
             eq(studentEnrollments.sectionId, sectionId),
             eq(studentEnrollments.academicYearId, academicYearId),
           ),
-        );
+        )
+        .orderBy(studentEnrollments.rollNumber, students.fullName)
+        .limit(200);
     },
 
     async saveAttendance(user: AuthUser, input: z.infer<typeof saveAttendanceSchema>) {
       await assertTeacherCanTakeAttendance(db, user, input);
+
+      const enrolledRows = await db
+        .select({ studentId: studentEnrollments.studentId })
+        .from(studentEnrollments)
+        .where(
+          and(
+            eq(studentEnrollments.schoolId, user.schoolId),
+            eq(studentEnrollments.sectionId, input.sectionId),
+            eq(studentEnrollments.academicYearId, input.academicYearId),
+          ),
+        );
+
+      const enrolledSet = new Set(enrolledRows.map((r) => r.studentId));
+      for (const record of input.records) {
+        if (!enrolledSet.has(record.studentId)) {
+          throw new ApiError(400, `Student ${record.studentId} is not enrolled in this section`);
+        }
+      }
 
       const [session] = await db
         .insert(attendanceSessions)
@@ -280,6 +351,12 @@ export function createSchoolRepository(db: Db) {
       },
     ) {
       const conditions = [eq(attendanceSessions.schoolId, user.schoolId)];
+
+      // Teachers are scoped to their own sessions unless they have the admin role
+      if (!user.roles.includes('admin') && user.staffId) {
+        conditions.push(eq(attendanceSessions.takenByStaffId, user.staffId));
+      }
+
       if (filters?.startDate) {
         conditions.push(gte(attendanceSessions.attendanceDate, filters.startDate));
       }
@@ -305,15 +382,16 @@ export function createSchoolRepository(db: Db) {
         .innerJoin(sections, eq(attendanceSessions.sectionId, sections.id))
         .innerJoin(staff, eq(attendanceSessions.takenByStaffId, staff.id))
         .where(and(...conditions))
-        .orderBy(desc(attendanceSessions.attendanceDate));
+        .orderBy(desc(attendanceSessions.attendanceDate))
+        .limit(500);
 
       return {
-        sessions: rows.map(r => ({
+        sessions: rows.map((r) => ({
           ...r.session,
           className: r.className,
           sectionName: r.sectionName,
           staffName: r.staffName,
-        }))
+        })),
       };
     },
 
@@ -343,7 +421,8 @@ export function createSchoolRepository(db: Db) {
             eq(attendanceRecords.studentId, studentId),
           ),
         )
-        .orderBy(desc(attendanceSessions.attendanceDate));
+        .orderBy(desc(attendanceSessions.attendanceDate))
+        .limit(500);
 
       const total = rows.length;
       let present = 0;
@@ -370,7 +449,7 @@ export function createSchoolRepository(db: Db) {
           excused,
           attendanceRate,
         },
-        records: rows.map(r => ({
+        records: rows.map((r) => ({
           date: r.session.attendanceDate,
           kind: r.session.kind,
           periodNumber: r.session.periodNumber,

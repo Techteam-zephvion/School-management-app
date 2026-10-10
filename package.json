@@ -6,10 +6,17 @@
     "api:dev": "pnpm --filter @schoolic/api dev",
     "api:test": "pnpm --filter @schoolic/api test",
     "api:typecheck": "pnpm --filter @schoolic/api typecheck",
-    "api:deploy": "pnpm --filter @schoolic/api deploy",
+    "api:deploy": "pnpm --filter @schoolic/api exec wrangler deploy",
+    "api:deploy:staging": "pnpm --filter @schoolic/api exec wrangler deploy --env staging",
+    "api:deploy:prod": "pnpm --filter @schoolic/api exec wrangler deploy --env production",
     "db:generate": "pnpm --filter @schoolic/api db:generate",
+    "db:migrate": "pnpm --filter @schoolic/api db:migrate",
     "flutter:test": "cd apps/flutter_app && flutter test",
-    "flutter:build:web": "cd apps/flutter_app && flutter build web --release"
+    "flutter:build:web": "cd apps/flutter_app && flutter build web --release",
+    "flutter:build:web:staging": "cd apps/flutter_app && flutter build web --release --output build/web_staging --dart-define=API_BASE_URL=https://staging-api-school.zephvion.com --dart-define=NEON_AUTH_URL=https://staging-auth.schoolic.zephvion.com",
+    "flutter:build:web:prod": "cd apps/flutter_app && flutter build web --release --dart-define=API_BASE_URL=https://api-school.zephvion.com --dart-define=NEON_AUTH_URL=https://auth.schoolic.zephvion.com",
+    "pages:deploy:staging": "pnpm --filter @schoolic/api exec wrangler pages deploy ../../apps/flutter_app/build/web_staging --project-name=schoolic-staging --branch=staging",
+    "pages:deploy:prod": "pnpm --filter @schoolic/api exec wrangler pages deploy ../../apps/flutter_app/build/web_prod --project-name=schoolic --branch=main"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
