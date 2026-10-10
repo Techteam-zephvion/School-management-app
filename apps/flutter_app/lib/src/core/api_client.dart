@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'auth_transport.dart' as auth_transport;
 import 'config.dart';
 import 'models.dart';
 
@@ -28,15 +29,33 @@ class ApiClient {
       throw ApiException('NEON_AUTH_URL is not configured for this build.', 400);
     }
 
-    final response = await _httpClient.post(
+    await auth_transport.postAuthJson(
       Uri.parse('${AppConfig.neonAuthUrl}/auth/sign-in/email'),
-      headers: {'content-type': 'application/json'},
-      body: jsonEncode({'email': email, 'password': password}),
+      {'email': email, 'password': password},
+      httpClient: _httpClient,
     );
-    _ensureSuccess(response);
 
-    final token = _extractBearerToken(_decode(response));
+    final tokenResponse = await auth_transport.getAuthJson(
+      Uri.parse('${AppConfig.neonAuthUrl}/auth/token'),
+      httpClient: _httpClient,
+    );
+    final token = tokenResponse['token'] as String?;
+    if (token == null || token.isEmpty) {
+      throw ApiException('Authentication token was not issued.', 401);
+    }
     return currentUser(bearerToken: token);
+  }
+
+  Future<void> signOutWithNeon() async {
+    if (AppConfig.neonAuthUrl.isEmpty) return;
+    try {
+      await auth_transport.postAuth(
+        Uri.parse('${AppConfig.neonAuthUrl}/auth/sign-out'),
+        httpClient: _httpClient,
+      );
+    } on auth_transport.AuthTransportException {
+      // Local session cleanup should still proceed if the remote session is already gone.
+    }
   }
 
   Future<AuthSession> currentUser({String? bearerToken, AuthSession? devSession}) async {
@@ -98,11 +117,6 @@ class ApiClient {
       if (devSession?.devNeonUserId != null) 'x-dev-neon-user-id': devSession!.devNeonUserId!,
       if (devSession?.devNeonUserId != null) 'x-dev-email': devSession!.email,
     };
-  }
-
-  String? _extractBearerToken(Map<String, Object?> json) {
-    final token = json['token'] ?? json['accessToken'] ?? (json['session'] as Map?)?['token'];
-    return token as String?;
   }
 
   void _ensureSuccess(http.Response response) {

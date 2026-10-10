@@ -1,50 +1,57 @@
 # Last Update (October 10, 2026)
 
-## 1. Phase 3.1: Staging Deployment Execution
+## 1. Phase 3.2: Default-Domain Staging Complete
 
-### Neon Staging Database
-- **Schoolic production reference identified:** Neon project `schoolic` (`dark-frost-36120929`), branch `main` (`br-rapid-lake-b5g9wtix`), endpoint host `ep-polished-silence-b52ozwm7.c-7.us-east-2.aws.neon.tech`.
-- **Unrelated Neon project check:** The prohibited `neon-amethyst-pillow` project was not used.
-- **Isolation method:** Created a separate empty Neon project for staging instead of branching from `main`, because `main` already contains application records.
-- **Staging database:** Neon project `schoolic-staging` (`nameless-dust-81736720`), branch `main` (`br-floral-mountain-b5s114go`), endpoint host `ep-billowing-shadow-b56k9cl2.c-7.us-east-2.aws.neon.tech`.
-- **Migration result:** `pnpm db:migrate` completed successfully against the staging database using `DATABASE_URL_UNPOOLED`.
-- **Schema verification:** The staging database contains the expected application tables plus `drizzle.__drizzle_migrations`. Follow-up row-count queries intermittently failed with Neon HTTP fetch timeouts from this environment.
+### Hosting URLs
+- **Frontend:** `https://schoolic-staging.pages.dev`
+- **Latest Pages deployment:** `https://40e7852c.schoolic-staging.pages.dev`
+- **API Worker:** `https://schoolic-api-staging.schoolic-api.workers.dev`
+- **Authentication root:** `https://ep-billowing-shadow-b56k9cl2.neonauth.c-7.us-east-2.aws.neon.tech/neondb`
+- **Neon Auth base URL:** `https://ep-billowing-shadow-b56k9cl2.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth`
 
-### Cloudflare Worker
-- **Wrangler authentication:** Confirmed logged in as `vbk.zephvion@gmail.com` under Cloudflare account `5c34da760e86d900ee5274d71ad9191e`.
-- **Worker deployment:** Uploaded and deployed Worker `schoolic-api-staging`.
-- **Worker secrets:** Configured staging secrets `DATABASE_URL` and `BOOTSTRAP_TOKEN` with Wrangler. Secret values were not written to source or documentation.
-- **Worker variables:** Staging deploy uses `APP_ENV=staging`, `CORS_ORIGIN=https://staging.schoolic.zephvion.com`, and `NEON_AUTH_URL=https://staging-auth.schoolic.zephvion.com`.
-- **Custom domain blocker:** Cloudflare rejected the `staging-api-school.zephvion.com` custom domain because the `zephvion.com` zone is not available in the authenticated account. The Worker code exists, but the intended API hostname is not attached.
-- **workers.dev blocker:** The fallback workers.dev URL is not usable because the account has not registered a workers.dev subdomain; HTTPS checks fail with a TLS handshake error.
+### Neon Staging
+- **Staging database project:** `schoolic-staging` (`nameless-dust-81736720`).
+- **Staging branch:** `main` (`br-floral-mountain-b5s114go`).
+- **Staging database endpoint:** `ep-billowing-shadow-b56k9cl2.c-7.us-east-2.aws.neon.tech`.
+- **Auth provider:** Neon Managed Auth / Better Auth enabled on the staging branch.
+- **Trusted auth domains:** `https://schoolic-staging.pages.dev`, `https://cd72e398.schoolic-staging.pages.dev`, and `https://40e7852c.schoolic-staging.pages.dev`.
+- **Unrelated Neon project check:** `neon-amethyst-pillow` was not used.
 
-### Frontend Artifact & Pages
-- **Staging artifact:** `apps/flutter_app/build/web_staging` exists and contains the SPA `_redirects` file.
-- **Artifact verification:** The staging bundle references `https://staging-api-school.zephvion.com` and `https://staging-auth.schoolic.zephvion.com`; no localhost, production API, or PostgreSQL URL references were found.
-- **Switzer fonts:** Verified in `apps/flutter_app/build/web_staging/assets/FontManifest.json`.
-- **Pages blocker:** The authenticated Cloudflare account has no visible Pages project named `schoolic-staging` or `schoolic`. The frontend was not deployed because creating a new Pages project would risk publishing to the wrong resource.
+### Cloudflare Staging
+- **Wrangler account:** `vbk.zephvion@gmail.com`, account `5c34da760e86d900ee5274d71ad9191e`.
+- **Worker:** `schoolic-api-staging`, deployed to the default `workers.dev` hostname with staging-only variables.
+- **Pages project:** `schoolic-staging`, production branch `staging`, deployed to the default `pages.dev` hostname.
+- **Secrets:** Staging `DATABASE_URL` and `BOOTSTRAP_TOKEN` are configured through Wrangler. Secret values are not stored in source or docs.
+- **Hostinger DNS:** Not modified. No `zephvion.com` nameserver, DNS, or custom-domain changes were made.
 
-### DNS, HTTPS, Auth, and E2E Status
-- **DNS:** `staging.schoolic.zephvion.com`, `staging-api-school.zephvion.com`, and `staging-auth.schoolic.zephvion.com` do not currently resolve from this environment.
-- **HTTPS certificates:** Not validatable while DNS does not resolve and Cloudflare custom domains are not attached.
-- **Authentication:** Live staging authentication was not verified because the auth hostname does not resolve.
-- **End-to-end workflows:** Live attendance, reporting, CSV export, and authorization workflows remain blocked by DNS/custom-domain/Pages availability.
+### Auth Fix
+- Updated the API to verify Neon Auth JWTs from `/auth/token` using the branch JWKS.
+- Updated Flutter Web sign-in to use credentialed Neon Auth calls, then request `/auth/token` and send that JWT to the Schoolic API.
+- Sign-out now calls Neon Auth `/auth/sign-out` before clearing local session state.
 
-### Repository Updates
-- Added `zone_name: "zephvion.com"` to the Worker route entries in `services/api/wrangler.jsonc` so Wrangler can resolve the intended zone when the authenticated account has access.
-- Fixed root deploy scripts in `package.json` to call `wrangler deploy` through `pnpm exec`; `pnpm --filter @schoolic/api deploy --env staging` is parsed as pnpm's own deploy command and fails under the current pnpm version.
-
-### Verification Commands
-- `pnpm api:typecheck`: passed.
-- `pnpm api:test`: 18/18 tests passed.
-- `cd apps/flutter_app && flutter analyze`: no issues found.
-- `pnpm flutter:test`: passed.
+### Verification
+- **HTTPS/DNS:** Canonical `pages.dev`, `workers.dev`, and `neonauth` hostnames resolve and present trusted provider-managed certificates.
+- **CORS:** `https://schoolic-staging.pages.dev` is allowed; `https://example.com` receives no `access-control-allow-origin`.
+- **Frontend bundle:** Verified default API/auth endpoints, no localhost references, no production API/auth references, no old staging custom domains, and no PostgreSQL URLs.
+- **Local checks:** `pnpm api:typecheck`, `pnpm api:test` (18/18), `cd apps/flutter_app && flutter analyze`, and `pnpm flutter:test` all pass.
+- **Live E2E:** Passed with synthetic staging records under school code `STAGE-1791645656627`:
+  - unauthenticated protected request returns 401;
+  - development headers cannot authenticate staging users;
+  - invalid sessions are rejected;
+  - admin and teacher sessions authenticate through Neon Auth JWTs;
+  - teacher is denied admin access with 403;
+  - admin overview, students, staff, classes, subjects, and assignments load;
+  - teacher assigned roster loads and unassigned roster is denied;
+  - daily and period attendance save and persist;
+  - attendance filters return the saved sessions;
+  - CSV export includes the filtered result set and escapes formula-leading values;
+  - student attendance history returns persisted records.
 
 ---
 
 ## 2. Phase 2: Security & Authentication Hardening (Summary)
 - Neutralized development bypass headers in staging and production.
-- Enforced session token verification against `NEON_AUTH_URL/auth/session` with fail-closed error handling.
+- Enforced session token verification against Neon Auth with fail-closed behavior.
 - Implemented object-level authorization for teachers and enrollment verification for student attendance.
 - Neutralized spreadsheet formula injection (CWE-1236) with single-quote escaping on API and Flutter client.
 - Restricted CORS to explicit domain whitelists without wildcard credentials.

@@ -91,6 +91,7 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    await _apiClient.signOutWithNeon();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_storageKey);
     session = null;

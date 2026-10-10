@@ -13,7 +13,7 @@
     "db:migrate": "pnpm --filter @schoolic/api db:migrate",
     "flutter:test": "cd apps/flutter_app && flutter test",
     "flutter:build:web": "cd apps/flutter_app && flutter build web --release",
-    "flutter:build:web:staging": "cd apps/flutter_app && flutter build web --release --output build/web_staging --dart-define=API_BASE_URL=https://staging-api-school.zephvion.com --dart-define=NEON_AUTH_URL=https://staging-auth.schoolic.zephvion.com",
+    "flutter:build:web:staging": "cd apps/flutter_app && flutter build web --release --output build/web_staging --dart-define=API_BASE_URL=https://schoolic-api-staging.schoolic-api.workers.dev --dart-define=NEON_AUTH_URL=https://ep-billowing-shadow-b56k9cl2.neonauth.c-7.us-east-2.aws.neon.tech/neondb",
     "flutter:build:web:prod": "cd apps/flutter_app && flutter build web --release --dart-define=API_BASE_URL=https://api-school.zephvion.com --dart-define=NEON_AUTH_URL=https://auth.schoolic.zephvion.com",
     "pages:deploy:staging": "pnpm --filter @schoolic/api exec wrangler pages deploy ../../apps/flutter_app/build/web_staging --project-name=schoolic-staging --branch=staging",
     "pages:deploy:prod": "pnpm --filter @schoolic/api exec wrangler pages deploy ../../apps/flutter_app/build/web_prod --project-name=schoolic --branch=main"

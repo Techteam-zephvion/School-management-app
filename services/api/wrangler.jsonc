@@ -12,17 +12,11 @@
   "env": {
     "staging": {
       "name": "schoolic-api-staging",
-      "routes": [
-        {
-          "pattern": "staging-api-school.zephvion.com",
-          "zone_name": "zephvion.com",
-          "custom_domain": true
-        }
-      ],
+      "workers_dev": true,
       "vars": {
         "APP_ENV": "staging",
-        "CORS_ORIGIN": "https://staging.schoolic.zephvion.com",
-        "NEON_AUTH_URL": "https://staging-auth.schoolic.zephvion.com"
+        "CORS_ORIGIN": "https://schoolic-staging.pages.dev",
+        "NEON_AUTH_URL": "https://ep-billowing-shadow-b56k9cl2.neonauth.c-7.us-east-2.aws.neon.tech/neondb"
       }
     },
     "production": {
