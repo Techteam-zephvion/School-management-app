@@ -30,13 +30,13 @@ class ApiClient {
     }
 
     await auth_transport.postAuthJson(
-      Uri.parse('${AppConfig.neonAuthUrl}/auth/sign-in/email'),
+      Uri.parse('${AppConfig.neonAuthBase}/sign-in/email'),
       {'email': email, 'password': password},
       httpClient: _httpClient,
     );
 
     final tokenResponse = await auth_transport.getAuthJson(
-      Uri.parse('${AppConfig.neonAuthUrl}/auth/token'),
+      Uri.parse('${AppConfig.neonAuthBase}/token'),
       httpClient: _httpClient,
     );
     final token = tokenResponse['token'] as String?;
@@ -50,7 +50,7 @@ class ApiClient {
     if (AppConfig.neonAuthUrl.isEmpty) return;
     try {
       await auth_transport.postAuth(
-        Uri.parse('${AppConfig.neonAuthUrl}/auth/sign-out'),
+        Uri.parse('${AppConfig.neonAuthBase}/sign-out'),
         httpClient: _httpClient,
       );
     } on auth_transport.AuthTransportException {

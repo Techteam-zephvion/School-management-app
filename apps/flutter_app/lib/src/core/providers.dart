@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_client.dart';
+import 'config.dart';
 import 'models.dart';
 
 final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
@@ -69,6 +70,12 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> devSignIn(AppRole role) async {
+    if (!AppConfig.isLocalDev) {
+      error = 'Development sign-in is only available for local builds.';
+      notifyListeners();
+      return;
+    }
+
     final devSession = AuthSession(
       email: role == AppRole.admin ? 'admin@schoolic.local' : 'teacher@schoolic.local',
       roles: [role],
@@ -81,10 +88,11 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
     try {
       session = await _apiClient.currentUser(devSession: devSession);
-    } on ApiException {
-      session = devSession;
+    } on ApiException catch (exception) {
+      error = exception.message;
+      session = null;
     } finally {
-      await _persist();
+      if (session != null) await _persist();
       isLoading = false;
       notifyListeners();
     }

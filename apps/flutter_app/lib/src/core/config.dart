@@ -8,4 +8,16 @@ class AppConfig {
     'NEON_AUTH_URL',
     defaultValue: '',
   );
+
+  static bool get isLocalDev =>
+      apiBaseUrl.startsWith('http://localhost:') ||
+      apiBaseUrl.startsWith('http://127.0.0.1:');
+
+  static String get neonAuthBase {
+    final trimmed = neonAuthUrl.endsWith('/')
+        ? neonAuthUrl.substring(0, neonAuthUrl.length - 1)
+        : neonAuthUrl;
+    if (trimmed.isEmpty || trimmed.endsWith('/auth')) return trimmed;
+    return '$trimmed/auth';
+  }
 }

@@ -44,6 +44,11 @@ function isJwt(value: string): boolean {
   return value.split('.').length === 3;
 }
 
+function neonAuthBase(authUrl: string): string {
+  const trimmed = authUrl.replace(/\/$/, '');
+  return trimmed.endsWith('/auth') ? trimmed : `${trimmed}/auth`;
+}
+
 async function readNeonJwt(authUrl: string, token: string): Promise<{ id: string; email: string }> {
   const [headerPart, payloadPart, signaturePart] = token.split('.');
   if (!headerPart || !payloadPart || !signaturePart) {
@@ -61,13 +66,13 @@ async function readNeonJwt(authUrl: string, token: string): Promise<{ id: string
     throw new ApiError(401, 'Invalid or expired session');
   }
 
-  const authBase = authUrl.replace(/\/$/, '');
+  const authBase = neonAuthBase(authUrl);
   const expectedIssuer = new URL(authBase).origin;
   if (payload.iss && payload.iss !== expectedIssuer) {
     throw new ApiError(401, 'Invalid or expired session');
   }
 
-  const jwksResponse = await fetch(`${authBase}/auth/.well-known/jwks.json`, {
+  const jwksResponse = await fetch(`${authBase}/.well-known/jwks.json`, {
     headers: { accept: 'application/json' },
   });
   if (!jwksResponse.ok) {
@@ -109,7 +114,7 @@ async function readNeonSession(
       return await readNeonJwt(authUrl, credential.bearer);
     }
 
-    const url = `${authUrl.replace(/\/$/, '')}/auth/get-session`;
+    const url = `${neonAuthBase(authUrl)}/get-session`;
     const sessionCookie = credential.bearer
       ? `__Secure-neon-auth.session_token=${credential.bearer}`
       : credential.cookie;

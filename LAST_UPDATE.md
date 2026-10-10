@@ -1,6 +1,70 @@
-# Last Update (October 10, 2026)
+# Last Update (October 11, 2026)
 
-## 1. Phase 3.2: Default-Domain Staging Complete
+## 1. Phase 4.2: Production Portfolio Deployment
+
+- Completed the approved default-domain production portfolio deployment.
+- Created production Neon recovery snapshot `snap-lucky-star-b5i49wpy` before migration-history changes.
+- Fixed production Drizzle migration history by inserting the baseline row for `0000_aspiring_madame_hydra`.
+- Verified `pnpm db:migrate` now succeeds against production.
+- Added `database/production-demo-seed.sql` and applied realistic synthetic data for `Schoolic Portfolio Academy` (`PORTFOLIO`): academic year, classes, sections, subjects, staff, users, 12 students, enrollments, teacher assignments, and attendance records.
+- Preserved existing production database records.
+- Created Cloudflare Pages project `schoolic` and deployed the frontend to `https://schoolic.pages.dev`.
+- Deployed production Worker `schoolic-api` to `https://schoolic-api.schoolic-api.workers.dev`.
+- Configured production Worker secrets `DATABASE_URL` and `BOOTSTRAP_TOKEN` through Wrangler. Secret values were not printed or documented.
+- Updated production CORS to `https://schoolic.pages.dev`.
+- Updated production Flutter build to use `https://schoolic-api.schoolic-api.workers.dev` and removed old `zephvion.com` production endpoint dependencies.
+- Hostinger DNS, nameservers, and `zephvion.com` custom domains were not modified.
+- Production Neon Auth remains unconfigured by design for this phase. Login fails closed until production Auth is enabled and `NEON_AUTH_URL` is set to the verified production auth root.
+- Verification passed: `pnpm api:typecheck`, `pnpm api:test` (18/18), `cd apps/flutter_app && flutter analyze`, `pnpm flutter:test`, `pnpm flutter:build:web:prod`, live API health, live frontend HTTP 200, CORS preflight from Pages, and production bundle scans.
+
+### Current Production URLs
+- Frontend: `https://schoolic.pages.dev`
+- Latest Pages deployment: `https://7e543704.schoolic.pages.dev`
+- API Worker: `https://schoolic-api.schoolic-api.workers.dev`
+
+### Remaining Production Blockers
+- Production Neon Auth is not configured, so authenticated login is unavailable.
+- Production Neon branch `br-rapid-lake-b5g9wtix` is not protected.
+- Recurring snapshot schedule and restore drill are still deferred.
+
+---
+
+## 2. Phase 4.1: Production Infrastructure Preparation
+
+- Updated `PRODUCTION_READINESS_AUDIT.md` with Phase 4.1 findings.
+- Production is still **not ready** for deployment.
+- Reconfirmed production Neon identity: project `schoolic` (`dark-frost-36120929`), branch `main` (`br-rapid-lake-b5g9wtix`), database `neondb`.
+- Resolved the previous SQL access blocker using Neon CLI embedded TypeScript `psql`; production schema is queryable.
+- Verified expected V1 Schoolic tables, enums, constraints, and `drizzle.__drizzle_migrations` table exist.
+- New critical blocker: `drizzle.__drizzle_migrations` contains zero rows while application tables and some existing records are present. Production migrations must not run until the baseline is approved and fixed.
+- Recovery controls remain incomplete: no manual snapshots, no automatic snapshot schedule, and the production branch is not protected.
+- Production Neon Auth remains unconfigured.
+- Production Cloudflare Worker `schoolic-api` and Pages project `schoolic` remain absent in the authenticated account.
+- Existing `apps/flutter_app/build/web_prod` remains stale and points at unavailable `zephvion.com` custom domains.
+- Local checks passed: `pnpm api:typecheck`, `pnpm api:test` (18/18), `cd apps/flutter_app && flutter analyze`, and `pnpm flutter:test`.
+- Production Worker dry run passed as a bundle check, but still uses obsolete production variables.
+- No production deployments, production secret writes, production database writes, branch protection changes, snapshots, auth changes, Hostinger DNS changes, nameserver changes, or custom-domain changes were performed.
+
+### Pending Explicit Approvals
+- Production branch protection and snapshot/schedule setup.
+- Production Drizzle baseline strategy for the existing schema.
+- Production Neon Auth enablement and trusted domains.
+- Production Worker and Pages resource creation.
+- Production secret writes and production config changes away from `zephvion.com`.
+- Production artifact rebuild and deployment.
+
+---
+
+## 3. Phase 4.0: Production Readiness Audit
+
+- Created `PRODUCTION_READINESS_AUDIT.md`.
+- Production was not ready for deployment.
+- Verified production Neon candidate: project `schoolic` (`dark-frost-36120929`), branch `main` (`br-rapid-lake-b5g9wtix`), database `neondb`.
+- Initial blockers: production Neon Auth was not configured, production Cloudflare Worker and Pages project did not exist in the authenticated account, production config still targeted unavailable `zephvion.com` custom domains, the existing `web_prod` artifact was stale, production SQL migration-history verification timed out, no production snapshot/schedule was found, and the production Neon branch was not protected.
+
+---
+
+## 4. Phase 3.2: Default-Domain Staging Complete
 
 ### Hosting URLs
 - **Frontend:** `https://schoolic-staging.pages.dev`
@@ -49,7 +113,7 @@
 
 ---
 
-## 2. Phase 2: Security & Authentication Hardening (Summary)
+## 5. Phase 2: Security & Authentication Hardening (Summary)
 - Neutralized development bypass headers in staging and production.
 - Enforced session token verification against Neon Auth with fail-closed behavior.
 - Implemented object-level authorization for teachers and enrollment verification for student attendance.

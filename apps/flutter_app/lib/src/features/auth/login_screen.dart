@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config.dart';
 import '../../core/models.dart';
 import '../../core/providers.dart';
 
@@ -64,27 +65,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     icon: const Icon(Icons.login),
                     label: Text(auth.isLoading ? 'Signing in...' : 'Sign in'),
                   ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: auth.isLoading
-                            ? null
-                            : () => ref.read(authControllerProvider).devSignIn(AppRole.admin),
-                        icon: const Icon(Icons.admin_panel_settings_outlined),
-                        label: const Text('Dev admin'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: auth.isLoading
-                            ? null
-                            : () => ref.read(authControllerProvider).devSignIn(AppRole.teacher),
-                        icon: const Icon(Icons.fact_check_outlined),
-                        label: const Text('Dev teacher'),
-                      ),
-                    ],
-                  ),
+                  if (AppConfig.isLocalDev) ...[
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: auth.isLoading
+                              ? null
+                              : () => ref.read(authControllerProvider).devSignIn(AppRole.admin),
+                          icon: const Icon(Icons.admin_panel_settings_outlined),
+                          label: const Text('Dev admin'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: auth.isLoading
+                              ? null
+                              : () => ref.read(authControllerProvider).devSignIn(AppRole.teacher),
+                          icon: const Icon(Icons.fact_check_outlined),
+                          label: const Text('Dev teacher'),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
