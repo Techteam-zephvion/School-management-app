@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/api_client.dart';
+import '../../core/csv_exporter.dart';
 import '../../core/providers.dart';
 import '../shared/shell.dart';
 
@@ -20,13 +22,26 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   List<Map<String, Object?>> _staff = [];
   List<Map<String, Object?>> _students = [];
   List<Map<String, Object?>> _assignments = [];
+  List<Map<String, Object?>> _summaries = [];
   bool _loading = true;
   String? _error;
+
+  String? _selectedClassId;
+  String? _selectedSectionId;
+  final _startDate = TextEditingController();
+  final _endDate = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _startDate.dispose();
+    _endDate.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -56,11 +71,173 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         _students = results[5];
         _assignments = results[6];
       });
+      await _loadSummaries();
     } on ApiException catch (exception) {
       setState(() => _error = exception.message);
     } finally {
       setState(() => _loading = false);
     }
+  }
+
+  Future<void> _loadSummaries() async {
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+    try {
+      final queryParams = <String, String>{
+        if (_selectedClassId != null && _selectedClassId!.isNotEmpty) 'classId': _selectedClassId!,
+        if (_selectedSectionId != null && _selectedSectionId!.isNotEmpty) 'sectionId': _selectedSectionId!,
+        if (_startDate.text.trim().isNotEmpty) 'startDate': _startDate.text.trim(),
+        if (_endDate.text.trim().isNotEmpty) 'endDate': _endDate.text.trim(),
+      };
+      final qs = queryParams.isEmpty ? '' : '?${Uri(queryParameters: queryParams).query}';
+      final res = await ref.read(apiClientProvider).getJson('/api/v1/admin/attendance-summary$qs', session: session);
+      setState(() {
+        _summaries = ((res['sessions'] as List?) ?? const []).cast<Map<String, Object?>>();
+      });
+    } on ApiException catch (exception) {
+      setState(() => _error = exception.message);
+    }
+  }
+
+  void _exportSummariesCsv() {
+    if (_summaries.isEmpty) return;
+    final headers = ['Date', 'Class', 'Section', 'Kind', 'Period', 'Teacher'];
+    final keys = ['attendanceDate', 'className', 'sectionName', 'kind', 'periodNumber', 'staffName'];
+    final buffer = StringBuffer()..writeln(headers.join(','));
+    for (final row in _summaries) {
+      final line = keys.map((k) {
+        final val = '${row[k] ?? ''}'.replaceAll('"', '""');
+        return '"$val"';
+      }).join(',');
+      buffer.writeln(line);
+    }
+    final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());
+    downloadCsv('attendance_summary_$dateStr.csv', buffer.toString());
+  }
+
+  void _showStudentDialog(Map<String, Object?> student) {
+    showDialog(
+      context: context,
+      builder: (context) => _StudentAttendanceDialog(
+        studentId: student['id'] as String,
+        studentName: student['fullName'] as String,
+      ),
+    );
+  }
+
+  Widget _buildFilterBar() {
+    final filteredSections = _selectedClassId == null || _selectedClassId!.isEmpty
+        ? _sections
+        : _sections.where((s) => s['classId'] == _selectedClassId).toList();
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        SizedBox(
+          width: 170,
+          child: DropdownButtonFormField<String?>(
+            isExpanded: true,
+            initialValue: _selectedClassId,
+            decoration: const InputDecoration(labelText: 'Filter Class'),
+            items: [
+              const DropdownMenuItem<String?>(value: null, child: Text('All Classes')),
+              ..._classes.map(
+                (c) => DropdownMenuItem<String?>(value: c['id'] as String, child: Text('${c['name']}')),
+              ),
+            ],
+            onChanged: (val) {
+              setState(() {
+                _selectedClassId = val;
+                _selectedSectionId = null;
+              });
+            },
+          ),
+        ),
+        SizedBox(
+          width: 170,
+          child: DropdownButtonFormField<String?>(
+            key: ValueKey('sec_$_selectedClassId'),
+            isExpanded: true,
+            initialValue: _selectedSectionId,
+            decoration: const InputDecoration(labelText: 'Filter Section'),
+            items: [
+              const DropdownMenuItem<String?>(value: null, child: Text('All Sections')),
+              ...filteredSections.map(
+                (s) => DropdownMenuItem<String?>(value: s['id'] as String, child: Text('${s['name']}')),
+              ),
+            ],
+            onChanged: (val) => setState(() => _selectedSectionId = val),
+          ),
+        ),
+        SizedBox(
+          width: 160,
+          child: TextField(
+            controller: _startDate,
+            decoration: InputDecoration(
+              labelText: 'From Date',
+              hintText: 'yyyy-MM-dd',
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.calendar_today, size: 18),
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2035),
+                  );
+                  if (picked != null) {
+                    _startDate.text = DateFormat('yyyy-MM-dd').format(picked);
+                  }
+                },
+              ),
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 160,
+          child: TextField(
+            controller: _endDate,
+            decoration: InputDecoration(
+              labelText: 'To Date',
+              hintText: 'yyyy-MM-dd',
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.calendar_today, size: 18),
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2035),
+                  );
+                  if (picked != null) {
+                    _endDate.text = DateFormat('yyyy-MM-dd').format(picked);
+                  }
+                },
+              ),
+            ),
+          ),
+        ),
+        FilledButton.icon(
+          onPressed: _loadSummaries,
+          icon: const Icon(Icons.filter_alt_outlined),
+          label: const Text('Filter'),
+        ),
+        OutlinedButton(
+          onPressed: () {
+            setState(() {
+              _selectedClassId = null;
+              _selectedSectionId = null;
+              _startDate.clear();
+              _endDate.clear();
+            });
+            _loadSummaries();
+          },
+          child: const Text('Reset'),
+        ),
+      ],
+    );
   }
 
   @override
@@ -104,7 +281,26 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                   staff: _staff,
                 ),
                 const SizedBox(height: 20),
-                _DataTablePreview(title: 'Students', rows: _students, columns: const ['admissionNumber', 'fullName', 'rollNumber']),
+                _DataTablePreview(
+                  title: 'Students (Click row for attendance history)',
+                  rows: _students,
+                  columns: const ['admissionNumber', 'fullName', 'rollNumber'],
+                  onRowTap: _showStudentDialog,
+                ),
+                const SizedBox(height: 20),
+                _DataTablePreview(
+                  title: 'Attendance Summaries',
+                  rows: _summaries,
+                  columns: const ['attendanceDate', 'className', 'sectionName', 'kind', 'periodNumber', 'staffName'],
+                  actions: [
+                    FilledButton.tonalIcon(
+                      onPressed: _summaries.isEmpty ? null : _exportSummariesCsv,
+                      icon: const Icon(Icons.download),
+                      label: const Text('Export CSV'),
+                    ),
+                  ],
+                  filterWidget: _buildFilterBar(),
+                ),
               ],
             ),
     );
@@ -353,11 +549,21 @@ class _QuickCreateCardState extends ConsumerState<_QuickCreateCard> {
 }
 
 class _DataTablePreview extends StatelessWidget {
-  const _DataTablePreview({required this.title, required this.rows, required this.columns});
+  const _DataTablePreview({
+    required this.title,
+    required this.rows,
+    required this.columns,
+    this.actions,
+    this.filterWidget,
+    this.onRowTap,
+  });
 
   final String title;
   final List<Map<String, Object?>> rows;
   final List<String> columns;
+  final List<Widget>? actions;
+  final Widget? filterWidget;
+  final void Function(Map<String, Object?> row)? onRowTap;
 
   @override
   Widget build(BuildContext context) {
@@ -365,26 +571,187 @@ class _DataTablePreview extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columns: columns.map((column) => DataColumn(label: Text(column))).toList(),
-                rows: rows
-                    .map(
-                      (row) => DataRow(
-                        cells: columns.map((column) => DataCell(Text('${row[column] ?? ''}'))).toList(),
-                      ),
-                    )
-                    .toList(),
-              ),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                if (actions != null) Wrap(spacing: 8, runSpacing: 8, children: actions!),
+              ],
             ),
+            if (filterWidget != null) ...[
+              const SizedBox(height: 16),
+              filterWidget!,
+            ],
+            const SizedBox(height: 12),
+            if (rows.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: Text('No records found.')),
+              )
+            else
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  showCheckboxColumn: false,
+                  columns: columns.map((column) => DataColumn(label: Text(column))).toList(),
+                  rows: rows
+                      .map(
+                        (row) => DataRow(
+                          onSelectChanged: onRowTap == null ? null : (_) => onRowTap!(row),
+                          cells: columns.map((column) => DataCell(Text('${row[column] ?? ''}'))).toList(),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
 }
+
+class _StudentAttendanceDialog extends ConsumerStatefulWidget {
+  const _StudentAttendanceDialog({required this.studentId, required this.studentName});
+
+  final String studentId;
+  final String studentName;
+
+  @override
+  ConsumerState<_StudentAttendanceDialog> createState() => _StudentAttendanceDialogState();
+}
+
+class _StudentAttendanceDialogState extends ConsumerState<_StudentAttendanceDialog> {
+  Map<String, Object?>? _data;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+    try {
+      final res = await ref.read(apiClientProvider).getJson(
+        '/api/v1/admin/students/${widget.studentId}/attendance-summary',
+        session: session,
+      );
+      setState(() => _data = res);
+    } on ApiException catch (e) {
+      setState(() => _error = e.message);
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stats = _data?['stats'] as Map<String, Object?>?;
+    final records = (_data?['records'] as List?)?.cast<Map<String, Object?>>() ?? [];
+
+    return AlertDialog(
+      title: Text('${widget.studentName} — Attendance History'),
+      content: SizedBox(
+        width: 620,
+        height: 480,
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? Center(child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)))
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (stats != null)
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            _miniMetric('Attendance Rate', '${stats['attendanceRate']}%', Colors.blue),
+                            _miniMetric('Total Sessions', '${stats['totalSessions']}', Colors.indigo),
+                            _miniMetric('Present', '${stats['present']}', Colors.green),
+                            _miniMetric('Absent', '${stats['absent']}', Colors.red),
+                            _miniMetric('Late', '${stats['late']}', Colors.orange),
+                            _miniMetric('Excused', '${stats['excused']}', Colors.teal),
+                          ],
+                        ),
+                      const SizedBox(height: 16),
+                      Text('Session Records', style: Theme.of(context).textTheme.titleSmall),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: records.isEmpty
+                            ? const Center(child: Text('No attendance records logged for this student yet.'))
+                            : ListView.separated(
+                                itemCount: records.length,
+                                separatorBuilder: (_, _) => const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final r = records[index];
+                                  final status = '${r['status'] ?? ''}';
+                                  Color badgeColor;
+                                  switch (status) {
+                                    case 'present':
+                                      badgeColor = Colors.green;
+                                    case 'absent':
+                                      badgeColor = Colors.red;
+                                    case 'late':
+                                      badgeColor = Colors.orange;
+                                    case 'excused':
+                                      badgeColor = Colors.teal;
+                                    default:
+                                      badgeColor = Colors.grey;
+                                  }
+                                  return ListTile(
+                                    dense: true,
+                                    title: Text('${r['className']} - ${r['sectionName']} (${r['kind']})'),
+                                    subtitle: Text('Date: ${r['date']}'),
+                                    trailing: Chip(
+                                      label: Text(
+                                        status.toUpperCase(),
+                                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                      ),
+                                      backgroundColor: badgeColor,
+                                      padding: EdgeInsets.zero,
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+
+  Widget _miniMetric(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+          Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+        ],
+      ),
+    );
+  }
+}
+

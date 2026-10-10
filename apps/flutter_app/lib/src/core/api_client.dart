@@ -56,10 +56,13 @@ class ApiClient {
     String path, {
     String? bearerToken,
     AuthSession? devSession,
+    AuthSession? session,
   }) async {
+    final token = bearerToken ?? session?.bearerToken;
+    final dev = devSession ?? (session?.devNeonUserId != null ? session : null);
     final response = await _httpClient.get(
       Uri.parse('${AppConfig.apiBaseUrl}$path'),
-      headers: _headers(bearerToken: bearerToken, devSession: devSession),
+      headers: _headers(bearerToken: token, devSession: dev),
     );
     _ensureSuccess(response);
     return _decode(response);

@@ -101,3 +101,44 @@ adminRoutes
     const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
     return c.json(await repo.createTeacherAssignment(c.get('authUser'), c.req.valid('json')), 201);
   });
+
+adminRoutes.get('/attendance-summary', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const { startDate, endDate, classId, sectionId, format } = c.req.query();
+  const summary = await repo.attendanceSummary(c.get('authUser'), {
+    startDate,
+    endDate,
+    classId,
+    sectionId,
+  });
+
+  if (format === 'csv') {
+    const headers = ['attendanceDate', 'className', 'sectionName', 'kind', 'periodNumber', 'staffName'];
+    const csvLines = [
+      headers.join(','),
+      ...summary.sessions.map((s) =>
+        [
+          s.attendanceDate ?? '',
+          `"${(s.className ?? '').replace(/"/g, '""')}"`,
+          `"${(s.sectionName ?? '').replace(/"/g, '""')}"`,
+          s.kind ?? '',
+          s.periodNumber ?? '',
+          `"${(s.staffName ?? '').replace(/"/g, '""')}"`,
+        ].join(','),
+      ),
+    ];
+    return new Response(csvLines.join('\n'), {
+      headers: {
+        'content-type': 'text/csv; charset=utf-8',
+        'content-disposition': 'attachment; filename="attendance-summary.csv"',
+      },
+    });
+  }
+
+  return c.json(summary);
+});
+
+adminRoutes.get('/students/:id/attendance-summary', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.studentAttendanceSummary(c.get('authUser'), c.req.param('id')));
+});

@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, desc, gte, lte } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import {
   academicYears,
@@ -173,10 +173,22 @@ export function createSchoolRepository(db: Db) {
 
     async teacherAssignmentsFor(user: AuthUser) {
       if (!user.staffId) return [];
-      return db
-        .select()
+      const rows = await db
+        .select({
+          assignment: teacherAssignments,
+          className: classes.name,
+          sectionName: sections.name,
+        })
         .from(teacherAssignments)
+        .innerJoin(classes, eq(teacherAssignments.classId, classes.id))
+        .innerJoin(sections, eq(teacherAssignments.sectionId, sections.id))
         .where(and(eq(teacherAssignments.schoolId, user.schoolId), eq(teacherAssignments.staffId, user.staffId)));
+        
+      return rows.map(r => ({
+        ...r.assignment,
+        className: r.className,
+        sectionName: r.sectionName,
+      }));
     },
 
     async rosterForSection(user: AuthUser, sectionId: string, academicYearId: string) {
@@ -258,12 +270,115 @@ export function createSchoolRepository(db: Db) {
       return { sessionId: session.id, savedRecords: input.records.length };
     },
 
-    async attendanceSummary(user: AuthUser) {
-      const sessions = await db
-        .select()
+    async attendanceSummary(
+      user: AuthUser,
+      filters?: {
+        startDate?: string | undefined;
+        endDate?: string | undefined;
+        classId?: string | undefined;
+        sectionId?: string | undefined;
+      },
+    ) {
+      const conditions = [eq(attendanceSessions.schoolId, user.schoolId)];
+      if (filters?.startDate) {
+        conditions.push(gte(attendanceSessions.attendanceDate, filters.startDate));
+      }
+      if (filters?.endDate) {
+        conditions.push(lte(attendanceSessions.attendanceDate, filters.endDate));
+      }
+      if (filters?.classId) {
+        conditions.push(eq(attendanceSessions.classId, filters.classId));
+      }
+      if (filters?.sectionId) {
+        conditions.push(eq(attendanceSessions.sectionId, filters.sectionId));
+      }
+
+      const rows = await db
+        .select({
+          session: attendanceSessions,
+          className: classes.name,
+          sectionName: sections.name,
+          staffName: staff.fullName,
+        })
         .from(attendanceSessions)
-        .where(eq(attendanceSessions.schoolId, user.schoolId));
-      return { sessions };
+        .innerJoin(classes, eq(attendanceSessions.classId, classes.id))
+        .innerJoin(sections, eq(attendanceSessions.sectionId, sections.id))
+        .innerJoin(staff, eq(attendanceSessions.takenByStaffId, staff.id))
+        .where(and(...conditions))
+        .orderBy(desc(attendanceSessions.attendanceDate));
+
+      return {
+        sessions: rows.map(r => ({
+          ...r.session,
+          className: r.className,
+          sectionName: r.sectionName,
+          staffName: r.staffName,
+        }))
+      };
+    },
+
+    async studentAttendanceSummary(user: AuthUser, studentId: string) {
+      const [student] = await db
+        .select()
+        .from(students)
+        .where(and(eq(students.schoolId, user.schoolId), eq(students.id, studentId)))
+        .limit(1);
+
+      if (!student) throw new ApiError(404, 'Student not found');
+
+      const rows = await db
+        .select({
+          record: attendanceRecords,
+          session: attendanceSessions,
+          className: classes.name,
+          sectionName: sections.name,
+        })
+        .from(attendanceRecords)
+        .innerJoin(attendanceSessions, eq(attendanceRecords.sessionId, attendanceSessions.id))
+        .innerJoin(classes, eq(attendanceSessions.classId, classes.id))
+        .innerJoin(sections, eq(attendanceSessions.sectionId, sections.id))
+        .where(
+          and(
+            eq(attendanceRecords.schoolId, user.schoolId),
+            eq(attendanceRecords.studentId, studentId),
+          ),
+        )
+        .orderBy(desc(attendanceSessions.attendanceDate));
+
+      const total = rows.length;
+      let present = 0;
+      let absent = 0;
+      let late = 0;
+      let excused = 0;
+
+      for (const r of rows) {
+        if (r.record.status === 'present') present++;
+        else if (r.record.status === 'absent') absent++;
+        else if (r.record.status === 'late') late++;
+        else if (r.record.status === 'excused') excused++;
+      }
+
+      const attendanceRate = total > 0 ? Math.round(((present + late) / total) * 100) : 100;
+
+      return {
+        student,
+        stats: {
+          totalSessions: total,
+          present,
+          absent,
+          late,
+          excused,
+          attendanceRate,
+        },
+        records: rows.map(r => ({
+          date: r.session.attendanceDate,
+          kind: r.session.kind,
+          periodNumber: r.session.periodNumber,
+          status: r.record.status,
+          className: r.className,
+          sectionName: r.sectionName,
+        })),
+      };
     },
   };
 }

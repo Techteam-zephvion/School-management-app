@@ -110,15 +110,27 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         SizedBox(
-                          width: 320,
+                          width: 340,
                           child: DropdownButtonFormField<Map<String, Object?>>(
+                            isExpanded: true,
                             initialValue: _selectedAssignment,
                             decoration: const InputDecoration(labelText: 'Assigned section'),
+                            selectedItemBuilder: (context) => _assignments
+                                .map(
+                                  (assignment) => Text(
+                                    '${assignment['className']} - ${assignment['sectionName']}',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                )
+                                .toList(),
                             items: _assignments
                                 .map(
                                   (assignment) => DropdownMenuItem(
                                     value: assignment,
-                                    child: Text('Section ${assignment['sectionId']}'),
+                                    child: Text(
+                                      '${assignment['className']} - ${assignment['sectionName']}',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 )
                                 .toList(),
@@ -129,7 +141,7 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                           ),
                         ),
                         SizedBox(
-                          width: 180,
+                          width: 250,
                           child: SegmentedButton<AttendanceKind>(
                             segments: const [
                               ButtonSegment(
@@ -257,8 +269,24 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
       };
       final result = await ref.read(apiClientProvider).postJson('/api/v1/teacher/attendance', body, session: session);
       setState(() => _message = 'Saved ${result['savedRecords']} records.');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved ${result['savedRecords']} attendance records.'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+          ),
+        );
+      }
     } on Exception catch (exception) {
       setState(() => _message = exception.toString());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving attendance: $exception'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
     } finally {
       setState(() => _saving = false);
     }
