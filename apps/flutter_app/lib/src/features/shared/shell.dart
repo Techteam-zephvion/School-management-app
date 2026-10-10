@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
+import '../../core/theme.dart';
 
 class AppShell extends ConsumerWidget {
   const AppShell({required this.child, super.key});
@@ -11,35 +12,76 @@ class AppShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final location = GoRouterState.of(context).matchedLocation;
+    if (location.startsWith('/admin')) {
+      return Scaffold(
+        backgroundColor: AppColors.mainBackground,
+        body: child,
+      );
+    }
+
     final auth = ref.watch(authControllerProvider);
     final session = auth.session;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Schoolic'),
-        actions: [
-          if (session?.isAdmin ?? false)
-            TextButton.icon(
-              onPressed: () => context.go('/admin'),
-              icon: const Icon(Icons.admin_panel_settings_outlined),
-              label: const Text('Admin'),
-            ),
-          if (session?.isTeacher ?? false)
-            TextButton.icon(
-              onPressed: () => context.go('/teacher'),
-              icon: const Icon(Icons.fact_check_outlined),
-              label: const Text('Teacher'),
-            ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Center(child: Text(session?.email ?? '')),
+      backgroundColor: AppColors.mainBackground,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(52),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.mainBackground,
+            border: Border(bottom: BorderSide(color: AppColors.primaryBorder)),
           ),
-          IconButton(
-            tooltip: 'Sign out',
-            onPressed: () => ref.read(authControllerProvider).signOut(),
-            icon: const Icon(Icons.logout),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              const Text(
+                'schoolic.',
+                style: TextStyle(
+                  fontFamily: 'Switzer',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.5,
+                  color: AppColors.primaryText,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Container(width: 1, height: 18, color: AppColors.primaryBorder),
+              const SizedBox(width: 16),
+              const Text(
+                'Teacher Portal',
+                style: TextStyle(
+                  fontFamily: 'Switzer',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+              const Spacer(),
+              if (session?.isAdmin ?? false)
+                TextButton(
+                  onPressed: () => context.go('/admin'),
+                  child: const Text('Switch to Admin', style: TextStyle(fontSize: 13)),
+                ),
+              const SizedBox(width: 12),
+              Text(
+                session?.email ?? '',
+                style: const TextStyle(
+                  fontFamily: 'Switzer',
+                  fontSize: 13,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Sign out',
+                iconSize: 18,
+                onPressed: () => ref.read(authControllerProvider).signOut(),
+                icon: const Icon(Icons.logout, color: AppColors.secondaryText),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
       body: child,
     );
@@ -56,19 +98,17 @@ class PageFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       children: [
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 16,
-          runSpacing: 12,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(title, style: Theme.of(context).textTheme.headlineMedium),
-            if (actions != null) Wrap(spacing: 8, runSpacing: 8, children: actions!),
+            Text(title, style: AppTypography.pageTitle),
+            if (actions != null) Row(children: actions!),
           ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         child,
       ],
     );
@@ -84,22 +124,26 @@ class InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(icon, size: 32, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: Theme.of(context).textTheme.labelLarge),
-                Text(value, style: Theme.of(context).textTheme.headlineSmall),
-              ],
-            ),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.mainBackground,
+        border: Border.all(color: AppColors.primaryBorder),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 24, color: AppColors.secondaryText),
+          const SizedBox(width: 14),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: AppTypography.label),
+              const SizedBox(height: 2),
+              Text(value, style: AppTypography.sectionHeading),
+            ],
+          ),
+        ],
       ),
     );
   }
