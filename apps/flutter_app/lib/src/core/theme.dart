@@ -21,6 +21,28 @@ class AppColors {
   static const Color statusNeutral = Color(0xFF737373);
 }
 
+class AppMotion {
+  const AppMotion._();
+
+  static const Duration quick = Duration(milliseconds: 120);
+  static const Duration normal = Duration(milliseconds: 160);
+  static const Duration comfortable = Duration(milliseconds: 200);
+
+  static const Curve curve = Curves.easeOutCubic;
+}
+
+class AppRadii {
+  const AppRadii._();
+
+  static const double sm = 4.0;
+  static const double md = 6.0;
+  static const double lg = 8.0;
+
+  static final BorderRadius rSm = BorderRadius.circular(sm);
+  static final BorderRadius rMd = BorderRadius.circular(md);
+  static final BorderRadius rLg = BorderRadius.circular(lg);
+}
+
 class AppTypography {
   const AppTypography._();
 

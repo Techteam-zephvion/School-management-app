@@ -74,7 +74,7 @@ graph TD
 | Staging | `NEON_AUTH_URL` | Neon Auth root endpoint | `https://ep-billowing-shadow-b56k9cl2.neonauth.c-7.us-east-2.aws.neon.tech/neondb` |
 | Production | `APP_ENV` | Runtime environment mode | `production` |
 | Production | `CORS_ORIGIN` | Allowed web origins | `https://schoolic.pages.dev` |
-| Production | `NEON_AUTH_URL` | Neon Auth verification endpoint | empty until production Neon Auth is enabled |
+| Production | `NEON_AUTH_URL` | Neon Auth Base URL | `https://ep-polished-silence-b52ozwm7.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth` |
 
 ### Required Staging Secrets (Cloudflare Worker)
 Configure via `wrangler secret put --env staging`:
@@ -183,12 +183,18 @@ pnpm pages:deploy:prod
 - [x] Production Worker deployed: `https://schoolic-api.schoolic-api.workers.dev`.
 - [x] Production Pages deployed: `https://schoolic.pages.dev`.
 - [x] Production synthetic portfolio data seeded for `Schoolic Portfolio Academy` (`PORTFOLIO`).
-- [x] Production bundle targets the default Cloudflare API URL and contains no old `zephvion.com`, staging endpoint, Neon Auth endpoint, or database URL references.
+- [x] Production Neon Auth enabled for branch `br-rapid-lake-b5g9wtix`.
+- [x] Trusted production auth domain configured: `https://schoolic.pages.dev`.
+- [x] Production Worker and Flutter build use the verified production Neon Auth Base URL.
+- [x] Designated synthetic admin and teacher accounts are mapped to real Neon Auth user IDs.
+- [x] Production authenticated smoke tests pass for admin login, teacher login, RBAC, invalid sessions, and blocked development-bypass headers.
+- [x] Production bundle targets the default Cloudflare API and Neon Auth URLs and contains no old `zephvion.com`, staging endpoint, or database URL references.
 
 ### Production Blockers
-- [ ] Production Neon Auth is not configured for branch `br-rapid-lake-b5g9wtix`.
-- [ ] Production login is unavailable until `NEON_AUTH_URL` is set to the verified production Neon Auth root and the frontend is rebuilt.
-- [ ] Production recovery controls are incomplete: no automatic snapshot schedule or restore drill, and the production branch is not protected.
+- [x] Phase 5.2 UX redesign: Completed and verified on staging (`https://schoolic-staging.pages.dev`). Production promotion pending final review.
+- [ ] Phase 5.3 timetable feature is pending.
+- [ ] Production recovery controls are incomplete: no automatic snapshot schedule or restore drill.
 
 ### Approval Gates
-- Remaining gates before real pilot use: production Neon Auth enablement, trusted auth domains, production `NEON_AUTH_URL` configuration, authenticated smoke tests, production branch protection, recurring recovery policy, and restore drill.
+- Remaining gates before real pilot use: Timetable completion, staging-first verification for new migrations, recurring recovery policy, restore drill, and any future real-user onboarding.
+

@@ -2,13 +2,46 @@
 
 Latest audit update: October 11, 2026
 
-Scope note: Phase 4.2 completed the approved production portfolio deployment path using Cloudflare default domains. Hostinger DNS, nameservers, and `zephvion.com` custom domains were not changed. Secret values are intentionally omitted.
+Scope note: Phase 5.1 completed production authentication on the existing Neon Auth / Better Auth architecture. Hostinger DNS, nameservers, and `zephvion.com` custom domains were not changed. Secret values are intentionally omitted.
+
+## Phase 5.1 Update
+
+Phase 5.1 enabled production Neon Auth, connected it to the deployed API and Flutter web app, created real production auth identities for the synthetic portfolio admin and teacher users, and verified authenticated production behavior.
+
+Completed work:
+
+- Enabled Neon Auth on production project `schoolic` (`dark-frost-36120929`), branch `main` (`br-rapid-lake-b5g9wtix`), database `neondb`.
+- Verified provider status reports Better Auth with Base URL `https://ep-polished-silence-b52ozwm7.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth`.
+- Added trusted domain `https://schoolic.pages.dev`.
+- Updated the API and Flutter client to accept Neon Auth values that are either the provider Base URL ending in `/auth` or the parent project auth root.
+- Configured production Worker `NEON_AUTH_URL` to the provider-reported production Base URL.
+- Rebuilt and redeployed production Flutter with the production API and Auth URLs.
+- Created one production administrator auth identity and one production teacher auth identity for the synthetic portfolio school, then mapped their real Neon Auth user IDs into existing `app_users` records.
+- Removed production/staging visibility of local development sign-in buttons and prevented local dev sign-in from fabricating a session when the API rejects it.
+- Corrected the production Worker `DATABASE_URL` secret formatting so runtime database queries use a valid URL. The value remains omitted.
+
+Authentication verification:
+
+- Admin sign-in succeeds through Neon Auth and `/api/v1/me` returns role `admin`.
+- Teacher sign-in succeeds through Neon Auth and `/api/v1/me` returns role `teacher`.
+- Admin can load `/api/v1/admin/overview` for `Schoolic Portfolio Academy`.
+- Teacher receives 403 on `/api/v1/admin/overview`.
+- Teacher can load `/api/v1/teacher/assignments`.
+- Invalid bearer token returns 401.
+- Production development-bypass headers return 401.
+- Local regression checks passed: `pnpm api:typecheck`, `pnpm api:test` (18/18), `cd apps/flutter_app && flutter analyze`, and `pnpm flutter:test`.
+
+Latest production deployment:
+
+- Frontend: `https://schoolic.pages.dev`
+- Latest Pages deployment: `https://6a2d70dc.schoolic.pages.dev`
+- API Worker: `https://schoolic-api.schoolic-api.workers.dev`
 
 ## Phase 4.2 Update
 
 Phase 4.2 resolved the production Drizzle migration-history issue, seeded realistic synthetic portfolio data, created production Cloudflare hosting resources, deployed the API and frontend, and verified the live default-domain application.
 
-Production URLs:
+Phase 4.2 production URLs:
 
 - Frontend: `https://schoolic.pages.dev`
 - Latest Pages deployment: `https://7e543704.schoolic.pages.dev`
@@ -51,9 +84,9 @@ Verification:
 
 ## Executive Summary
 
-Schoolic is now deployed for portfolio inspection on Cloudflare default domains, but it is not fully production-ready for authenticated pilot use.
+Schoolic is deployed on Cloudflare default domains and production authentication now works for the designated synthetic portfolio administrator and teacher accounts.
 
-The API and frontend are live, production migration history is repaired, realistic synthetic data exists, and old custom-domain dependencies have been removed from the production build. The remaining primary blocker is production Neon Auth: login cannot work until Neon Auth is enabled for the production branch and `NEON_AUTH_URL` is configured to the verified production auth root.
+The API and frontend are live, production migration history is repaired, realistic synthetic data exists, old custom-domain dependencies have been removed from the production build, and authenticated role-based access has been verified. Product UX redesign and timetable implementation remain pending Phase 5 work.
 
 ## Status Key
 
@@ -78,10 +111,12 @@ The API and frontend are live, production migration history is repaired, realist
 
 | Item | Status | Finding |
 | --- | --- | --- |
-| Production Neon Auth | Blocked | Neon Auth is not configured for branch `br-rapid-lake-b5g9wtix`. |
-| Production auth endpoint | Blocked | No production Neon Auth root exists yet. |
-| Worker auth variable | Deferred | `NEON_AUTH_URL` is intentionally empty in production until the real production auth root exists. |
-| Frontend auth config | Deferred | Production Flutter build intentionally omits `NEON_AUTH_URL`; sign-in displays the existing configuration error rather than using a fake or staging auth endpoint. |
+| Production Neon Auth | Verified | Neon Auth is enabled for branch `br-rapid-lake-b5g9wtix`. |
+| Production auth endpoint | Verified | Provider-reported Base URL is `https://ep-polished-silence-b52ozwm7.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth`. |
+| Trusted production frontend domain | Verified | `https://schoolic.pages.dev` is registered. |
+| Worker auth variable | Verified | Production Worker `NEON_AUTH_URL` is configured to the verified provider Base URL. |
+| Frontend auth config | Verified | Production Flutter build includes the verified production Auth Base URL. |
+| Auth identities | Verified | Synthetic admin and teacher auth users are mapped to existing `app_users` records. |
 | Auth safety | Verified | Protected API routes fail closed; no public demo mode or auth bypass was introduced. |
 
 ## 3. Cloudflare Production Infrastructure
@@ -101,7 +136,7 @@ The API and frontend are live, production migration history is repaired, realist
 | --- | --- | --- | --- |
 | `APP_ENV` | Worker variable | Verified | `production`. |
 | `CORS_ORIGIN` | Worker variable | Verified | `https://schoolic.pages.dev`. |
-| `NEON_AUTH_URL` | Worker variable | Blocked | Empty until production Neon Auth is enabled. |
+| `NEON_AUTH_URL` | Worker variable | Verified | Configured to the verified production Neon Auth Base URL. |
 | `DATABASE_URL` | Worker secret | Verified | Configured through Wrangler; value omitted. |
 | `DATABASE_URL_UNPOOLED` | Local migration env | Verified | Present in ignored local env for migration tooling; value omitted. |
 | `BOOTSTRAP_TOKEN` | Worker secret | Verified | Configured through Wrangler; value omitted. |
@@ -111,7 +146,7 @@ Security separation checks:
 - **Verified:** Production/staging code ignores development bypass headers unless `APP_ENV` is `development` or `test`.
 - **Verified:** CORS code uses an explicit allowlist and does not allow arbitrary origins in production.
 - **Verified:** Flutter production assets do not contain database URLs, staging endpoints, old custom domains, or Neon Auth endpoints.
-- **Blocked:** Production API cannot verify real users until production Neon Auth is enabled and `NEON_AUTH_URL` is configured.
+- **Verified:** Production API verifies real Neon Auth users and enforces role authorization.
 
 ## 5. Database Migration And Recovery Assessment
 
@@ -141,6 +176,7 @@ Remaining recovery work:
 | --- | --- | --- |
 | Production artifact | Verified | `apps/flutter_app/build/web_prod` was rebuilt for production default domains. |
 | API endpoint in artifact | Verified | Artifact targets `https://schoolic-api.schoolic-api.workers.dev`. |
+| Auth endpoint in artifact | Verified | Artifact targets the production Neon Auth Base URL. |
 | Obsolete custom domains | Verified | No `zephvion.com`, `api-school`, or `auth.schoolic` references found in production bundle. |
 | Staging references | Verified | No staging API/Pages endpoint references found in production bundle. |
 | Database secrets in artifact | Verified | No database URL or Postgres host was found in `web_prod`. |
@@ -148,18 +184,15 @@ Remaining recovery work:
 
 ## 7. Remaining Blockers
 
-1. **Blocked:** Production Neon Auth is not configured, so real production login is unavailable.
-2. **Blocked:** Production branch `br-rapid-lake-b5g9wtix` is not protected.
+1. **Complete on Staging:** Phase 5.2 UX redesign completed and verified on staging (`https://schoolic-staging.pages.dev`). Production promotion pending final approval.
+2. **Pending:** Phase 5.3 timetable feature is not yet implemented.
 3. **Deferred:** Recurring production snapshot schedule and restore drill are not configured.
-4. **Deferred:** Real pilot user onboarding cannot begin until auth is enabled, trusted domains are configured, and login is verified end to end.
+4. **Out of scope for Phase 5:** Production branch protection work.
 
 ## 8. Safe Next Production Sequence
 
-1. Enable Neon Auth on production project `dark-frost-36120929`, branch `br-rapid-lake-b5g9wtix`.
-2. Add trusted auth domain `https://schoolic.pages.dev`.
-3. Configure production Worker `NEON_AUTH_URL` to the verified production Neon Auth root.
-4. Rebuild production Flutter with the verified `NEON_AUTH_URL`.
-5. Redeploy API and frontend.
-6. Create or map real production auth users to `app_users.neon_user_id`.
-7. Run authenticated live smoke tests for admin and teacher workflows against the synthetic portfolio data.
-8. Protect the production Neon branch and configure/test recovery policy before introducing real student data.
+1. Promote Phase 5.2 UX redesign to production after approval.
+2. Implement the timetable feature (Phase 5.3) as a complete database, API, and Flutter vertical slice.
+3. Apply new migrations to staging first, verify, then promote to production.
+4. Keep production and staging data/auth separation intact.
+5. Configure/test recovery policy before introducing real student data.

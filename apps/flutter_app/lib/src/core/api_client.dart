@@ -29,16 +29,21 @@ class ApiClient {
       throw ApiException('NEON_AUTH_URL is not configured for this build.', 400);
     }
 
-    await auth_transport.postAuthJson(
-      Uri.parse('${AppConfig.neonAuthBase}/sign-in/email'),
-      {'email': email, 'password': password},
-      httpClient: _httpClient,
-    );
+    final Map<String, Object?> tokenResponse;
+    try {
+      await auth_transport.postAuthJson(
+        Uri.parse('${AppConfig.neonAuthBase}/sign-in/email'),
+        {'email': email, 'password': password},
+        httpClient: _httpClient,
+      );
 
-    final tokenResponse = await auth_transport.getAuthJson(
-      Uri.parse('${AppConfig.neonAuthBase}/token'),
-      httpClient: _httpClient,
-    );
+      tokenResponse = await auth_transport.getAuthJson(
+        Uri.parse('${AppConfig.neonAuthBase}/token'),
+        httpClient: _httpClient,
+      );
+    } on auth_transport.AuthTransportException catch (exception) {
+      throw ApiException(exception.message, exception.statusCode);
+    }
     final token = tokenResponse['token'] as String?;
     if (token == null || token.isEmpty) {
       throw ApiException('Authentication token was not issued.', 401);

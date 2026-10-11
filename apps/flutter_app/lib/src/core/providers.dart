@@ -70,7 +70,7 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> devSignIn(AppRole role) async {
-    if (!AppConfig.isLocalDev) {
+    if (!AppConfig.isLocalDev || !AppConfig.allowDevSignIn) {
       error = 'Development sign-in is only available for local builds.';
       notifyListeners();
       return;

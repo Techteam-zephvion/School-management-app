@@ -33,7 +33,10 @@ Future<void> postAuth(Uri uri, {http.Client? httpClient}) async {
 Map<String, Object?> _decode(int statusCode, String body) {
   final decoded = body.isEmpty ? <String, Object?>{} : (jsonDecode(body) as Map).cast<String, Object?>();
   if (statusCode < 200 || statusCode >= 300) {
-    throw AuthTransportException(decoded['error'] as String? ?? 'Authentication request failed', statusCode);
+    throw AuthTransportException(
+      decoded['error'] as String? ?? decoded['message'] as String? ?? 'Authentication request failed',
+      statusCode,
+    );
   }
   return decoded;
 }

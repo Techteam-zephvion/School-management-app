@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../core/api_client.dart';
-import '../../core/models.dart';
 import '../../core/providers.dart';
-import '../shared/shell.dart';
+import '../../core/theme.dart';
+import '../shared/components/feedback_banner.dart';
+import 'views/teacher_attendance_view.dart';
+import 'views/teacher_classes_view.dart';
+import 'views/teacher_my_day_view.dart';
 
 class TeacherDashboard extends ConsumerStatefulWidget {
   const TeacherDashboard({super.key});
@@ -15,280 +17,241 @@ class TeacherDashboard extends ConsumerStatefulWidget {
 }
 
 class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
+  int _activeTab = 0; // 0: My Day, 1: My Classes, 2: Attendance Register
   List<Map<String, Object?>> _assignments = [];
-  List<StudentRow> _roster = [];
-  final Map<String, AttendanceStatus> _statuses = {};
+  List<Map<String, Object?>> _recentSessions = [];
   Map<String, Object?>? _selectedAssignment;
-  AttendanceKind _kind = AttendanceKind.daily;
-  final _date = TextEditingController(text: DateFormat('yyyy-MM-dd').format(DateTime.now()));
-  final _period = TextEditingController(text: '1');
   bool _loading = true;
-  bool _saving = false;
-  String? _message;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadAssignments();
+    _loadData();
   }
 
-  @override
-  void dispose() {
-    _date.dispose();
-    _period.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadAssignments() async {
+  Future<void> _loadData() async {
     final session = ref.read(authControllerProvider).session;
     if (session == null) return;
 
     setState(() {
       _loading = true;
-      _message = null;
+      _error = null;
     });
+
     try {
-      final assignments = await ref.read(apiClientProvider).getList('/api/v1/teacher/assignments', session: session);
+      final api = ref.read(apiClientProvider);
+      final results = await Future.wait([
+        api.getList('/api/v1/teacher/assignments', session: session),
+        api.getJson('/api/v1/teacher/attendance/summary', session: session).catchError((_) => {'sessions': []}),
+      ]);
+
+      final assignments = results[0] as List<Map<String, Object?>>;
+      final summaryJson = results[1] as Map<String, Object?>;
+      final sessions = ((summaryJson['sessions'] as List?) ?? const []).cast<Map<String, Object?>>();
+
       setState(() {
         _assignments = assignments;
-        _selectedAssignment = assignments.isEmpty ? null : assignments.first;
+        _recentSessions = sessions;
+        if (_selectedAssignment == null && assignments.isNotEmpty) {
+          _selectedAssignment = assignments.first;
+        }
       });
-      await _loadRoster();
-    } on ApiException catch (exception) {
-      setState(() => _message = exception.message);
+    } on ApiException catch (e) {
+      setState(() => _error = e.message);
+    } catch (e) {
+      setState(() => _error = e.toString());
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _loadRoster() async {
-    final session = ref.read(authControllerProvider).session;
-    final assignment = _selectedAssignment;
-    if (session == null || assignment == null) return;
-
-    final query = Uri(queryParameters: {
-      'sectionId': assignment['sectionId'] as String,
-      'academicYearId': assignment['academicYearId'] as String,
-    }).query;
-    final rosterJson = await ref.read(apiClientProvider).getList('/api/v1/teacher/roster?$query', session: session);
-    final roster = rosterJson.map(StudentRow.fromJson).toList();
+  void _selectAssignmentAndTakeAttendance(Map<String, Object?> assignment) {
     setState(() {
-      _roster = roster;
-      _statuses
-        ..clear()
-        ..addEntries(roster.map((student) => MapEntry(student.id, AttendanceStatus.present)));
+      _selectedAssignment = assignment;
+      _activeTab = 2; // Switch to Attendance Register tab
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return PageFrame(
-      title: 'Teacher attendance',
-      actions: [
-        IconButton.filledTonal(
-          tooltip: 'Refresh',
-          onPressed: _loadAssignments,
-          icon: const Icon(Icons.refresh),
+    final session = ref.watch(authControllerProvider).session;
+
+    if (_loading) {
+      return const Scaffold(
+        backgroundColor: AppColors.mainBackground,
+        body: Center(
+          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryText),
         ),
-      ],
-      child: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: AppColors.mainBackground,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(52),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.mainBackground,
+            border: Border(bottom: BorderSide(color: AppColors.primaryBorder)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Row(
+            children: [
+              const Text(
+                'schoolic.',
+                style: TextStyle(
+                  fontFamily: 'Switzer',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.5,
+                  color: AppColors.primaryText,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.secondaryBackground,
+                  borderRadius: AppRadii.rSm,
+                  border: Border.all(color: AppColors.primaryBorder),
+                ),
+                child: const Text(
+                  'TEACHER',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.secondaryText),
+                ),
+              ),
+              const SizedBox(width: 24),
+
+              // Navigation tab buttons
+              _buildTabButton(0, 'My Day', Icons.dashboard_outlined),
+              const SizedBox(width: 4),
+              _buildTabButton(1, 'My Classes', Icons.layers_outlined),
+              const SizedBox(width: 4),
+              _buildTabButton(2, 'Attendance Register', Icons.fact_check_outlined),
+
+              const Spacer(),
+
+              // Refresh button
+              IconButton(
+                tooltip: 'Refresh data',
+                iconSize: 18,
+                onPressed: _loadData,
+                icon: const Icon(Icons.refresh, color: AppColors.secondaryText),
+              ),
+              const SizedBox(width: 8),
+
+              Container(width: 1, height: 16, color: AppColors.primaryBorder),
+              const SizedBox(width: 14),
+
+              Text(
+                session?.email ?? 'teacher@schoolic.local',
+                style: const TextStyle(
+                  fontFamily: 'Switzer',
+                  fontSize: 13,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              IconButton(
+                tooltip: 'Sign out',
+                iconSize: 16,
+                onPressed: () => ref.read(authControllerProvider).signOut(),
+                icon: const Icon(Icons.logout, color: AppColors.secondaryText),
+              ),
+            ],
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (_message != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Text(_message!, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+                if (_error != null)
+                  FeedbackBanner(
+                    message: _error!,
+                    tone: FeedbackTone.error,
+                    onDismiss: () => setState(() => _error = null),
                   ),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 340,
-                          child: DropdownButtonFormField<Map<String, Object?>>(
-                            isExpanded: true,
-                            initialValue: _selectedAssignment,
-                            decoration: const InputDecoration(labelText: 'Assigned section'),
-                            selectedItemBuilder: (context) => _assignments
-                                .map(
-                                  (assignment) => Text(
-                                    '${assignment['className']} - ${assignment['sectionName']}',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                )
-                                .toList(),
-                            items: _assignments
-                                .map(
-                                  (assignment) => DropdownMenuItem(
-                                    value: assignment,
-                                    child: Text(
-                                      '${assignment['className']} - ${assignment['sectionName']}',
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) async {
-                              setState(() => _selectedAssignment = value);
-                              await _loadRoster();
-                            },
-                          ),
-                        ),
-                        SizedBox(
-                          width: 250,
-                          child: SegmentedButton<AttendanceKind>(
-                            segments: const [
-                              ButtonSegment(
-                                value: AttendanceKind.daily,
-                                icon: Icon(Icons.today_outlined),
-                                label: Text('Daily'),
-                              ),
-                              ButtonSegment(
-                                value: AttendanceKind.period,
-                                icon: Icon(Icons.schedule_outlined),
-                                label: Text('Period'),
-                              ),
-                            ],
-                            selected: {_kind},
-                            onSelectionChanged: (value) => setState(() => _kind = value.first),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 160,
-                          child: TextField(
-                            controller: _date,
-                            decoration: const InputDecoration(labelText: 'Date'),
-                          ),
-                        ),
-                        if (_kind == AttendanceKind.period)
-                          SizedBox(
-                            width: 140,
-                            child: TextField(
-                              controller: _period,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(labelText: 'Period'),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Roster', style: Theme.of(context).textTheme.titleMedium),
-                        const SizedBox(height: 12),
-                        if (_roster.isEmpty)
-                          const Text('No students found for this assigned section.')
-                        else
-                          ..._roster.map(_studentAttendanceRow),
-                        const SizedBox(height: 16),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: FilledButton.icon(
-                            onPressed: _saving || _roster.isEmpty ? null : _saveAttendance,
-                            icon: const Icon(Icons.save_outlined),
-                            label: Text(_saving ? 'Saving...' : 'Save attendance'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                _buildActiveTabContent(),
               ],
             ),
-    );
-  }
-
-  Widget _studentAttendanceRow(StudentRow student) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          SizedBox(
-            width: 260,
-            child: Text(
-              '${student.rollNumber ?? student.admissionNumber}  ${student.fullName}',
-              overflow: TextOverflow.ellipsis,
-            ),
           ),
-          SegmentedButton<AttendanceStatus>(
-            segments: const [
-              ButtonSegment(value: AttendanceStatus.present, icon: Icon(Icons.check), label: Text('Present')),
-              ButtonSegment(value: AttendanceStatus.absent, icon: Icon(Icons.close), label: Text('Absent')),
-              ButtonSegment(value: AttendanceStatus.late, icon: Icon(Icons.schedule), label: Text('Late')),
-              ButtonSegment(value: AttendanceStatus.excused, icon: Icon(Icons.event_available), label: Text('Excused')),
-            ],
-            selected: {_statuses[student.id] ?? AttendanceStatus.present},
-            onSelectionChanged: (value) => setState(() => _statuses[student.id] = value.first),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Future<void> _saveAttendance() async {
-    final session = ref.read(authControllerProvider).session;
-    final assignment = _selectedAssignment;
-    if (session == null || assignment == null) return;
+  Widget _buildTabButton(int index, String label, IconData icon) {
+    final isSelected = _activeTab == index;
 
-    setState(() {
-      _saving = true;
-      _message = null;
-    });
-    try {
-      final body = {
-        'academicYearId': assignment['academicYearId'],
-        'classId': assignment['classId'],
-        'sectionId': assignment['sectionId'],
-        'subjectId': _kind == AttendanceKind.period ? assignment['subjectId'] : null,
-        'kind': _kind.name,
-        'attendanceDate': _date.text,
-        'periodNumber': _kind == AttendanceKind.period ? int.parse(_period.text) : null,
-        'records': _roster
-            .map(
-              (student) => {
-                'studentId': student.id,
-                'status': (_statuses[student.id] ?? AttendanceStatus.present).name,
-              },
-            )
-            .toList(),
-      };
-      final result = await ref.read(apiClientProvider).postJson('/api/v1/teacher/attendance', body, session: session);
-      setState(() => _message = 'Saved ${result['savedRecords']} records.');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Saved ${result['savedRecords']} attendance records.'),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-          ),
+    return InkWell(
+      onTap: () => setState(() => _activeTab = index),
+      borderRadius: AppRadii.rMd,
+      child: AnimatedContainer(
+        duration: AppMotion.quick,
+        curve: AppMotion.curve,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.secondaryBackground : Colors.transparent,
+          borderRadius: AppRadii.rMd,
+          border: isSelected ? Border.all(color: AppColors.primaryBorder) : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: isSelected ? AppColors.primaryText : AppColors.secondaryText,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Switzer',
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected ? AppColors.primaryText : AppColors.secondaryText,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActiveTabContent() {
+    final session = ref.watch(authControllerProvider).session;
+
+    switch (_activeTab) {
+      case 0:
+        return TeacherMyDayView(
+          assignments: _assignments,
+          recentSessions: _recentSessions,
+          teacherEmail: session?.email ?? 'Faculty',
+          onSelectAssignmentAndTakeAttendance: _selectAssignmentAndTakeAttendance,
+          onNavigateToRegister: () => setState(() => _activeTab = 2),
         );
-      }
-    } on Exception catch (exception) {
-      setState(() => _message = exception.toString());
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving attendance: $exception'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
+      case 1:
+        return TeacherClassesView(
+          assignments: _assignments,
+          onTakeAttendance: _selectAssignmentAndTakeAttendance,
         );
-      }
-    } finally {
-      setState(() => _saving = false);
+      case 2:
+        return TeacherAttendanceView(
+          assignments: _assignments,
+          selectedAssignment: _selectedAssignment,
+          onAssignmentChanged: (val) => setState(() => _selectedAssignment = val),
+          onAttendanceSaved: _loadData,
+        );
+      default:
+        return const SizedBox.shrink();
     }
   }
 }

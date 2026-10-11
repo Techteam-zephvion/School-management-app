@@ -20,4 +20,7 @@ class AppConfig {
     if (trimmed.isEmpty || trimmed.endsWith('/auth')) return trimmed;
     return '$trimmed/auth';
   }
+
+  static bool get allowDevSignIn =>
+      const bool.fromEnvironment('SCHOOLIC_ALLOW_DEV_SIGN_IN', defaultValue: true);
 }

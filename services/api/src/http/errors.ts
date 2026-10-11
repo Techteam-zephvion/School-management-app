@@ -14,6 +14,9 @@ export function fail(c: Context, error: unknown) {
     return c.json({ error: error.message }, error.status);
   }
 
-  console.error(error);
+  console.error('Unexpected API error', error);
+  if (error instanceof Error && 'cause' in error) {
+    console.error('Unexpected API error cause', error.cause);
+  }
   return c.json({ error: 'Unexpected server error' }, 500);
 }
