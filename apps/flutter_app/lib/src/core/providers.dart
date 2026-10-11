@@ -99,11 +99,16 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    await _apiClient.signOutWithNeon();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_storageKey);
     session = null;
     notifyListeners();
+
+    try {
+      await _apiClient.signOutWithNeon();
+    } catch (_) {
+      // Local logout must not be blocked by a remote session cleanup failure.
+    }
   }
 
   Future<void> _persist() async {
