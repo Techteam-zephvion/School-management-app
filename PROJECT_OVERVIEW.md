@@ -180,22 +180,25 @@ pnpm pages:deploy:prod
 - [x] Runtime connection source is the pooled production Neon host in ignored local env.
 - [x] Migration connection source is the unpooled production Neon host in ignored local env.
 - [x] Direct production SQL access works through Neon CLI embedded TypeScript `psql`.
-- [x] Production recovery snapshot created before Phase 4.2 database changes: `snap-lucky-star-b5i49wpy`.
+- [x] Production recovery snapshot created before Phase 5.4 timetable release: `snap-curly-hat-b5woqrcz`.
 - [x] Drizzle migration history is baselined and `pnpm db:migrate` succeeds.
 - [x] Production Worker deployed: `https://schoolic-api.schoolic-api.workers.dev`.
 - [x] Production Pages deployed: `https://schoolic.pages.dev`.
 - [x] Production synthetic portfolio data seeded for `Schoolic Portfolio Academy` (`PORTFOLIO`).
+- [x] Production timetable schema migrated with `0001_harsh_firedrake`.
+- [x] Production synthetic portfolio timetable data seeded from existing teacher assignments.
 - [x] Production Neon Auth enabled for branch `br-rapid-lake-b5g9wtix`.
 - [x] Trusted production auth domain configured: `https://schoolic.pages.dev`.
 - [x] Production Worker and Flutter build use the verified production Neon Auth Base URL.
 - [x] Designated synthetic admin and teacher accounts are mapped to real Neon Auth user IDs.
 - [x] Production authenticated smoke tests pass for admin login, teacher login, RBAC, invalid sessions, and blocked development-bypass headers.
+- [x] Production timetable and scheduled attendance smoke tests pass.
 - [x] Production bundle targets the default Cloudflare API and Neon Auth URLs and contains no old `zephvion.com`, staging endpoint, or database URL references.
 
 ### Production Blockers
-- [x] Phase 5.2 UX redesign: Completed and verified on staging (`https://schoolic-staging.pages.dev`). Production promotion pending final review.
-- [x] Phase 5.3 timetable feature: Completed and verified on staging. Production promotion pending explicit approval.
+- [x] Phase 5.2 UX redesign: Completed and deployed to production.
+- [x] Phase 5.3 timetable feature: Completed and deployed to production.
 - [ ] Production recovery controls are incomplete: no automatic snapshot schedule or restore drill.
 
 ### Approval Gates
-- Remaining gates before real pilot use: Timetable completion, staging-first verification for new migrations, recurring recovery policy, restore drill, and any future real-user onboarding.
+- Remaining gates before real pilot use: recurring recovery policy, restore drill, and any future real-user onboarding.

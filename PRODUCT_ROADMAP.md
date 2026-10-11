@@ -4,12 +4,12 @@ Last updated: October 11, 2026
 
 ## Current Status
 
-Phase 5.1 authentication is complete and deployed to production.
+Phase 5.4 production promotion is complete.
 
 - Fully implemented and tested: production Neon Auth, trusted production frontend domain, production Worker auth configuration, production Flutter auth configuration, real admin and teacher auth identities mapped to `app_users`, role-based smoke tests, invalid-session rejection, and blocked production development-bypass headers.
 - Implemented and deployed: default-domain production frontend and API.
-- Completed and verified on staging: Phase 5.2 Product UX Redesign.
-- Completed and verified on staging: Phase 5.3 Timetable & Daily Schedule.
+- Deployed to production: Phase 5.2 Product UX Redesign.
+- Deployed to production: Phase 5.3 Timetable & Daily Schedule.
 - Planned later: homework, academic results, announcements/calendar, and fee management.
 
 ## Phase 5.2: Product UX Redesign
@@ -24,7 +24,7 @@ Scope & Deliverables:
 - Polished authentication screen with Switzer typography and keyboard accessibility.
 - Deployed and verified on staging (`https://schoolic-staging.pages.dev`).
 
-Status: Complete (deployed to staging, verified with synthetic data; production preserved).
+Status: Complete and deployed to production.
 
 ## Phase 5.3: Timetable
 
@@ -55,7 +55,7 @@ Required implementation:
 - Flutter teacher daily and weekly timetable views.
 - Synthetic staging and production portfolio timetable data after migration verification.
 
-Status: Complete on staging. Production migration and deployment intentionally pending explicit approval.
+Status: Complete and deployed to production with synthetic portfolio timetable data.
 
 ## Later Feature Priorities
 

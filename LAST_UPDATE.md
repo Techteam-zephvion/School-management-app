@@ -1,6 +1,38 @@
 # Last Update (October 11, 2026)
 
-## 1. Phase 5.3: Timetable & Daily Schedule Complete on Staging
+## 1. Phase 5.4: UX Redesign & Timetable Released to Production
+
+- Promoted the Phase 5.2 Product UX Redesign and Phase 5.3 Timetable & Daily Schedule from staging to production.
+- **Release Commit**: `6de84bf` (`feat(timetable): release timetable scheduling workflow`).
+- **Production Migration**:
+  - Confirmed `database/migrations/0001_harsh_firedrake.sql` is additive timetable schema only.
+  - Replaced the older manual Neon snapshot because the project snapshot limit was already reached, then created fresh recovery snapshot `snap-curly-hat-b5woqrcz` on production branch `br-rapid-lake-b5g9wtix`.
+  - Applied `0001_harsh_firedrake` to production project `schoolic` (`dark-frost-36120929`), database `neondb`.
+  - Verified `timetable_entries`, primary key, unique constraint, teacher/day index, section/day index, and two Drizzle migration history rows.
+  - A post-apply Drizzle rerun exited nonzero without a visible error, but direct production verification confirmed no duplicate migration application and exactly two migration records.
+- **Production Data**:
+  - Seeded eight realistic timetable entries for `Schoolic Portfolio Academy` (`PORTFOLIO`) from existing production teacher assignments.
+  - Preserved existing students, staff, enrollments, assignments, and attendance records.
+- **Production Deployments**:
+  - Deployed Worker `schoolic-api`, version `8739669f-8c95-4a6d-83fb-a5cfc9ab8ee5`.
+  - Built production Flutter Web with `https://schoolic-api.schoolic-api.workers.dev` and the production Neon Auth Base URL.
+  - Deployed Cloudflare Pages production preview `https://3023752a.schoolic.pages.dev`; canonical frontend remains `https://schoolic.pages.dev`.
+- **Verification**:
+  - Local checks passed: `pnpm api:typecheck`, `pnpm api:test` (22/22), `cd apps/flutter_app && flutter analyze`, and `cd apps/flutter_app && flutter test` (6/6).
+  - Production API health returned `{"ok":true,"service":"schoolic-api"}`.
+  - Production Pages canonical and preview returned HTTP 200.
+  - Production CORS allows `https://schoolic.pages.dev`.
+  - Live auth smoke passed for admin and teacher login; invalid token and development-bypass headers return 401; teacher admin access returns 403.
+  - Live timetable smoke passed: admin load, create, conflict rejection, edit, delete; teacher weekly timetable returned authorized rows.
+  - Live attendance smoke passed: teacher submitted scheduled period attendance and the saved session persisted in teacher attendance summary.
+- **Boundaries**:
+  - Hostinger DNS, nameservers, and custom domains were not modified.
+  - No staging Auth/database resources were reused for production.
+  - No credentials or secret values were written to source or docs.
+
+---
+
+## 2. Phase 5.3: Timetable & Daily Schedule Complete on Staging
 
 - Implemented a persisted timetable vertical slice across Neon Postgres, Hono API, and Flutter Web.
 - **Database & Migration**:
@@ -31,12 +63,12 @@
   - Hostinger DNS, nameservers, and custom domains were not modified.
   - Existing attendance persistence was preserved; no second attendance system was introduced.
 
-### Next Step
-- Promote Phase 5.3 to production only after staging review and explicit approval.
+### Promotion
+- Promoted to production in Phase 5.4.
 
 ---
 
-## 2. Phase 5.2: Product UX Redesign Complete & Verified on Staging
+## 3. Phase 5.2: Product UX Redesign Complete & Verified on Staging
 
 - Executed the complete UX redesign adhering strictly to Schoolic's monochrome Switzer design principles:
   - Strict palette: `#111111` (Ink), `#FFFFFF` (Surface), `#F7F7F7` (Neutral surface), `#E5E5E5` (Borders), `#D4D4D4` (Separators), `#737373` (Secondary text), `#A3A3A3` (Muted), and one interactive accent `#10A37F`.
@@ -78,14 +110,14 @@
   - Staging Live Verification: Verified HTTP 200, bundle integrity, and rendered login screen in browser.
   - Production Guardrails: Production (`https://schoolic.pages.dev` and `https://schoolic-api.schoolic-api.workers.dev`) was completely untouched and preserved.
 
-### Next Feature
-- Phase 5.3 Timetable (database schema, conflict detection API, admin scheduling, and teacher daily/weekly schedule).
+### Promotion
+- Promoted to production in Phase 5.4.
 
 ---
 
-## 3. Phase 5.1: Production Authentication Complete
+## 4. Phase 5.1: Production Authentication Complete
 
-## 4. Phase 4.2: Production Portfolio Deployment
+## 5. Phase 4.2: Production Portfolio Deployment
 
 - Completed the approved default-domain production portfolio deployment.
 - Created production Neon recovery snapshot `snap-lucky-star-b5i49wpy` before migration-history changes.
@@ -114,7 +146,7 @@
 
 ---
 
-## 5. Phase 4.1: Production Infrastructure Preparation
+## 6. Phase 4.1: Production Infrastructure Preparation
 
 - Updated `PRODUCTION_READINESS_AUDIT.md` with Phase 4.1 findings.
 - Production is still **not ready** for deployment.
@@ -140,7 +172,7 @@
 
 ---
 
-## 6. Phase 4.0: Production Readiness Audit
+## 7. Phase 4.0: Production Readiness Audit
 
 - Created `PRODUCTION_READINESS_AUDIT.md`.
 - Production was not ready for deployment.
@@ -149,7 +181,7 @@
 
 ---
 
-## 7. Phase 3.2: Default-Domain Staging Complete
+## 8. Phase 3.2: Default-Domain Staging Complete
 
 ### Hosting URLs
 - **Frontend:** `https://schoolic-staging.pages.dev`
@@ -198,7 +230,7 @@
 
 ---
 
-## 8. Phase 2: Security & Authentication Hardening (Summary)
+## 9. Phase 2: Security & Authentication Hardening (Summary)
 - Neutralized development bypass headers in staging and production.
 - Enforced session token verification against Neon Auth with fail-closed behavior.
 - Implemented object-level authorization for teachers and enrollment verification for student attendance.

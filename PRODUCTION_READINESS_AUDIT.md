@@ -2,7 +2,34 @@
 
 Latest audit update: October 11, 2026
 
-Scope note: Phase 5.1 completed production authentication on the existing Neon Auth / Better Auth architecture. Phase 5.3 timetable work has been implemented and verified on staging only. Hostinger DNS, nameservers, and `zephvion.com` custom domains were not changed. Secret values are intentionally omitted.
+Scope note: Phase 5.4 promoted the Phase 5.2 UX redesign and Phase 5.3 timetable work to production on the existing Neon Auth / Better Auth architecture. Hostinger DNS, nameservers, and `zephvion.com` custom domains were not changed. Secret values are intentionally omitted.
+
+## Phase 5.4 Update
+
+Phase 5.4 released the redesigned administrator/teacher workspaces and timetable feature to production.
+
+Completed work:
+
+- Release commit: `6de84bf`.
+- Created fresh pre-release Neon snapshot `snap-curly-hat-b5woqrcz` on production branch `br-rapid-lake-b5g9wtix`.
+- Applied migration `0001_harsh_firedrake` to production and verified `timetable_entries` plus timetable indexes and Drizzle migration history.
+- Seeded eight production portfolio timetable entries from existing teacher assignments.
+- Deployed production Worker `schoolic-api`, version `8739669f-8c95-4a6d-83fb-a5cfc9ab8ee5`.
+- Deployed production Pages preview `https://3023752a.schoolic.pages.dev`; canonical frontend remains `https://schoolic.pages.dev`.
+
+Verification:
+
+- `pnpm api:typecheck`: passed.
+- `pnpm api:test`: passed, 22/22 tests.
+- `cd apps/flutter_app && flutter analyze`: passed with no issues.
+- `cd apps/flutter_app && flutter test`: passed, 6/6 tests.
+- Production API health, Pages HTTP 200, and CORS from `https://schoolic.pages.dev` passed.
+- Production admin and teacher login smoke tests passed.
+- Invalid tokens and development-bypass headers return 401; teacher admin access returns 403.
+- Admin timetable create/conflict/edit/delete smoke test passed.
+- Teacher timetable visibility and scheduled attendance submission smoke test passed.
+
+Note: The older manual snapshot `snap-lucky-star-b5i49wpy` was deleted because the Neon project snapshot limit had been reached; it was replaced by `snap-curly-hat-b5woqrcz`.
 
 ## Phase 5.1 Update
 
@@ -34,7 +61,7 @@ Authentication verification:
 Latest production deployment:
 
 - Frontend: `https://schoolic.pages.dev`
-- Latest Pages deployment: `https://6a2d70dc.schoolic.pages.dev`
+- Latest Pages deployment: `https://3023752a.schoolic.pages.dev`
 - API Worker: `https://schoolic-api.schoolic-api.workers.dev`
 
 ## Phase 4.2 Update
@@ -86,7 +113,7 @@ Verification:
 
 Schoolic is deployed on Cloudflare default domains and production authentication now works for the designated synthetic portfolio administrator and teacher accounts.
 
-The API and frontend are live, production migration history is repaired, realistic synthetic data exists, old custom-domain dependencies have been removed from the production build, and authenticated role-based access has been verified. Product UX redesign and timetable implementation are complete on staging. Production promotion remains gated by explicit approval and recovery controls.
+The API and frontend are live, production migration history is repaired, realistic synthetic data exists, old custom-domain dependencies have been removed from the production build, authenticated role-based access has been verified, and the UX redesign plus timetable feature are deployed to production.
 
 ## Status Key
 
@@ -103,9 +130,9 @@ The API and frontend are live, production migration history is repaired, realist
 | Production database | Verified | Database `neondb`, owner role `neondb_owner`. |
 | Staging separation | Verified | Staging remains separate: `schoolic-staging` / `nameless-dust-81736720` / branch `br-floral-mountain-b5s114go`. |
 | Unrelated Neon project | Verified | `neon-amethyst-pillow` was not used. |
-| Recovery snapshot | Verified | Manual snapshot `snap-lucky-star-b5i49wpy` created before Phase 4.2 database changes. |
+| Recovery snapshot | Verified | Manual snapshot `snap-curly-hat-b5woqrcz` created before Phase 5.4 timetable release. |
 | Branch protection | Blocked | Production branch is still not protected in Neon metadata. |
-| Drizzle migration history | Verified | Baseline row for `0000_aspiring_madame_hydra` is present and `pnpm db:migrate` succeeds. |
+| Drizzle migration history | Verified | Baseline row for `0000_aspiring_madame_hydra` and timetable row for `0001_harsh_firedrake` are present. |
 
 ## 2. Production Authentication
 
@@ -184,15 +211,11 @@ Remaining recovery work:
 
 ## 7. Remaining Blockers
 
-1. **Complete on Staging:** Phase 5.2 UX redesign completed and verified on staging (`https://schoolic-staging.pages.dev`). Production promotion pending final approval.
-2. **Complete on Staging:** Phase 5.3 timetable migration, API, admin UI, teacher schedule views, and synthetic timetable data are verified on staging. Production migration/deployment pending explicit approval.
-3. **Deferred:** Recurring production snapshot schedule and restore drill are not configured.
-4. **Out of scope for Phase 5:** Production branch protection work.
+1. **Deferred:** Recurring production snapshot schedule and restore drill are not configured.
+2. **Out of scope for Phase 5:** Production branch protection work.
 
 ## 8. Safe Next Production Sequence
 
-1. Promote Phase 5.2 UX redesign to production after approval.
-2. Review Phase 5.3 timetable on staging and approve or request changes.
-3. Apply Phase 5.3 migrations to production only after explicit approval.
-4. Keep production and staging data/auth separation intact.
-5. Configure/test recovery policy before introducing real student data.
+1. Keep production and staging data/auth separation intact.
+2. Configure/test recovery policy before introducing real student data.
+3. Continue with the next product feature only after production monitoring remains healthy.
