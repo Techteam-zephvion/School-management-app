@@ -9,7 +9,7 @@ Phase 5.1 authentication is complete and deployed to production.
 - Fully implemented and tested: production Neon Auth, trusted production frontend domain, production Worker auth configuration, production Flutter auth configuration, real admin and teacher auth identities mapped to `app_users`, role-based smoke tests, invalid-session rejection, and blocked production development-bypass headers.
 - Implemented and deployed: default-domain production frontend and API.
 - Completed and verified on staging: Phase 5.2 Product UX Redesign.
-- Pending: Phase 5.3 timetable.
+- Completed and verified on staging: Phase 5.3 Timetable & Daily Schedule.
 - Planned later: homework, academic results, announcements/calendar, and fee management.
 
 ## Phase 5.2: Product UX Redesign
@@ -55,7 +55,7 @@ Required implementation:
 - Flutter teacher daily and weekly timetable views.
 - Synthetic staging and production portfolio timetable data after migration verification.
 
-Status: planned after Phase 5.2.
+Status: Complete on staging. Production migration and deployment intentionally pending explicit approval.
 
 ## Later Feature Priorities
 

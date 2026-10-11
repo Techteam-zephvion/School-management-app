@@ -8,6 +8,7 @@ import '../shared/components/feedback_banner.dart';
 import 'views/teacher_attendance_view.dart';
 import 'views/teacher_classes_view.dart';
 import 'views/teacher_my_day_view.dart';
+import 'views/teacher_timetable_view.dart';
 
 class TeacherDashboard extends ConsumerStatefulWidget {
   const TeacherDashboard({super.key});
@@ -17,8 +18,9 @@ class TeacherDashboard extends ConsumerStatefulWidget {
 }
 
 class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
-  int _activeTab = 0; // 0: My Day, 1: My Classes, 2: Attendance Register
+  int _activeTab = 0;
   List<Map<String, Object?>> _assignments = [];
+  List<Map<String, Object?>> _timetable = [];
   List<Map<String, Object?>> _recentSessions = [];
   Map<String, Object?>? _selectedAssignment;
   bool _loading = true;
@@ -43,15 +45,18 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
       final api = ref.read(apiClientProvider);
       final results = await Future.wait([
         api.getList('/api/v1/teacher/assignments', session: session),
+        api.getList('/api/v1/teacher/timetable', session: session),
         api.getJson('/api/v1/teacher/attendance/summary', session: session).catchError((_) => {'sessions': []}),
       ]);
 
       final assignments = results[0] as List<Map<String, Object?>>;
-      final summaryJson = results[1] as Map<String, Object?>;
+      final timetable = results[1] as List<Map<String, Object?>>;
+      final summaryJson = results[2] as Map<String, Object?>;
       final sessions = ((summaryJson['sessions'] as List?) ?? const []).cast<Map<String, Object?>>();
 
       setState(() {
         _assignments = assignments;
+        _timetable = timetable;
         _recentSessions = sessions;
         if (_selectedAssignment == null && assignments.isNotEmpty) {
           _selectedAssignment = assignments.first;
@@ -69,7 +74,33 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
   void _selectAssignmentAndTakeAttendance(Map<String, Object?> assignment) {
     setState(() {
       _selectedAssignment = assignment;
-      _activeTab = 2; // Switch to Attendance Register tab
+      _activeTab = 3;
+    });
+  }
+
+  void _selectTimetableEntryAndTakeAttendance(Map<String, Object?> entry) {
+    final matchingAssignments = _assignments.where((assignment) {
+      return assignment['academicYearId'] == entry['academicYearId'] &&
+          assignment['classId'] == entry['classId'] &&
+          assignment['sectionId'] == entry['sectionId'] &&
+          assignment['subjectId'] == entry['subjectId'];
+    });
+    final baseAssignment = matchingAssignments.isEmpty ? null : matchingAssignments.first;
+
+    setState(() {
+      _selectedAssignment = {
+        ...(baseAssignment ?? entry),
+        'academicYearId': entry['academicYearId'],
+        'classId': entry['classId'],
+        'sectionId': entry['sectionId'],
+        'subjectId': entry['subjectId'],
+        'className': entry['className'],
+        'sectionName': entry['sectionName'],
+        'subjectName': entry['subjectName'],
+        'periodNumber': entry['periodNumber'],
+        'attendanceDate': _todayIso(),
+      };
+      _activeTab = 3;
     });
   }
 
@@ -126,9 +157,11 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
               // Navigation tab buttons
               _buildTabButton(0, 'My Day', Icons.dashboard_outlined),
               const SizedBox(width: 4),
-              _buildTabButton(1, 'My Classes', Icons.layers_outlined),
+              _buildTabButton(1, 'My Week', Icons.calendar_month_outlined),
               const SizedBox(width: 4),
-              _buildTabButton(2, 'Attendance Register', Icons.fact_check_outlined),
+              _buildTabButton(2, 'My Classes', Icons.layers_outlined),
+              const SizedBox(width: 4),
+              _buildTabButton(3, 'Attendance Register', Icons.fact_check_outlined),
 
               const Spacer(),
 
@@ -233,19 +266,29 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
       case 0:
         return TeacherMyDayView(
           assignments: _assignments,
+          timetableEntries: _timetable,
           recentSessions: _recentSessions,
           teacherEmail: session?.email ?? 'Faculty',
           onSelectAssignmentAndTakeAttendance: _selectAssignmentAndTakeAttendance,
-          onNavigateToRegister: () => setState(() => _activeTab = 2),
+          onSelectTimetableEntryAndTakeAttendance: _selectTimetableEntryAndTakeAttendance,
+          onNavigateToRegister: () => setState(() => _activeTab = 3),
         );
       case 1:
+        return TeacherTimetableView(
+          entries: _timetable,
+          onTakeAttendance: _selectTimetableEntryAndTakeAttendance,
+        );
+      case 2:
         return TeacherClassesView(
           assignments: _assignments,
           onTakeAttendance: _selectAssignmentAndTakeAttendance,
         );
-      case 2:
+      case 3:
+        final attendanceAssignments = _selectedAssignment == null || _assignments.contains(_selectedAssignment)
+            ? _assignments
+            : [_selectedAssignment!, ..._assignments];
         return TeacherAttendanceView(
-          assignments: _assignments,
+          assignments: attendanceAssignments,
           selectedAssignment: _selectedAssignment,
           onAssignmentChanged: (val) => setState(() => _selectedAssignment = val),
           onAttendanceSaved: _loadData,
@@ -254,4 +297,9 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
         return const SizedBox.shrink();
     }
   }
+}
+
+String _todayIso() {
+  final now = DateTime.now();
+  return '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 }

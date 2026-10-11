@@ -2,7 +2,7 @@
 
 Latest audit update: October 11, 2026
 
-Scope note: Phase 5.1 completed production authentication on the existing Neon Auth / Better Auth architecture. Hostinger DNS, nameservers, and `zephvion.com` custom domains were not changed. Secret values are intentionally omitted.
+Scope note: Phase 5.1 completed production authentication on the existing Neon Auth / Better Auth architecture. Phase 5.3 timetable work has been implemented and verified on staging only. Hostinger DNS, nameservers, and `zephvion.com` custom domains were not changed. Secret values are intentionally omitted.
 
 ## Phase 5.1 Update
 
@@ -86,7 +86,7 @@ Verification:
 
 Schoolic is deployed on Cloudflare default domains and production authentication now works for the designated synthetic portfolio administrator and teacher accounts.
 
-The API and frontend are live, production migration history is repaired, realistic synthetic data exists, old custom-domain dependencies have been removed from the production build, and authenticated role-based access has been verified. Product UX redesign and timetable implementation remain pending Phase 5 work.
+The API and frontend are live, production migration history is repaired, realistic synthetic data exists, old custom-domain dependencies have been removed from the production build, and authenticated role-based access has been verified. Product UX redesign and timetable implementation are complete on staging. Production promotion remains gated by explicit approval and recovery controls.
 
 ## Status Key
 
@@ -185,14 +185,14 @@ Remaining recovery work:
 ## 7. Remaining Blockers
 
 1. **Complete on Staging:** Phase 5.2 UX redesign completed and verified on staging (`https://schoolic-staging.pages.dev`). Production promotion pending final approval.
-2. **Pending:** Phase 5.3 timetable feature is not yet implemented.
+2. **Complete on Staging:** Phase 5.3 timetable migration, API, admin UI, teacher schedule views, and synthetic timetable data are verified on staging. Production migration/deployment pending explicit approval.
 3. **Deferred:** Recurring production snapshot schedule and restore drill are not configured.
 4. **Out of scope for Phase 5:** Production branch protection work.
 
 ## 8. Safe Next Production Sequence
 
 1. Promote Phase 5.2 UX redesign to production after approval.
-2. Implement the timetable feature (Phase 5.3) as a complete database, API, and Flutter vertical slice.
-3. Apply new migrations to staging first, verify, then promote to production.
+2. Review Phase 5.3 timetable on staging and approve or request changes.
+3. Apply Phase 5.3 migrations to production only after explicit approval.
 4. Keep production and staging data/auth separation intact.
 5. Configure/test recovery policy before introducing real student data.

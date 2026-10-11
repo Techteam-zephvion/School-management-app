@@ -29,7 +29,7 @@ class AdminOverviewView extends StatelessWidget {
   final List<Map<String, Object?>> assignments;
   final List<Map<String, Object?>> summaries;
   final String activeYearName;
-  final ValueChanged<int> onNavigateToSection;
+  final ValueChanged<String> onNavigateToSection;
   final VoidCallback onOpenAddStudent;
   final VoidCallback onOpenAddStaff;
 
@@ -134,7 +134,7 @@ class AdminOverviewView extends StatelessWidget {
           emptyMessage: 'No attendance sessions logged yet.',
           actions: [
             TextButton(
-              onPressed: () => onNavigateToSection(1), // Nav to Attendance
+              onPressed: () => onNavigateToSection('attendance'),
               child: const Text('View register →', style: TextStyle(fontSize: 13, color: AppColors.primaryText)),
             ),
           ],
@@ -225,7 +225,7 @@ class AdminOverviewView extends StatelessWidget {
                   title: 'Daily Attendance Pending (${unrecordedSections.length} sections)',
                   subtitle: '${unrecordedSections.map((s) => s['name']).take(4).join(', ')}${unrecordedSections.length > 4 ? '...' : ''} have not logged attendance today.',
                   actionLabel: 'Check register →',
-                  onTap: () => onNavigateToSection(1),
+                  onTap: () => onNavigateToSection('attendance'),
                   isAlert: true,
                 ),
                 const Divider(height: 1, color: AppColors.primaryBorder),
@@ -236,7 +236,7 @@ class AdminOverviewView extends StatelessWidget {
                   title: 'Unassigned Sections (${unassignedSections.length} cohorts)',
                   subtitle: 'Class sections without an active assigned teacher mapping.',
                   actionLabel: 'Assign faculty →',
-                  onTap: () => onNavigateToSection(5),
+                  onTap: () => onNavigateToSection('assignments'),
                   isAlert: true,
                 ),
                 const Divider(height: 1, color: AppColors.primaryBorder),
@@ -247,7 +247,7 @@ class AdminOverviewView extends StatelessWidget {
                   title: 'All Active Systems Current',
                   subtitle: 'All cohort teacher assignments mapped and attendance logging is active.',
                   actionLabel: 'Review reports →',
-                  onTap: () => onNavigateToSection(6),
+                  onTap: () => onNavigateToSection('reports'),
                   isAlert: false,
                 ),
               ],
@@ -313,11 +313,11 @@ class AdminOverviewView extends StatelessWidget {
           spacing: 10,
           runSpacing: 10,
           children: [
-            _quickTile('Manage Students', Icons.people_outline, () => onNavigateToSection(2)),
-            _quickTile('Manage Staff', Icons.badge_outlined, () => onNavigateToSection(3)),
-            _quickTile('Configure Classes & Curricula', Icons.layers_outlined, () => onNavigateToSection(4)),
-            _quickTile('Teacher Allocations', Icons.assignment_ind_outlined, () => onNavigateToSection(5)),
-            _quickTile('Compliance Reports & CSV', Icons.analytics_outlined, () => onNavigateToSection(6)),
+            _quickTile('Manage Students', Icons.people_outline, () => onNavigateToSection('students')),
+            _quickTile('Manage Staff', Icons.badge_outlined, () => onNavigateToSection('staff')),
+            _quickTile('Configure Classes & Curricula', Icons.layers_outlined, () => onNavigateToSection('classes')),
+            _quickTile('Teacher Allocations', Icons.assignment_ind_outlined, () => onNavigateToSection('assignments')),
+            _quickTile('Compliance Reports & CSV', Icons.analytics_outlined, () => onNavigateToSection('reports')),
           ],
         ),
       ],

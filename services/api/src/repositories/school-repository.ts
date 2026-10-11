@@ -1,4 +1,4 @@
-import { and, eq, desc, gte, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, lte, ne } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import {
   academicYears,
@@ -12,6 +12,7 @@ import {
   studentEnrollments,
   students,
   subjects,
+  timetableEntries,
   teacherAssignments,
   userRoles,
 } from '../db/schema';
@@ -26,12 +27,19 @@ import type {
   createStudentSchema,
   createSubjectSchema,
   createTeacherAssignmentSchema,
+  createTimetableEntrySchema,
   createUserSchema,
   saveAttendanceSchema,
+  timetableQuerySchema,
+  updateTimetableEntrySchema,
 } from '../http/validation';
 import type { z } from 'zod';
 
 export type SchoolRepository = ReturnType<typeof createSchoolRepository>;
+
+type TimetableFilters = z.infer<typeof timetableQuerySchema>;
+type TimetableInput = z.infer<typeof createTimetableEntrySchema>;
+type TimetableUpdateInput = z.infer<typeof updateTimetableEntrySchema>;
 
 export function createSchoolRepository(db: Db) {
   return {
@@ -198,6 +206,121 @@ export function createSchoolRepository(db: Db) {
       return created;
     },
 
+    async listTimetableEntries(user: AuthUser, filters: TimetableFilters = {}) {
+      const conditions = [eq(timetableEntries.schoolId, user.schoolId)];
+      if (filters.academicYearId) conditions.push(eq(timetableEntries.academicYearId, filters.academicYearId));
+      if (filters.classId) conditions.push(eq(timetableEntries.classId, filters.classId));
+      if (filters.sectionId) conditions.push(eq(timetableEntries.sectionId, filters.sectionId));
+      if (filters.staffId) conditions.push(eq(timetableEntries.staffId, filters.staffId));
+      if (filters.subjectId) conditions.push(eq(timetableEntries.subjectId, filters.subjectId));
+      if (filters.dayOfWeek) conditions.push(eq(timetableEntries.dayOfWeek, filters.dayOfWeek));
+
+      const rows = await db
+        .select({
+          entry: timetableEntries,
+          className: classes.name,
+          sectionName: sections.name,
+          subjectName: subjects.name,
+          staffName: staff.fullName,
+          academicYearName: academicYears.name,
+        })
+        .from(timetableEntries)
+        .innerJoin(classes, eq(timetableEntries.classId, classes.id))
+        .innerJoin(sections, eq(timetableEntries.sectionId, sections.id))
+        .innerJoin(subjects, eq(timetableEntries.subjectId, subjects.id))
+        .innerJoin(staff, eq(timetableEntries.staffId, staff.id))
+        .innerJoin(academicYears, eq(timetableEntries.academicYearId, academicYears.id))
+        .where(and(...conditions))
+        .orderBy(timetableEntries.dayOfWeek, timetableEntries.startTime)
+        .limit(500);
+
+      return rows.map((r) => ({
+        ...r.entry,
+        className: r.className,
+        sectionName: r.sectionName,
+        subjectName: r.subjectName,
+        staffName: r.staffName,
+        academicYearName: r.academicYearName,
+      }));
+    },
+
+    async createTimetableEntry(user: AuthUser, input: TimetableInput) {
+      await assertTimetableInputIsValid(db, user, input);
+      await assertNoTimetableConflict(db, user, input);
+
+      const [created] = await db
+        .insert(timetableEntries)
+        .values({
+          ...input,
+          schoolId: user.schoolId,
+          periodNumber: input.periodNumber ?? null,
+          label: input.label ?? null,
+        })
+        .returning();
+
+      return created;
+    },
+
+    async updateTimetableEntry(user: AuthUser, id: string, input: TimetableUpdateInput) {
+      const [existing] = await db
+        .select()
+        .from(timetableEntries)
+        .where(and(eq(timetableEntries.schoolId, user.schoolId), eq(timetableEntries.id, id)))
+        .limit(1);
+
+      if (!existing) throw new ApiError(404, 'Timetable entry not found');
+
+      const next: TimetableInput = {
+        academicYearId: input.academicYearId ?? existing.academicYearId,
+        classId: input.classId ?? existing.classId,
+        sectionId: input.sectionId ?? existing.sectionId,
+        subjectId: input.subjectId ?? existing.subjectId,
+        staffId: input.staffId ?? existing.staffId,
+        dayOfWeek: input.dayOfWeek ?? existing.dayOfWeek,
+        startTime: input.startTime ?? existing.startTime,
+        endTime: input.endTime ?? existing.endTime,
+        periodNumber: input.periodNumber === undefined ? existing.periodNumber : input.periodNumber,
+        label: input.label === undefined ? existing.label : input.label,
+      };
+
+      if (next.endTime <= next.startTime) {
+        throw new ApiError(422, 'End time must be later than start time');
+      }
+
+      await assertTimetableInputIsValid(db, user, next);
+      await assertNoTimetableConflict(db, user, next, id);
+
+      const [updated] = await db
+        .update(timetableEntries)
+        .set({
+          academicYearId: next.academicYearId,
+          classId: next.classId,
+          sectionId: next.sectionId,
+          subjectId: next.subjectId,
+          staffId: next.staffId,
+          dayOfWeek: next.dayOfWeek,
+          startTime: next.startTime,
+          endTime: next.endTime,
+          periodNumber: next.periodNumber ?? null,
+          label: next.label ?? null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(timetableEntries.schoolId, user.schoolId), eq(timetableEntries.id, id)))
+        .returning();
+
+      return updated;
+    },
+
+    async deleteTimetableEntry(user: AuthUser, id: string) {
+      const [deleted] = await db
+        .delete(timetableEntries)
+        .where(and(eq(timetableEntries.schoolId, user.schoolId), eq(timetableEntries.id, id)))
+        .returning({ id: timetableEntries.id });
+
+      if (!deleted) throw new ApiError(404, 'Timetable entry not found');
+      return deleted;
+    },
+
     async teacherAssignmentsFor(user: AuthUser) {
       if (!user.staffId) return [];
       const rows = await db
@@ -217,6 +340,14 @@ export function createSchoolRepository(db: Db) {
         className: r.className,
         sectionName: r.sectionName,
       }));
+    },
+
+    async teacherTimetable(user: AuthUser, filters: TimetableFilters = {}) {
+      if (!user.staffId) return [];
+      return this.listTimetableEntries(user, {
+        ...filters,
+        staffId: user.staffId,
+      });
     },
 
     async rosterForSection(user: AuthUser, sectionId: string, academicYearId: string) {
@@ -491,4 +622,113 @@ async function assertTeacherCanTakeAttendance(
   if (!assignment) {
     throw new ApiError(403, 'Teacher is not assigned to this attendance session');
   }
+}
+
+async function assertTimetableInputIsValid(db: Db, user: AuthUser, input: TimetableInput) {
+  const [section] = await db
+    .select({ id: sections.id, classId: sections.classId })
+    .from(sections)
+    .where(and(eq(sections.schoolId, user.schoolId), eq(sections.id, input.sectionId), eq(sections.classId, input.classId)))
+    .limit(1);
+  if (!section) throw new ApiError(422, 'Selected section does not belong to the selected class');
+
+  const [year] = await db
+    .select({ id: academicYears.id })
+    .from(academicYears)
+    .where(and(eq(academicYears.schoolId, user.schoolId), eq(academicYears.id, input.academicYearId)))
+    .limit(1);
+  if (!year) throw new ApiError(422, 'Selected academic year is not available');
+
+  const [subject] = await db
+    .select({ id: subjects.id })
+    .from(subjects)
+    .where(and(eq(subjects.schoolId, user.schoolId), eq(subjects.id, input.subjectId)))
+    .limit(1);
+  if (!subject) throw new ApiError(422, 'Selected subject is not available');
+
+  const [teacher] = await db
+    .select({ id: staff.id })
+    .from(staff)
+    .where(and(eq(staff.schoolId, user.schoolId), eq(staff.id, input.staffId), eq(staff.isTeacher, true)))
+    .limit(1);
+  if (!teacher) throw new ApiError(422, 'Selected teacher is not available');
+
+  const [assignment] = await db
+    .select({ id: teacherAssignments.id })
+    .from(teacherAssignments)
+    .where(
+      and(
+        eq(teacherAssignments.schoolId, user.schoolId),
+        eq(teacherAssignments.staffId, input.staffId),
+        eq(teacherAssignments.academicYearId, input.academicYearId),
+        eq(teacherAssignments.classId, input.classId),
+        eq(teacherAssignments.sectionId, input.sectionId),
+        eq(teacherAssignments.subjectId, input.subjectId),
+      ),
+    )
+    .limit(1);
+
+  if (!assignment) {
+    throw new ApiError(422, 'Selected teacher is not assigned to teach this subject and section');
+  }
+}
+
+async function assertNoTimetableConflict(
+  db: Db,
+  user: AuthUser,
+  input: TimetableInput,
+  excludeId?: string,
+) {
+  const teacherConditions = [
+    eq(timetableEntries.schoolId, user.schoolId),
+    eq(timetableEntries.academicYearId, input.academicYearId),
+    eq(timetableEntries.staffId, input.staffId),
+    eq(timetableEntries.dayOfWeek, input.dayOfWeek),
+    lte(timetableEntries.startTime, input.endTime),
+    gte(timetableEntries.endTime, input.startTime),
+  ];
+  const sectionConditions = [
+    eq(timetableEntries.schoolId, user.schoolId),
+    eq(timetableEntries.academicYearId, input.academicYearId),
+    eq(timetableEntries.sectionId, input.sectionId),
+    eq(timetableEntries.dayOfWeek, input.dayOfWeek),
+    lte(timetableEntries.startTime, input.endTime),
+    gte(timetableEntries.endTime, input.startTime),
+  ];
+
+  if (excludeId) {
+    teacherConditions.push(ne(timetableEntries.id, excludeId));
+    sectionConditions.push(ne(timetableEntries.id, excludeId));
+  }
+
+  const teacherRows = await db
+    .select({ id: timetableEntries.id, startTime: timetableEntries.startTime, endTime: timetableEntries.endTime })
+    .from(timetableEntries)
+    .where(and(...teacherConditions))
+    .limit(20);
+
+  const teacherConflict = teacherRows.find((row) => overlaps(input.startTime, input.endTime, row.startTime, row.endTime));
+  if (teacherConflict) {
+    throw new ApiError(409, `Teacher has an overlapping lesson from ${teacherConflict.startTime} to ${teacherConflict.endTime}`);
+  }
+
+  const sectionRows = await db
+    .select({ id: timetableEntries.id, startTime: timetableEntries.startTime, endTime: timetableEntries.endTime })
+    .from(timetableEntries)
+    .where(and(...sectionConditions))
+    .limit(20);
+
+  const sectionConflict = sectionRows.find((row) => overlaps(input.startTime, input.endTime, row.startTime, row.endTime));
+  if (sectionConflict) {
+    throw new ApiError(409, `Class section has an overlapping lesson from ${sectionConflict.startTime} to ${sectionConflict.endTime}`);
+  }
+}
+
+function overlaps(startA: string, endA: string, startB: string, endB: string) {
+  return toMinutes(startA) < toMinutes(endB) && toMinutes(startB) < toMinutes(endA);
+}
+
+function toMinutes(value: string) {
+  const [hour, minute] = value.split(':').map(Number);
+  return (hour ?? 0) * 60 + (minute ?? 0);
 }

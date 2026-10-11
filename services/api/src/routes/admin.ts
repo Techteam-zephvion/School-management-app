@@ -13,7 +13,11 @@ import {
   createStudentSchema,
   createSubjectSchema,
   createTeacherAssignmentSchema,
+  createTimetableEntrySchema,
   createUserSchema,
+  idSchema,
+  timetableQuerySchema,
+  updateTimetableEntrySchema,
 } from '../http/validation';
 
 export const adminRoutes = new Hono<AppBindings>();
@@ -119,6 +123,31 @@ adminRoutes
   .post('/teacher-assignments', zValidator('json', createTeacherAssignmentSchema), async (c) => {
     const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
     return c.json(await repo.createTeacherAssignment(c.get('authUser'), c.req.valid('json')), 201);
+  });
+
+adminRoutes
+  .get('/timetable', zValidator('query', timetableQuerySchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listTimetableEntries(c.get('authUser'), c.req.valid('query')));
+  })
+  .post('/timetable', zValidator('json', createTimetableEntrySchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createTimetableEntry(c.get('authUser'), c.req.valid('json')), 201);
+  });
+
+adminRoutes
+  .put(
+    '/timetable/:id',
+    zValidator('param', idSchema),
+    zValidator('json', updateTimetableEntrySchema),
+    async (c) => {
+      const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+      return c.json(await repo.updateTimetableEntry(c.get('authUser'), c.req.valid('param').id, c.req.valid('json')));
+    },
+  )
+  .delete('/timetable/:id', zValidator('param', idSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.deleteTimetableEntry(c.get('authUser'), c.req.valid('param').id));
   });
 
 adminRoutes.get('/attendance-summary', zValidator('query', attendanceSummaryQuerySchema), async (c) => {

@@ -1,10 +1,12 @@
 import {
   boolean,
   date,
+  index,
   integer,
   pgEnum,
   pgTable,
   text,
+  time,
   timestamp,
   unique,
   uuid,
@@ -186,6 +188,37 @@ export const attendanceSessions = pgTable(
       table.periodNumber,
       table.subjectId,
     ),
+  ],
+);
+
+export const timetableEntries = pgTable(
+  'timetable_entries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull().references(() => academicYears.id),
+    classId: uuid('class_id').notNull().references(() => classes.id),
+    sectionId: uuid('section_id').notNull().references(() => sections.id),
+    subjectId: uuid('subject_id').notNull().references(() => subjects.id),
+    staffId: uuid('staff_id').notNull().references(() => staff.id),
+    dayOfWeek: integer('day_of_week').notNull(),
+    startTime: time('start_time').notNull(),
+    endTime: time('end_time').notNull(),
+    periodNumber: integer('period_number'),
+    label: text('label'),
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(
+      table.schoolId,
+      table.academicYearId,
+      table.sectionId,
+      table.dayOfWeek,
+      table.startTime,
+      table.endTime,
+    ),
+    index('timetable_entries_teacher_day_idx').on(table.schoolId, table.academicYearId, table.staffId, table.dayOfWeek),
+    index('timetable_entries_section_day_idx').on(table.schoolId, table.academicYearId, table.sectionId, table.dayOfWeek),
   ],
 );
 

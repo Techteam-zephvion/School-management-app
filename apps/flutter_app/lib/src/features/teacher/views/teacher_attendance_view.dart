@@ -91,6 +91,13 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
       final roster = rosterJson.map(StudentRow.fromJson).toList();
       setState(() {
         _roster = roster;
+        if (assignment['periodNumber'] != null || assignment['subjectId'] != null) {
+          _kind = AttendanceKind.period;
+          _period.text = '${assignment['periodNumber'] ?? 1}';
+        }
+        if (assignment['attendanceDate'] != null) {
+          _date.text = '${assignment['attendanceDate']}';
+        }
         _statuses
           ..clear()
           ..addEntries(roster.map((student) => MapEntry(student.id, AttendanceStatus.present)));

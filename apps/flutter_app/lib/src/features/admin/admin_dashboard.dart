@@ -19,6 +19,7 @@ import 'views/admin_reports_view.dart';
 import 'views/admin_settings_view.dart';
 import 'views/admin_staff_view.dart';
 import 'views/admin_students_view.dart';
+import 'views/admin_timetable_view.dart';
 
 enum AdminNavSection {
   overview,
@@ -27,6 +28,7 @@ enum AdminNavSection {
   staff,
   classesAndSubjects,
   teacherAssignments,
+  timetable,
   reports,
   settings,
 }
@@ -49,6 +51,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   List<Map<String, Object?>> _staff = [];
   List<Map<String, Object?>> _students = [];
   List<Map<String, Object?>> _assignments = [];
+  List<Map<String, Object?>> _timetable = [];
   List<Map<String, Object?>> _summaries = [];
   String _schoolName = 'Schoolic Academy';
   bool _loading = true;
@@ -91,6 +94,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         api.getList('/api/v1/admin/staff', session: session),
         api.getList('/api/v1/admin/students', session: session),
         api.getList('/api/v1/admin/teacher-assignments', session: session),
+        api.getList('/api/v1/admin/timetable', session: session),
         api.getJson('/api/v1/admin/overview', session: session).then((res) {
           final school = res['school'] as Map<String, Object?>?;
           if (school != null && school['name'] != null) {
@@ -107,6 +111,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         _staff = results[4];
         _students = results[5];
         _assignments = results[6];
+        _timetable = results[7];
       });
       await _loadSummaries();
     } on ApiException catch (exception) {
@@ -347,6 +352,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           _sidebarItem(AdminNavSection.staff, Icons.badge_outlined, 'Staff'),
           _sidebarItem(AdminNavSection.classesAndSubjects, Icons.layers_outlined, 'Classes & Subjects'),
           _sidebarItem(AdminNavSection.teacherAssignments, Icons.assignment_ind_outlined, 'Teacher Assignments'),
+          _sidebarItem(AdminNavSection.timetable, Icons.calendar_month_outlined, 'Timetable'),
           _sidebarItem(AdminNavSection.reports, Icons.analytics_outlined, 'Reports'),
           const Spacer(),
           const Divider(height: 1, color: AppColors.primaryBorder),
@@ -518,6 +524,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         return 'Classes & Subjects';
       case AdminNavSection.teacherAssignments:
         return 'Teacher Assignments';
+      case AdminNavSection.timetable:
+        return 'Timetable';
       case AdminNavSection.reports:
         return 'Reports & Export';
       case AdminNavSection.settings:
@@ -538,7 +546,17 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           assignments: _assignments,
           summaries: _summaries,
           activeYearName: activeYear,
-          onNavigateToSection: (index) => setState(() => _activeSection = AdminNavSection.values[index]),
+          onNavigateToSection: (section) => setState(() {
+            _activeSection = switch (section) {
+              'attendance' => AdminNavSection.attendance,
+              'students' => AdminNavSection.students,
+              'staff' => AdminNavSection.staff,
+              'classes' => AdminNavSection.classesAndSubjects,
+              'assignments' => AdminNavSection.teacherAssignments,
+              'reports' => AdminNavSection.reports,
+              _ => AdminNavSection.overview,
+            };
+          }),
           onOpenAddStudent: _openAddStudentDialog,
           onOpenAddStaff: _openAddStaffDialog,
         );
@@ -597,6 +615,17 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           classes: _classes,
           sections: _sections,
           subjects: _subjects,
+          reload: _load,
+        );
+      case AdminNavSection.timetable:
+        return AdminTimetableView(
+          years: _years,
+          classes: _classes,
+          sections: _sections,
+          subjects: _subjects,
+          staff: _staff,
+          assignments: _assignments,
+          entries: _timetable,
           reload: _load,
         );
       case AdminNavSection.reports:

@@ -11,17 +11,21 @@ import '../../shared/components/status_badge.dart';
 class TeacherMyDayView extends StatelessWidget {
   const TeacherMyDayView({
     required this.assignments,
+    required this.timetableEntries,
     required this.recentSessions,
     required this.teacherEmail,
     required this.onSelectAssignmentAndTakeAttendance,
+    required this.onSelectTimetableEntryAndTakeAttendance,
     required this.onNavigateToRegister,
     super.key,
   });
 
   final List<Map<String, Object?>> assignments;
+  final List<Map<String, Object?>> timetableEntries;
   final List<Map<String, Object?>> recentSessions;
   final String teacherEmail;
   final void Function(Map<String, Object?> assignment) onSelectAssignmentAndTakeAttendance;
+  final void Function(Map<String, Object?> entry) onSelectTimetableEntryAndTakeAttendance;
   final VoidCallback onNavigateToRegister;
 
   @override
@@ -29,20 +33,25 @@ class TeacherMyDayView extends StatelessWidget {
     final nowFormatted = DateFormat('EEEE, MMMM d, y').format(DateTime.now());
     final todayIso = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-    // Calculate completed vs pending sections today
+    final todayEntries = timetableEntries
+        .where((entry) => entry['dayOfWeek'] == DateTime.now().weekday)
+        .toList()
+      ..sort((a, b) => '${a['startTime']}'.compareTo('${b['startTime']}'));
+
     final todaySessionSectionIds = recentSessions
         .where((s) => s['attendanceDate'] == todayIso)
         .map((s) => s['sectionId'] as String?)
         .whereType<String>()
         .toSet();
 
-    final pendingAssignments = assignments
-        .where((a) => !todaySessionSectionIds.contains(a['sectionId']))
-        .toList();
+    final pendingEntries = todayEntries.where((entry) => !_isEntryCompleted(entry, todayIso)).toList();
 
-    final completedAssignments = assignments
-        .where((a) => todaySessionSectionIds.contains(a['sectionId']))
-        .toList();
+    final pendingAssignments = assignments.where((a) => !todaySessionSectionIds.contains(a['sectionId'])).toList();
+
+    final completedCount = todayEntries.isNotEmpty
+        ? todayEntries.length - pendingEntries.length
+        : assignments.where((a) => todaySessionSectionIds.contains(a['sectionId'])).length;
+    final pendingCount = todayEntries.isNotEmpty ? pendingEntries.length : pendingAssignments.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -68,14 +77,20 @@ class TeacherMyDayView extends StatelessWidget {
             ),
           ),
           primaryAction: FilledButton.icon(
-            onPressed: assignments.isEmpty
+            onPressed: assignments.isEmpty && todayEntries.isEmpty
                 ? null
                 : () {
-                    final nextPending = pendingAssignments.isNotEmpty ? pendingAssignments.first : assignments.first;
-                    onSelectAssignmentAndTakeAttendance(nextPending);
+                    if (pendingEntries.isNotEmpty) {
+                      onSelectTimetableEntryAndTakeAttendance(pendingEntries.first);
+                    } else if (todayEntries.isNotEmpty) {
+                      onSelectTimetableEntryAndTakeAttendance(todayEntries.first);
+                    } else {
+                      final nextPending = pendingAssignments.isNotEmpty ? pendingAssignments.first : assignments.first;
+                      onSelectAssignmentAndTakeAttendance(nextPending);
+                    }
                   },
             icon: const Icon(Icons.fact_check_outlined, size: 16),
-            label: Text(pendingAssignments.isNotEmpty ? 'Start attendance' : 'Open register'),
+            label: Text(pendingCount > 0 ? 'Start attendance' : 'Open register'),
           ),
         ),
         const SizedBox(height: 20),
@@ -90,24 +105,24 @@ class TeacherMyDayView extends StatelessWidget {
             ),
             StatItemData(
               label: 'Submitted Today',
-              value: '${completedAssignments.length}',
+              value: '$completedCount',
               helper: 'Sessions completed',
             ),
             StatItemData(
               label: 'Pending Attendance',
-              value: '${pendingAssignments.length}',
-              helper: pendingAssignments.isNotEmpty ? 'Action required today' : 'All classes submitted',
+              value: '$pendingCount',
+              helper: pendingCount > 0 ? 'Action required today' : 'All classes submitted',
             ),
           ],
         ),
         const SizedBox(height: 28),
 
         // Actionable Attendance Attention Queue
-        _buildActionableAttention(pendingAssignments),
+        _buildActionableAttention(pendingEntries, pendingAssignments),
         const SizedBox(height: 28),
 
         // Today's Assigned Cohorts & Schedule Overview
-        _buildTodaySchedule(todaySessionSectionIds),
+        _buildTodaySchedule(todayEntries, todaySessionSectionIds, todayIso),
         const SizedBox(height: 28),
 
         // Recent Attendance Sessions Table
@@ -165,7 +180,13 @@ class TeacherMyDayView extends StatelessWidget {
     );
   }
 
-  Widget _buildActionableAttention(List<Map<String, Object?>> pendingAssignments) {
+  Widget _buildActionableAttention(
+    List<Map<String, Object?>> pendingEntries,
+    List<Map<String, Object?>> pendingAssignments,
+  ) {
+    final hasTimetable = timetableEntries.isNotEmpty;
+    final pendingCount = hasTimetable ? pendingEntries.length : pendingAssignments.length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -173,7 +194,7 @@ class TeacherMyDayView extends StatelessWidget {
           children: [
             const Text('Attendance Requiring Attention', style: AppTypography.subsectionHeading),
             const SizedBox(width: 8),
-            if (pendingAssignments.isNotEmpty)
+            if (pendingCount > 0)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                 decoration: BoxDecoration(
@@ -182,7 +203,7 @@ class TeacherMyDayView extends StatelessWidget {
                   border: Border.all(color: AppColors.statusWarning.withValues(alpha: 0.3)),
                 ),
                 child: Text(
-                  '${pendingAssignments.length} PENDING',
+                  '$pendingCount PENDING',
                   style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
@@ -199,7 +220,7 @@ class TeacherMyDayView extends StatelessWidget {
             border: Border.all(color: AppColors.primaryBorder),
             borderRadius: AppRadii.rLg,
           ),
-          child: pendingAssignments.isEmpty
+          child: pendingCount == 0
               ? Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                   child: Row(
@@ -226,12 +247,13 @@ class TeacherMyDayView extends StatelessWidget {
               : ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: pendingAssignments.length,
+                  itemCount: hasTimetable ? pendingEntries.length : pendingAssignments.length,
                   separatorBuilder: (_, _) => const Divider(height: 1, color: AppColors.primaryBorder),
                   itemBuilder: (context, index) {
-                    final item = pendingAssignments[index];
+                    final item = hasTimetable ? pendingEntries[index] : pendingAssignments[index];
                     final className = '${item['className']} - ${item['sectionName']}';
                     final subject = item['subjectName'] != null ? '${item['subjectName']}' : 'General attendance';
+                    final time = hasTimetable ? '${_time(item['startTime'])}–${_time(item['endTime'])} • ' : '';
 
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
@@ -246,14 +268,16 @@ class TeacherMyDayView extends StatelessWidget {
                                 Text(className, style: AppTypography.bodyMedium),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '$subject • Attendance has not yet been submitted for today.',
+                                  '$time$subject • Attendance has not yet been submitted for today.',
                                   style: AppTypography.bodySecondary,
                                 ),
                               ],
                             ),
                           ),
                           FilledButton.tonal(
-                            onPressed: () => onSelectAssignmentAndTakeAttendance(item),
+                            onPressed: () => hasTimetable
+                                ? onSelectTimetableEntryAndTakeAttendance(item)
+                                : onSelectAssignmentAndTakeAttendance(item),
                             style: FilledButton.styleFrom(
                               backgroundColor: AppColors.secondaryBackground,
                               foregroundColor: AppColors.primaryText,
@@ -272,7 +296,15 @@ class TeacherMyDayView extends StatelessWidget {
     );
   }
 
-  Widget _buildTodaySchedule(Set<String> todaySessionSectionIds) {
+  Widget _buildTodaySchedule(
+    List<Map<String, Object?>> todayEntries,
+    Set<String> todaySessionSectionIds,
+    String todayIso,
+  ) {
+    if (todayEntries.isNotEmpty) {
+      return _buildTimetableSchedule(todayEntries, todayIso);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -359,4 +391,100 @@ class TeacherMyDayView extends StatelessWidget {
       ],
     );
   }
+
+  Widget _buildTimetableSchedule(List<Map<String, Object?>> todayEntries, String todayIso) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Today\'s Timetable', style: AppTypography.subsectionHeading),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.mainBackground,
+            border: Border.all(color: AppColors.primaryBorder),
+            borderRadius: AppRadii.rLg,
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: todayEntries.length,
+            separatorBuilder: (_, _) => const Divider(height: 1, color: AppColors.primaryBorder),
+            itemBuilder: (context, index) {
+              final entry = todayEntries[index];
+              final isDone = _isEntryCompleted(entry, todayIso);
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 68,
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.secondaryBackground,
+                        borderRadius: AppRadii.rSm,
+                        border: Border.all(color: AppColors.primaryBorder),
+                      ),
+                      child: Text(
+                        _time(entry['startTime']),
+                        style: const TextStyle(
+                          fontFamily: AppTypography.fontFamily,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryText,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${entry['className']} - ${entry['sectionName']}', style: AppTypography.bodyMedium),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${entry['subjectName']} • ${_time(entry['startTime'])}–${_time(entry['endTime'])}',
+                            style: AppTypography.metadata,
+                          ),
+                        ],
+                      ),
+                    ),
+                    StatusBadge(
+                      label: isDone ? 'COMPLETED' : 'PENDING',
+                      tone: isDone ? BadgeTone.success : BadgeTone.warning,
+                      icon: isDone ? Icons.check : Icons.schedule,
+                    ),
+                    const SizedBox(width: 14),
+                    OutlinedButton(
+                      onPressed: () => onSelectTimetableEntryAndTakeAttendance(entry),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        textStyle: const TextStyle(fontSize: 12),
+                      ),
+                      child: Text(isDone ? 'Review' : 'Take attendance'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  bool _isEntryCompleted(Map<String, Object?> entry, String todayIso) {
+    return recentSessions.any((session) {
+      if (session['attendanceDate'] != todayIso) return false;
+      if (session['sectionId'] != entry['sectionId']) return false;
+      if (entry['subjectId'] != null && session['subjectId'] != entry['subjectId']) return false;
+      if (entry['periodNumber'] != null && session['periodNumber'] != entry['periodNumber']) return false;
+      return true;
+    });
+  }
+}
+
+String _time(Object? value) {
+  final text = '$value';
+  return text.length >= 5 ? text.substring(0, 5) : text;
 }

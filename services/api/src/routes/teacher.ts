@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { createDb } from '../db/client';
 import { requireRole } from '../http/auth';
 import { createSchoolRepository } from '../repositories/school-repository';
-import { saveAttendanceSchema } from '../http/validation';
+import { saveAttendanceSchema, timetableQuerySchema } from '../http/validation';
 import type { AppBindings } from '../types';
 
 export const teacherRoutes = new Hono<AppBindings>();
@@ -17,6 +17,11 @@ teacherRoutes.use('*', async (c, next) => {
 teacherRoutes.get('/assignments', async (c) => {
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
   return c.json(await repo.teacherAssignmentsFor(c.get('authUser')));
+});
+
+teacherRoutes.get('/timetable', zValidator('query', timetableQuerySchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.teacherTimetable(c.get('authUser'), c.req.valid('query')));
 });
 
 teacherRoutes.get(

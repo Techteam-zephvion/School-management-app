@@ -67,6 +67,50 @@ export const createTeacherAssignmentSchema = z.object({
   canTakeDailyAttendance: z.boolean().default(false),
 });
 
+const clockTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected HH:MM time');
+
+export const timetableQuerySchema = z.object({
+  academicYearId: z.uuid().optional(),
+  classId: z.uuid().optional(),
+  sectionId: z.uuid().optional(),
+  staffId: z.uuid().optional(),
+  subjectId: z.uuid().optional(),
+  dayOfWeek: z.coerce.number().int().min(1).max(7).optional(),
+});
+
+const timetableEntryBaseSchema = z.object({
+  academicYearId: z.uuid(),
+  classId: z.uuid(),
+  sectionId: z.uuid(),
+  subjectId: z.uuid(),
+  staffId: z.uuid(),
+  dayOfWeek: z.number().int().min(1).max(7),
+  startTime: clockTimeSchema,
+  endTime: clockTimeSchema,
+  periodNumber: z.number().int().positive().nullable().optional(),
+  label: z.string().max(80).nullable().optional(),
+});
+
+export const createTimetableEntrySchema = timetableEntryBaseSchema.superRefine((value, ctx) => {
+  if (value.endTime <= value.startTime) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'End time must be later than start time',
+      path: ['endTime'],
+    });
+  }
+});
+
+export const updateTimetableEntrySchema = timetableEntryBaseSchema.partial().superRefine((value, ctx) => {
+  if (value.startTime && value.endTime && value.endTime <= value.startTime) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'End time must be later than start time',
+      path: ['endTime'],
+    });
+  }
+});
+
 export const attendanceRecordInputSchema = z.object({
   studentId: z.uuid(),
   status: z.enum(['present', 'absent', 'late', 'excused']),

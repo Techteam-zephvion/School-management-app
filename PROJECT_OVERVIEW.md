@@ -1,7 +1,7 @@
 # Schoolic - V1 Pilot MVP
 
 ## Overview
-Schoolic is a lightweight, modern school management application designed for a focused V1 pilot launch. It provides foundational capabilities for school administrators to configure academic structures, staff, and students, and enables teachers to record daily and period-based attendance with real-time feedback.
+Schoolic is a lightweight, modern school management application designed for a focused V1 pilot launch. It provides foundational capabilities for school administrators to configure academic structures, staff, students, and weekly timetables, and enables teachers to view schedules and record daily or period-based attendance with real-time feedback.
 
 ---
 
@@ -102,7 +102,7 @@ pnpm flutter:dev
 # Run API type checking (0 errors)
 pnpm api:typecheck
 
-# Run Vitest test suite (18/18 tests passed)
+# Run Vitest test suite (22/22 tests passed)
 pnpm api:test
 
 # Run Flutter static analyzer (0 issues)
@@ -161,6 +161,8 @@ pnpm pages:deploy:prod
 - [x] Staging artifact verified to contain default API/auth URLs, Switzer fonts, no localhost references, no production references, and no database URLs.
 - [x] Local verification passed: API typecheck, API tests, Flutter analyzer, and Flutter widget tests.
 - [x] Live synthetic E2E passed for auth, admin workflows, teacher workflows, attendance persistence, filters, CSV export, and student attendance history.
+- [x] Phase 5.3 timetable migration applied to staging only.
+- [x] Staging timetable API, admin scheduling UI, teacher daily/weekly schedule views, and seeded synthetic timetable rows verified.
 
 ### Phase 3.2 Status
 - [x] Complete using Cloudflare default hosting domains.
@@ -192,9 +194,8 @@ pnpm pages:deploy:prod
 
 ### Production Blockers
 - [x] Phase 5.2 UX redesign: Completed and verified on staging (`https://schoolic-staging.pages.dev`). Production promotion pending final review.
-- [ ] Phase 5.3 timetable feature is pending.
+- [x] Phase 5.3 timetable feature: Completed and verified on staging. Production promotion pending explicit approval.
 - [ ] Production recovery controls are incomplete: no automatic snapshot schedule or restore drill.
 
 ### Approval Gates
 - Remaining gates before real pilot use: Timetable completion, staging-first verification for new migrations, recurring recovery policy, restore drill, and any future real-user onboarding.
-

@@ -115,6 +115,29 @@ class ApiClient {
     return _decode(response);
   }
 
+  Future<Map<String, Object?>> putJson(
+    String path,
+    Map<String, Object?> body, {
+    required AuthSession session,
+  }) async {
+    final response = await _httpClient.put(
+      Uri.parse('${AppConfig.apiBaseUrl}$path'),
+      headers: _headers(bearerToken: session.bearerToken, devSession: session),
+      body: jsonEncode(body),
+    );
+    _ensureSuccess(response);
+    return _decode(response);
+  }
+
+  Future<Map<String, Object?>> deleteJson(String path, {required AuthSession session}) async {
+    final response = await _httpClient.delete(
+      Uri.parse('${AppConfig.apiBaseUrl}$path'),
+      headers: _headers(bearerToken: session.bearerToken, devSession: session),
+    );
+    _ensureSuccess(response);
+    return _decode(response);
+  }
+
   Map<String, String> _headers({String? bearerToken, AuthSession? devSession}) {
     return {
       'content-type': 'application/json',

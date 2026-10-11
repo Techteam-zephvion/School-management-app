@@ -1,6 +1,42 @@
 # Last Update (October 11, 2026)
 
-## 1. Phase 5.2: Product UX Redesign Complete & Verified on Staging
+## 1. Phase 5.3: Timetable & Daily Schedule Complete on Staging
+
+- Implemented a persisted timetable vertical slice across Neon Postgres, Hono API, and Flutter Web.
+- **Database & Migration**:
+  - Added `timetable_entries` with academic year, class, section, subject, teacher, day-of-week, time range, optional period number, and label.
+  - Added teacher/day and section/day indexes plus a uniqueness guard for duplicate section time blocks.
+  - Generated and applied Drizzle migration `0001_harsh_firedrake` to the isolated staging Neon project only.
+- **Backend API**:
+  - Added validated admin routes: `GET/POST/PUT/DELETE /api/v1/admin/timetable`.
+  - Added read-only teacher route: `GET /api/v1/teacher/timetable`.
+  - Enforced server-side timetable validation, teacher-assignment validation, tenant scoping, and teacher/class-section overlap rejection.
+  - Teachers can view schedules assigned to their authenticated staff identity but cannot create, edit, or delete timetable entries.
+- **Administrator Workspace**:
+  - Added a Timetable section with class/teacher filtering, weekly schedule cards, tabular scheduled lessons, create/edit dialog, and delete confirmation.
+  - Timetable teacher/subject choices are derived from existing teacher assignments.
+- **Teacher Workspace**:
+  - Added a read-only **My Week** timetable view.
+  - Updated **My Day** to prefer real timetable entries for today's schedule and pending attendance queue.
+  - Starting attendance from a scheduled period pre-fills date, period number, subject, class, and section while preserving the existing attendance storage model.
+- **Staging Deployment & Verification**:
+  - Applied migration to staging project `schoolic-staging` (`nameless-dust-81736720`), branch `br-floral-mountain-b5s114go`.
+  - Seeded five synthetic timetable entries from the existing staging teacher assignment.
+  - Deployed staging API Worker `schoolic-api-staging`, version `e419213f-cd73-4bce-8af7-fc2c4b2815bc`.
+  - Built and deployed staging Flutter Web to Cloudflare Pages preview `https://0e1d82bf.schoolic-staging.pages.dev`.
+  - Smoke checks passed: API `/health`, Pages HTTP 200, and staging timetable rows verified in Neon.
+  - Local checks passed: `pnpm api:typecheck`, `pnpm api:test` (22/22), `cd apps/flutter_app && flutter analyze`, and `cd apps/flutter_app && flutter test` (6/6).
+- **Production Guardrails**:
+  - Production was not deployed or migrated in Phase 5.3.
+  - Hostinger DNS, nameservers, and custom domains were not modified.
+  - Existing attendance persistence was preserved; no second attendance system was introduced.
+
+### Next Step
+- Promote Phase 5.3 to production only after staging review and explicit approval.
+
+---
+
+## 2. Phase 5.2: Product UX Redesign Complete & Verified on Staging
 
 - Executed the complete UX redesign adhering strictly to Schoolic's monochrome Switzer design principles:
   - Strict palette: `#111111` (Ink), `#FFFFFF` (Surface), `#F7F7F7` (Neutral surface), `#E5E5E5` (Borders), `#D4D4D4` (Separators), `#737373` (Secondary text), `#A3A3A3` (Muted), and one interactive accent `#10A37F`.
@@ -47,9 +83,9 @@
 
 ---
 
-## 2. Phase 5.1: Production Authentication Complete
+## 3. Phase 5.1: Production Authentication Complete
 
-## 2. Phase 4.2: Production Portfolio Deployment
+## 4. Phase 4.2: Production Portfolio Deployment
 
 - Completed the approved default-domain production portfolio deployment.
 - Created production Neon recovery snapshot `snap-lucky-star-b5i49wpy` before migration-history changes.
@@ -78,7 +114,7 @@
 
 ---
 
-## 3. Phase 4.1: Production Infrastructure Preparation
+## 5. Phase 4.1: Production Infrastructure Preparation
 
 - Updated `PRODUCTION_READINESS_AUDIT.md` with Phase 4.1 findings.
 - Production is still **not ready** for deployment.
@@ -104,7 +140,7 @@
 
 ---
 
-## 4. Phase 4.0: Production Readiness Audit
+## 6. Phase 4.0: Production Readiness Audit
 
 - Created `PRODUCTION_READINESS_AUDIT.md`.
 - Production was not ready for deployment.
@@ -113,7 +149,7 @@
 
 ---
 
-## 5. Phase 3.2: Default-Domain Staging Complete
+## 7. Phase 3.2: Default-Domain Staging Complete
 
 ### Hosting URLs
 - **Frontend:** `https://schoolic-staging.pages.dev`
@@ -162,7 +198,7 @@
 
 ---
 
-## 6. Phase 2: Security & Authentication Hardening (Summary)
+## 8. Phase 2: Security & Authentication Hardening (Summary)
 - Neutralized development bypass headers in staging and production.
 - Enforced session token verification against Neon Auth with fail-closed behavior.
 - Implemented object-level authorization for teachers and enrollment verification for student attendance.
