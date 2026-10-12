@@ -7,6 +7,8 @@ import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../shared/components/feedback_banner.dart';
 import '../shared/components/schoolic_logo.dart';
+import '../shared/components/shortcuts_dialog.dart';
+import '../shared/components/tour_dialog.dart';
 import 'views/teacher_attendance_view.dart';
 import 'views/teacher_classes_view.dart';
 import 'views/teacher_copilot_view.dart';
@@ -33,6 +35,13 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
   void initState() {
     super.initState();
     _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (await TourDialog.shouldShowAutoTour()) {
+        if (mounted) {
+          TourDialog.show(context, isFirstVisit: true);
+        }
+      }
+    });
   }
 
   Future<void> _loadData() async {
@@ -200,6 +209,17 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
 
                     const Spacer(),
 
+                    // Tutorial button
+                    IconButton(
+                      tooltip: 'App Tutorial',
+                      iconSize: 18,
+                      onPressed: () => TourDialog.show(context),
+                      icon: const Icon(
+                        Icons.help_outline_rounded,
+                        color: AppColors.secondaryText,
+                      ),
+                    ),
+
                     // Refresh button
                     IconButton(
                       tooltip: 'Refresh data',
@@ -330,6 +350,26 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                     'Teacher Copilot',
                     Icons.auto_awesome_outlined,
                   ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Divider(height: 1, color: AppColors.primaryBorder),
+                  ),
+                  _drawerActionItem(
+                    label: 'Tutorial',
+                    icon: Icons.explore_outlined,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      TourDialog.show(context);
+                    },
+                  ),
+                  _drawerActionItem(
+                    label: 'Keyboard Shortcuts',
+                    icon: Icons.keyboard_outlined,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      ShortcutsDialog.show(context);
+                    },
+                  ),
                 ],
               ),
             ),
@@ -428,6 +468,41 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                 color: isSelected
                     ? AppColors.primaryText
                     : AppColors.secondaryText,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _drawerActionItem({
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: AppRadii.rMd,
+      child: Container(
+        height: 40,
+        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: AppColors.secondaryText,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: const TextStyle(
+                fontFamily: 'Switzer',
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+                color: AppColors.secondaryText,
               ),
             ),
           ],

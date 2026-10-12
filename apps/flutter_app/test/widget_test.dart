@@ -7,12 +7,15 @@ import 'package:schoolic/src/features/admin/dialogs/student_attendance_dialog.da
 import 'package:schoolic/src/features/admin/views/admin_overview_view.dart';
 import 'package:schoolic/src/features/admin/views/admin_students_view.dart';
 import 'package:schoolic/src/features/admin/views/admin_timetable_view.dart';
+import 'package:schoolic/src/features/auth/login_screen.dart';
 import 'package:schoolic/src/features/shared/components/attendance_status_button.dart';
 import 'package:schoolic/src/features/shared/components/feedback_banner.dart';
 import 'package:schoolic/src/features/shared/components/page_header.dart';
 import 'package:schoolic/src/features/shared/components/schoolic_logo.dart';
+import 'package:schoolic/src/features/shared/components/shortcuts_dialog.dart';
 import 'package:schoolic/src/features/shared/components/stat_strip.dart';
 import 'package:schoolic/src/features/shared/components/status_badge.dart';
+import 'package:schoolic/src/features/shared/components/tour_dialog.dart';
 import 'package:schoolic/src/features/teacher/utils/teaching_material_pdf.dart';
 
 void main() {
@@ -559,7 +562,7 @@ void main() {
 
       final logoFinder = find.byType(SchoolicLogo).first;
       expect(logoFinder, findsOneWidget);
-      expect(find.text('S.'), findsOneWidget);
+      expect(find.text('Schoolic.'), findsOneWidget);
 
       final logoTopLeft = tester.getTopLeft(logoFinder);
       // The logo must be rendered strictly below the 44.0px status bar
@@ -568,7 +571,7 @@ void main() {
   });
 
   group('Schoolic Official Logo Branding', () {
-    testWidgets('SchoolicLogo renders official S. mark with Switzer bold typography and Schoolic accessibility label', (tester) async {
+    testWidgets('SchoolicLogo renders horizontal Schoolic. full name by default with Switzer bold typography and accessibility label', (tester) async {
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(
         const MaterialApp(
@@ -578,11 +581,11 @@ void main() {
         ),
       );
 
-      final textFinder = find.text('S.');
+      final textFinder = find.text('Schoolic.');
       expect(textFinder, findsOneWidget);
 
       final textWidget = tester.widget<Text>(textFinder);
-      expect(textWidget.data, 'S.');
+      expect(textWidget.data, 'Schoolic.');
       expect(textWidget.style?.fontFamily, 'Switzer');
       expect(textWidget.style?.fontWeight, FontWeight.w700);
       expect(textWidget.style?.fontSize, 24);
@@ -591,6 +594,19 @@ void main() {
       // Accessibility Semantics label must remain 'Schoolic'
       expect(find.bySemanticsLabel('Schoolic'), findsOneWidget);
       handle.dispose();
+    });
+
+    testWidgets('SchoolicLogo.compact renders compact S. mark', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SchoolicLogo.compact(size: 20),
+          ),
+        ),
+      );
+
+      final textFinder = find.text('S.');
+      expect(textFinder, findsOneWidget);
     });
 
     testWidgets('SchoolicLogo supports custom size and color', (tester) async {
@@ -602,9 +618,86 @@ void main() {
         ),
       );
 
-      final textWidget = tester.widget<Text>(find.text('S.'));
+      final textWidget = tester.widget<Text>(find.text('Schoolic.'));
       expect(textWidget.style?.fontSize, 32);
       expect(textWidget.style?.color, Colors.white);
+    });
+  });
+
+  group('Schoolic Product Tour & Shortcuts', () {
+    testWidgets('TourDialog renders initial step and advances through steps', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: TourDialog(),
+          ),
+        ),
+      );
+
+      // Verify header with Schoolic. logo and step indicator
+      expect(find.text('STEP 1 OF 5'), findsOneWidget);
+      expect(find.text('Institutional School Management'), findsOneWidget);
+      expect(find.text('Next'), findsOneWidget);
+      expect(find.text('Skip'), findsOneWidget);
+
+      // Tap Next to step 2
+      await tester.tap(find.text('Next'));
+      await tester.pump();
+
+      expect(find.text('STEP 2 OF 5'), findsOneWidget);
+      expect(find.text('Fast Attendance Recording'), findsOneWidget);
+      expect(find.text('Back'), findsOneWidget);
+
+      // Tap Back to step 1
+      await tester.tap(find.text('Back'));
+      await tester.pump();
+
+      expect(find.text('STEP 1 OF 5'), findsOneWidget);
+    });
+
+    testWidgets('ShortcutsDialog displays categorized shortcuts', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: ShortcutsDialog(),
+          ),
+        ),
+      );
+
+      expect(find.text('KEYBOARD SHORTCUTS'), findsOneWidget);
+      expect(find.text('GENERAL & HELP'), findsOneWidget);
+      expect(find.text('FORM INPUTS & ACTIONS'), findsOneWidget);
+      expect(find.text('WORKSPACE NAVIGATION'), findsOneWidget);
+      expect(find.text('Close'), findsOneWidget);
+    });
+
+    testWidgets('LoginScreen renders show password toggle, shortcuts row, and tour trigger', (tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: LoginScreen(),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Brand logo renders Schoolic.
+      expect(find.text('Schoolic.'), findsOneWidget);
+
+      // Password visibility toggle icon is present
+      final toggleFinder = find.byTooltip('Show password');
+      expect(toggleFinder, findsOneWidget);
+
+      // Tap show password toggle
+      await tester.tap(toggleFinder);
+      await tester.pump();
+
+      expect(find.byTooltip('Hide password'), findsOneWidget);
+
+      // Keyboard shortcuts bar and tour trigger are present
+      expect(find.text('↵ Enter'), findsOneWidget);
+      expect(find.text('Shortcuts'), findsOneWidget);
+      expect(find.text('First time here? Explore Product Tour'), findsOneWidget);
     });
   });
 }

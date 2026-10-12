@@ -9,6 +9,8 @@ import '../../core/theme.dart';
 import '../shared/components/app_dialog.dart';
 import '../shared/components/feedback_banner.dart';
 import '../shared/components/schoolic_logo.dart';
+import '../shared/components/shortcuts_dialog.dart';
+import '../shared/components/tour_dialog.dart';
 import 'dialogs/add_staff_dialog.dart';
 import 'dialogs/add_student_dialog.dart';
 import 'dialogs/student_attendance_dialog.dart';
@@ -72,6 +74,13 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   void initState() {
     super.initState();
     _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (await TourDialog.shouldShowAutoTour()) {
+        if (mounted) {
+          TourDialog.show(context, isFirstVisit: true);
+        }
+      }
+    });
   }
 
   @override
@@ -355,7 +364,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                 ),
               ),
               child: (!isDrawer && _sidebarCollapsed)
-                  ? const Center(child: SchoolicLogo(size: 20))
+                  ? const Center(child: SchoolicLogo.compact(size: 20))
                   : Row(
                       children: [
                         const SchoolicLogo(size: 20),
@@ -452,6 +461,28 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     Icons.settings_outlined,
                     'Settings',
                     isDrawer: isDrawer,
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    child: Divider(height: 1, color: AppColors.primaryBorder),
+                  ),
+                  _sidebarActionItem(
+                    icon: Icons.explore_outlined,
+                    label: 'Tutorial',
+                    isDrawer: isDrawer,
+                    onTap: () {
+                      if (isDrawer) Navigator.of(context).pop();
+                      TourDialog.show(context);
+                    },
+                  ),
+                  _sidebarActionItem(
+                    icon: Icons.keyboard_outlined,
+                    label: 'Shortcuts',
+                    isDrawer: isDrawer,
+                    onTap: () {
+                      if (isDrawer) Navigator.of(context).pop();
+                      ShortcutsDialog.show(context);
+                    },
                   ),
                 ],
               ),
@@ -587,6 +618,54 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     );
   }
 
+  Widget _sidebarActionItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool isDrawer = false,
+  }) {
+    final collapsed = !isDrawer && _sidebarCollapsed;
+    return Tooltip(
+      message: collapsed ? label : '',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadii.rMd,
+        child: Container(
+          height: 38,
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+          padding: EdgeInsets.symmetric(horizontal: collapsed ? 12 : 12),
+          child: Row(
+            mainAxisAlignment: collapsed
+                ? MainAxisAlignment.center
+                : MainAxisAlignment.start,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: AppColors.secondaryText,
+              ),
+              if (!collapsed) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Switzer',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.secondaryText,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTopBar({bool isMobile = false, double topInset = 0}) {
     final session = ref.watch(authControllerProvider).session;
     final yearName = _years.isNotEmpty
@@ -684,6 +763,16 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
               ),
               const SizedBox(width: 4),
             ],
+            IconButton(
+              tooltip: 'App Tutorial',
+              iconSize: 18,
+              onPressed: () => TourDialog.show(context),
+              icon: const Icon(
+                Icons.help_outline_rounded,
+                color: AppColors.secondaryText,
+              ),
+            ),
+            const SizedBox(width: 4),
             IconButton(
               tooltip: 'Refresh data',
               iconSize: 18,
