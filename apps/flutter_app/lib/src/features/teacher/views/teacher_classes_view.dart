@@ -63,7 +63,10 @@ class TeacherClassesView extends StatelessWidget {
           LayoutBuilder(
             builder: (context, constraints) {
               final isDesktop = constraints.maxWidth > 800;
-              final cardWidth = isDesktop ? (constraints.maxWidth - 16) / 2 : constraints.maxWidth;
+              final isPhone = constraints.maxWidth < 520;
+              final cardWidth = isDesktop
+                  ? (constraints.maxWidth - 16) / 2
+                  : constraints.maxWidth;
 
               return Wrap(
                 spacing: 16,
@@ -71,7 +74,9 @@ class TeacherClassesView extends StatelessWidget {
                 children: assignments.map((assignment) {
                   final className = '${assignment['className']}';
                   final sectionName = '${assignment['sectionName']}';
-                  final subject = assignment['subjectName'] != null ? '${assignment['subjectName']}' : 'General Curriculum';
+                  final subject = assignment['subjectName'] != null
+                      ? '${assignment['subjectName']}'
+                      : 'General Curriculum';
 
                   return SizedBox(
                     width: cardWidth,
@@ -85,57 +90,56 @@ class TeacherClassesView extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '$className - $sectionName',
-                                    style: AppTypography.sectionHeading,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
+                          if (isPhone)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _classTitle(className, sectionName, subject),
+                                const SizedBox(height: 10),
+                                _assignedBadge(),
+                              ],
+                            )
+                          else
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: _classTitle(
+                                    className,
+                                    sectionName,
                                     subject,
-                                    style: AppTypography.bodySecondary,
-                                  ),
-                                ],
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: AppColors.secondaryBackground,
-                                  borderRadius: AppRadii.rSm,
-                                  border: Border.all(color: AppColors.primaryBorder),
-                                ),
-                                child: const Text(
-                                  'ASSIGNED',
-                                  style: TextStyle(
-                                    fontFamily: AppTypography.fontFamily,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.secondaryText,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
+                                const SizedBox(width: 12),
+                                _assignedBadge(),
+                              ],
+                            ),
                           const SizedBox(height: 20),
-                          const Divider(height: 1, color: AppColors.primaryBorder),
+                          const Divider(
+                            height: 1,
+                            color: AppColors.primaryBorder,
+                          ),
                           const SizedBox(height: 16),
-                          Row(
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
                             children: [
                               OutlinedButton.icon(
-                                onPressed: () => _openRoster(context, assignment),
-                                icon: const Icon(Icons.people_outline, size: 15),
+                                onPressed: () =>
+                                    _openRoster(context, assignment),
+                                icon: const Icon(
+                                  Icons.people_outline,
+                                  size: 15,
+                                ),
                                 label: const Text('View roster'),
                               ),
-                              const SizedBox(width: 8),
                               FilledButton.icon(
                                 onPressed: () => onTakeAttendance(assignment),
-                                icon: const Icon(Icons.fact_check_outlined, size: 15),
+                                icon: const Icon(
+                                  Icons.fact_check_outlined,
+                                  size: 15,
+                                ),
                                 label: const Text('Take attendance'),
                               ),
                             ],
@@ -149,6 +153,41 @@ class TeacherClassesView extends StatelessWidget {
             },
           ),
       ],
+    );
+  }
+
+  Widget _classTitle(String className, String sectionName, String subject) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$className - $sectionName',
+          style: AppTypography.sectionHeading,
+          softWrap: true,
+        ),
+        const SizedBox(height: 4),
+        Text(subject, style: AppTypography.bodySecondary),
+      ],
+    );
+  }
+
+  Widget _assignedBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.secondaryBackground,
+        borderRadius: AppRadii.rSm,
+        border: Border.all(color: AppColors.primaryBorder),
+      ),
+      child: const Text(
+        'ASSIGNED',
+        style: TextStyle(
+          fontFamily: AppTypography.fontFamily,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: AppColors.secondaryText,
+        ),
+      ),
     );
   }
 }

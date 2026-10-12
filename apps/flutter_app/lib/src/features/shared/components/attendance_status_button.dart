@@ -17,22 +17,64 @@ class AttendanceStatusGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.secondaryBackground,
-        borderRadius: AppRadii.rMd,
-        border: Border.all(color: AppColors.primaryBorder),
+    final items = [
+      _buildItem(
+        AttendanceStatus.present,
+        'Present',
+        'P',
+        Icons.check,
+        AppColors.statusSuccess,
       ),
-      padding: const EdgeInsets.all(2),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildItem(AttendanceStatus.present, 'Present', 'P', Icons.check, AppColors.statusSuccess),
-          _buildItem(AttendanceStatus.absent, 'Absent', 'A', Icons.close, AppColors.statusError),
-          _buildItem(AttendanceStatus.late, 'Late', 'L', Icons.schedule, AppColors.statusWarning),
-          _buildItem(AttendanceStatus.excused, 'Excused', 'E', Icons.event_available, AppColors.statusInfo),
-        ],
+      _buildItem(
+        AttendanceStatus.absent,
+        'Absent',
+        'A',
+        Icons.close,
+        AppColors.statusError,
       ),
+      _buildItem(
+        AttendanceStatus.late,
+        'Late',
+        'L',
+        Icons.schedule,
+        AppColors.statusWarning,
+      ),
+      _buildItem(
+        AttendanceStatus.excused,
+        'Excused',
+        'E',
+        Icons.event_available,
+        AppColors.statusInfo,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final shouldWrap =
+            constraints.maxWidth.isFinite && constraints.maxWidth < 260;
+        return Container(
+          decoration: BoxDecoration(
+            color: AppColors.secondaryBackground,
+            borderRadius: AppRadii.rMd,
+            border: Border.all(color: AppColors.primaryBorder),
+          ),
+          padding: const EdgeInsets.all(2),
+          child: shouldWrap
+              ? Wrap(
+                  spacing: 2,
+                  runSpacing: 2,
+                  children: items
+                      .map(
+                        (item) => SizedBox(
+                          width: (constraints.maxWidth - 6) / 2,
+                          child: item,
+                        ),
+                      )
+                      .toList(),
+                )
+              : Row(mainAxisSize: MainAxisSize.min, children: items),
+        );
+      },
     );
   }
 
@@ -53,12 +95,14 @@ class AttendanceStatusGroup extends StatelessWidget {
         curve: AppMotion.curve,
         padding: EdgeInsets.symmetric(
           horizontal: compact ? 10 : 12,
-          vertical: 6,
+          vertical: compact ? 8 : 7,
         ),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.mainBackground : Colors.transparent,
           borderRadius: BorderRadius.circular(4),
-          border: isSelected ? Border.all(color: activeColor.withValues(alpha: 0.4), width: 1) : null,
+          border: isSelected
+              ? Border.all(color: activeColor.withValues(alpha: 0.4), width: 1)
+              : null,
           boxShadow: isSelected
               ? [
                   BoxShadow(
@@ -78,13 +122,16 @@ class AttendanceStatusGroup extends StatelessWidget {
               color: isSelected ? activeColor : AppColors.mutedText,
             ),
             const SizedBox(width: 5),
-            Text(
-              compact ? shortLabel : label,
-              style: TextStyle(
-                fontFamily: AppTypography.fontFamily,
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected ? activeColor : AppColors.secondaryText,
+            Flexible(
+              child: Text(
+                compact ? shortLabel : label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: AppTypography.fontFamily,
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  color: isSelected ? activeColor : AppColors.secondaryText,
+                ),
               ),
             ),
           ],

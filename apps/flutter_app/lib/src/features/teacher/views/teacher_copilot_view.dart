@@ -9,10 +9,7 @@ import '../../shared/components/page_header.dart';
 import '../utils/teaching_material_pdf.dart';
 
 class TeacherCopilotView extends ConsumerStatefulWidget {
-  const TeacherCopilotView({
-    required this.assignments,
-    super.key,
-  });
+  const TeacherCopilotView({required this.assignments, super.key});
 
   final List<Map<String, Object?>> assignments;
 
@@ -77,10 +74,15 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
 
   Future<void> _loadSaved() async {
     final session = ref.read(authControllerProvider).session;
-    if (session == null) return;
+    if (session == null) {
+      setState(() => _loadingSaved = false);
+      return;
+    }
     setState(() => _loadingSaved = true);
     try {
-      final response = await ref.read(apiClientProvider).getList('/api/v1/teacher/materials', session: session);
+      final response = await ref
+          .read(apiClientProvider)
+          .getList('/api/v1/teacher/materials', session: session);
       setState(() => _saved = response);
     } on ApiException catch (exception) {
       setState(() => _error = exception.message);
@@ -107,11 +109,16 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
           'durationMinutes': _duration,
           'questionCount': _questionCount,
           'difficulty': _difficulty,
-          'language': _languageController.text.trim().isEmpty ? 'English' : _languageController.text.trim(),
-          if (_instructions.text.trim().isNotEmpty) 'instructions': _instructions.text.trim(),
+          'language': _languageController.text.trim().isEmpty
+              ? 'English'
+              : _languageController.text.trim(),
+          if (_instructions.text.trim().isNotEmpty)
+            'instructions': _instructions.text.trim(),
           if (assignment?['classId'] != null) 'classId': assignment!['classId'],
-          if (assignment?['sectionId'] != null) 'sectionId': assignment!['sectionId'],
-          if (assignment?['subjectId'] != null) 'subjectId': assignment!['subjectId'],
+          if (assignment?['sectionId'] != null)
+            'sectionId': assignment!['sectionId'],
+          if (assignment?['subjectId'] != null)
+            'subjectId': assignment!['subjectId'],
         },
         session: session,
       );
@@ -120,11 +127,15 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
         'type': _outputType,
         'topic': _topic.text.trim(),
         'difficulty': _difficulty,
-        'language': _languageController.text.trim().isEmpty ? 'English' : _languageController.text.trim(),
+        'language': _languageController.text.trim().isEmpty
+            ? 'English'
+            : _languageController.text.trim(),
         'durationMinutes': _duration,
         'questionCount': _questionCount,
       }, saved: false);
-      setState(() => _notice = 'Draft generated. Review and edit it before saving.');
+      setState(
+        () => _notice = 'Draft generated. Review and edit it before saving.',
+      );
     } on ApiException catch (exception) {
       setState(() => _error = exception.message);
     } catch (e) {
@@ -136,7 +147,9 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
 
   Future<void> _save() async {
     final session = ref.read(authControllerProvider).session;
-    if (session == null || _saving || _titleController.text.trim().isEmpty) return;
+    if (session == null || _saving || _titleController.text.trim().isEmpty) {
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
@@ -146,8 +159,16 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
       final body = _materialPayload();
       final id = _currentDraft?['id'];
       final response = id == null
-          ? await ref.read(apiClientProvider).postJson('/api/v1/teacher/materials', body, session: session)
-          : await ref.read(apiClientProvider).patchJson('/api/v1/teacher/materials/$id', body, session: session);
+          ? await ref
+                .read(apiClientProvider)
+                .postJson('/api/v1/teacher/materials', body, session: session)
+          : await ref
+                .read(apiClientProvider)
+                .patchJson(
+                  '/api/v1/teacher/materials/$id',
+                  body,
+                  session: session,
+                );
       _applyDraft(response, saved: true);
       await _loadSaved();
       setState(() => _notice = 'Draft saved.');
@@ -164,7 +185,12 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
     final session = ref.read(authControllerProvider).session;
     if (session == null) return;
     try {
-      final response = await ref.read(apiClientProvider).getJson('/api/v1/teacher/materials/${material['id']}', session: session);
+      final response = await ref
+          .read(apiClientProvider)
+          .getJson(
+            '/api/v1/teacher/materials/${material['id']}',
+            session: session,
+          );
       _applyDraft(response, saved: true);
       setState(() {
         _notice = 'Draft opened.';
@@ -180,7 +206,9 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
     final id = _currentDraft?['id'];
     if (session == null || id == null) return;
     try {
-      await ref.read(apiClientProvider).deleteJson('/api/v1/teacher/materials/$id', session: session);
+      await ref
+          .read(apiClientProvider)
+          .deleteJson('/api/v1/teacher/materials/$id', session: session);
       _clearDraft();
       await _loadSaved();
       setState(() => _notice = 'Draft deleted.');
@@ -190,29 +218,45 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
   }
 
   Future<void> _downloadStudentPdf() async {
-    await downloadTeachingMaterialPdf(_pdfData(), mode: TeachingMaterialExportMode.student);
+    await downloadTeachingMaterialPdf(
+      _pdfData(),
+      mode: TeachingMaterialExportMode.student,
+    );
   }
 
   Future<void> _printStudentPdf() async {
-    await printTeachingMaterialPdf(_pdfData(), mode: TeachingMaterialExportMode.student);
+    await printTeachingMaterialPdf(
+      _pdfData(),
+      mode: TeachingMaterialExportMode.student,
+    );
   }
 
   Future<void> _downloadAnswerKeyPdf() async {
     final data = _pdfData();
     if (!hasAnswerKey(data)) {
-      setState(() => _notice = 'This draft does not include a generated answer key.');
+      setState(
+        () => _notice = 'This draft does not include a generated answer key.',
+      );
       return;
     }
-    await downloadTeachingMaterialPdf(data, mode: TeachingMaterialExportMode.answerKey);
+    await downloadTeachingMaterialPdf(
+      data,
+      mode: TeachingMaterialExportMode.answerKey,
+    );
   }
 
   Future<void> _printAnswerKeyPdf() async {
     final data = _pdfData();
     if (!hasAnswerKey(data)) {
-      setState(() => _notice = 'This draft does not include a generated answer key.');
+      setState(
+        () => _notice = 'This draft does not include a generated answer key.',
+      );
       return;
     }
-    await printTeachingMaterialPdf(data, mode: TeachingMaterialExportMode.answerKey);
+    await printTeachingMaterialPdf(
+      data,
+      mode: TeachingMaterialExportMode.answerKey,
+    );
   }
 
   @override
@@ -228,7 +272,11 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
           primaryAction: FilledButton.icon(
             onPressed: busy ? null : _generate,
             icon: _generating
-                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Icon(Icons.auto_awesome_outlined, size: 16),
             label: Text(_generating ? 'Generating...' : 'Generate draft'),
           ),
@@ -249,8 +297,9 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
         LayoutBuilder(
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= 920;
-            final form = _leftPanel();
-            final editor = _editorPanel();
+            final isPhone = constraints.maxWidth < 560;
+            final form = _leftPanel(isPhone: isPhone);
+            final editor = _editorPanel(isPhone: isPhone);
             if (!wide) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -271,17 +320,21 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
     );
   }
 
-  Widget _leftPanel() {
+  Widget _leftPanel({required bool isPhone}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _panel(
+          isPhone: isPhone,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text('Generate', style: AppTypography.subsectionHeading),
               const SizedBox(height: 12),
-              TextField(controller: _topic, decoration: const InputDecoration(labelText: 'Topic')),
+              TextField(
+                controller: _topic,
+                decoration: const InputDecoration(labelText: 'Topic'),
+              ),
               const SizedBox(height: 10),
               _dropdown('Type', _outputType, const {
                 'lesson_plan': 'Lesson plan',
@@ -298,7 +351,9 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
               DropdownButtonFormField<Map<String, Object?>?>(
                 initialValue: _assignment,
                 isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Assigned context'),
+                decoration: const InputDecoration(
+                  labelText: 'Assigned context',
+                ),
                 items: widget.assignments.map((assignment) {
                   return DropdownMenuItem<Map<String, Object?>?>(
                     value: assignment,
@@ -318,7 +373,8 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
                       controller: _durationController,
                       decoration: const InputDecoration(labelText: 'Minutes'),
                       keyboardType: TextInputType.number,
-                      onChanged: (value) => _duration = int.tryParse(value) ?? _duration,
+                      onChanged: (value) =>
+                          _duration = int.tryParse(value) ?? _duration,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -327,25 +383,32 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
                       controller: _questionCountController,
                       decoration: const InputDecoration(labelText: 'Questions'),
                       keyboardType: TextInputType.number,
-                      onChanged: (value) => _questionCount = int.tryParse(value) ?? _questionCount,
+                      onChanged: (value) => _questionCount =
+                          int.tryParse(value) ?? _questionCount,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 10),
-              TextField(controller: _languageController, decoration: const InputDecoration(labelText: 'Language')),
+              TextField(
+                controller: _languageController,
+                decoration: const InputDecoration(labelText: 'Language'),
+              ),
               const SizedBox(height: 10),
               TextField(
                 controller: _instructions,
                 minLines: 2,
                 maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Objectives or instructions'),
+                decoration: const InputDecoration(
+                  labelText: 'Objectives or instructions',
+                ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 16),
         _panel(
+          isPhone: isPhone,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -354,7 +417,10 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
               if (_loadingSaved)
                 const Center(child: CircularProgressIndicator(strokeWidth: 2))
               else if (_saved.isEmpty)
-                const Text('No saved drafts yet.', style: AppTypography.bodySecondary)
+                const Text(
+                  'No saved drafts yet.',
+                  style: AppTypography.bodySecondary,
+                )
               else
                 ..._saved.map(_savedTile),
             ],
@@ -364,10 +430,11 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
     );
   }
 
-  Widget _editorPanel() {
+  Widget _editorPanel({required bool isPhone}) {
     final hasDraft = _currentDraft != null || _titleController.text.isNotEmpty;
     if (!hasDraft) {
       return _panel(
+        isPhone: isPhone,
         child: const Padding(
           padding: EdgeInsets.all(18),
           child: Text(
@@ -379,16 +446,31 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
     }
 
     return _panel(
+      isPhone: isPhone,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            alignment: WrapAlignment.spaceBetween,
             children: [
-              Expanded(child: Text('Draft Editor', style: AppTypography.subsectionHeading)),
+              SizedBox(
+                width: isPhone ? double.infinity : 180,
+                child: Text(
+                  'Draft Editor',
+                  style: AppTypography.subsectionHeading,
+                ),
+              ),
               TextButton.icon(
                 onPressed: _saving ? null : _save,
                 icon: _saving
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Icon(Icons.save_outlined, size: 16),
                 label: Text(_currentDraft?['id'] == null ? 'Save' : 'Update'),
               ),
@@ -456,7 +538,9 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
             controller: _checksController,
             minLines: 3,
             maxLines: 8,
-            decoration: const InputDecoration(labelText: 'Checks for understanding'),
+            decoration: const InputDecoration(
+              labelText: 'Checks for understanding',
+            ),
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 10),
@@ -464,22 +548,24 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
             controller: _notesController,
             minLines: 3,
             maxLines: 8,
-            decoration: const InputDecoration(labelText: 'Teacher notes and answer key'),
+            decoration: const InputDecoration(
+              labelText: 'Teacher notes and answer key',
+            ),
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 16),
-          _documentPreview(),
+          _documentPreview(isPhone: isPhone),
         ],
       ),
     );
   }
 
-  Widget _documentPreview() {
+  Widget _documentPreview({required bool isPhone}) {
     final sections = _parseSections(_sectionsController.text);
     final checks = _plainLines(_checksController.text);
     final notes = _plainLines(_notesController.text);
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: EdgeInsets.all(isPhone ? 14 : 18),
       decoration: BoxDecoration(
         color: AppColors.mainBackground,
         border: Border.all(color: AppColors.primaryBorder),
@@ -490,21 +576,39 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
         children: [
           Text('Preview', style: AppTypography.subsectionHeading),
           const SizedBox(height: 14),
-          Text(_titleController.text.trim().isEmpty ? 'Untitled draft' : _titleController.text.trim(), style: AppTypography.sectionHeading),
+          Text(
+            _titleController.text.trim().isEmpty
+                ? 'Untitled draft'
+                : _titleController.text.trim(),
+            style: AppTypography.sectionHeading,
+          ),
           const SizedBox(height: 6),
           Text(_previewMeta(), style: AppTypography.metadata),
           const Divider(height: 28, color: AppColors.primaryBorder),
           _previewSection('Overview', [_overviewController.text.trim()]),
-          ...sections.map((section) => _previewSection('${section['heading']}', ((section['items'] as List?) ?? const []).map((e) => '$e').toList())),
-          if (checks.isNotEmpty) _previewSection('Checks for Understanding', checks),
-          if ((_outputType == 'worksheet' || _outputType == 'quiz') && notes.isNotEmpty)
+          ...sections.map(
+            (section) => _previewSection(
+              '${section['heading']}',
+              ((section['items'] as List?) ?? const [])
+                  .map((e) => '$e')
+                  .toList(),
+            ),
+          ),
+          if (checks.isNotEmpty)
+            _previewSection('Checks for Understanding', checks),
+          if ((_outputType == 'worksheet' || _outputType == 'quiz') &&
+              notes.isNotEmpty)
             _previewSection('Teacher Answer Key', notes, teacherOnly: true),
         ],
       ),
     );
   }
 
-  Widget _previewSection(String title, List<String> items, {bool teacherOnly = false}) {
+  Widget _previewSection(
+    String title,
+    List<String> items, {
+    bool teacherOnly = false,
+  }) {
     final cleanItems = items.where((item) => item.trim().isNotEmpty).toList();
     if (cleanItems.isEmpty) return const SizedBox.shrink();
     return Padding(
@@ -515,12 +619,17 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
           Row(
             children: [
               Expanded(child: Text(title, style: AppTypography.bodyMedium)),
-              if (teacherOnly) const Text('Teacher only', style: AppTypography.metadata),
+              if (teacherOnly)
+                const Text('Teacher only', style: AppTypography.metadata),
             ],
           ),
           const SizedBox(height: 6),
           ...cleanItems.asMap().entries.map((entry) {
-            final prefix = (_outputType == 'worksheet' || _outputType == 'quiz') && !teacherOnly ? '${entry.key + 1}. ' : '- ';
+            final prefix =
+                (_outputType == 'worksheet' || _outputType == 'quiz') &&
+                    !teacherOnly
+                ? '${entry.key + 1}. '
+                : '- ';
             return Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Text('$prefix${entry.value}', style: AppTypography.body),
@@ -531,9 +640,9 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
     );
   }
 
-  Widget _panel({required Widget child}) {
+  Widget _panel({required Widget child, bool isPhone = false}) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(isPhone ? 12 : 14),
       decoration: BoxDecoration(
         color: AppColors.secondaryBackground,
         border: Border.all(color: AppColors.primaryBorder),
@@ -543,11 +652,21 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
     );
   }
 
-  Widget _dropdown(String label, String value, Map<String, String> items, ValueChanged<String?> onChanged) {
+  Widget _dropdown(
+    String label,
+    String value,
+    Map<String, String> items,
+    ValueChanged<String?> onChanged,
+  ) {
     return DropdownButtonFormField<String>(
       initialValue: value,
       decoration: InputDecoration(labelText: label),
-      items: items.entries.map((entry) => DropdownMenuItem(value: entry.key, child: Text(entry.value))).toList(),
+      items: items.entries
+          .map(
+            (entry) =>
+                DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+          )
+          .toList(),
       onChanged: onChanged,
     );
   }
@@ -561,7 +680,12 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${material['title']}', style: AppTypography.bodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(
+              '${material['title']}',
+              style: AppTypography.bodyMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             const SizedBox(height: 2),
             Text(
               '${_typeLabel('${material['type']}')} - ${material['className'] ?? 'No class'} ${material['sectionName'] ?? ''}',
@@ -576,29 +700,41 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
   }
 
   void _applyDraft(Map<String, Object?> draft, {required bool saved}) {
-    final content = ((draft['content'] as Map?) ?? draft).cast<String, Object?>();
-    final sections = ((content['sections'] as List?) ?? const []).cast<Map<String, Object?>>();
-    final checks = ((content['checksForUnderstanding'] as List?) ?? const []).map((e) => '$e').toList();
-    final notes = ((content['teacherNotes'] as List?) ?? const []).map((e) => '$e').toList();
+    final content = ((draft['content'] as Map?) ?? draft)
+        .cast<String, Object?>();
+    final sections = ((content['sections'] as List?) ?? const [])
+        .cast<Map<String, Object?>>();
+    final checks = ((content['checksForUnderstanding'] as List?) ?? const [])
+        .map((e) => '$e')
+        .toList();
+    final notes = ((content['teacherNotes'] as List?) ?? const [])
+        .map((e) => '$e')
+        .toList();
 
     setState(() {
       _currentDraft = saved ? draft : {'metadata': draft['metadata']};
       _titleController.text = '${draft['title'] ?? ''}';
       _overviewController.text = '${content['overview'] ?? ''}';
-      _sectionsController.text = sections.map((section) {
-        final items = ((section['items'] as List?) ?? const []).map((e) => '- $e').join('\n');
-        return '## ${section['heading']}\n$items';
-      }).join('\n\n');
+      _sectionsController.text = sections
+          .map((section) {
+            final items = ((section['items'] as List?) ?? const [])
+                .map((e) => '- $e')
+                .join('\n');
+            return '## ${section['heading']}\n$items';
+          })
+          .join('\n\n');
       _checksController.text = checks.map((item) => '- $item').join('\n');
       _notesController.text = notes.map((item) => '- $item').join('\n');
       _outputType = '${draft['type'] ?? _outputType}';
       _difficulty = '${draft['difficulty'] ?? _difficulty}';
       _topic.text = '${draft['topic'] ?? _topic.text}';
       _duration = (draft['durationMinutes'] as num?)?.toInt() ?? _duration;
-      _questionCount = (draft['questionCount'] as num?)?.toInt() ?? _questionCount;
+      _questionCount =
+          (draft['questionCount'] as num?)?.toInt() ?? _questionCount;
       _durationController.text = '$_duration';
       _questionCountController.text = '$_questionCount';
-      _languageController.text = '${draft['language'] ?? _languageController.text}';
+      _languageController.text =
+          '${draft['language'] ?? _languageController.text}';
       _assignment = _assignmentForDraft(draft) ?? _assignment;
     });
   }
@@ -621,13 +757,18 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
       'title': _titleController.text.trim(),
       'topic': _topic.text.trim(),
       'difficulty': _difficulty,
-      'language': _languageController.text.trim().isEmpty ? 'English' : _languageController.text.trim(),
+      'language': _languageController.text.trim().isEmpty
+          ? 'English'
+          : _languageController.text.trim(),
       'durationMinutes': _duration,
       'questionCount': _questionCount,
-      if (assignment?['academicYearId'] != null) 'academicYearId': assignment!['academicYearId'],
+      if (assignment?['academicYearId'] != null)
+        'academicYearId': assignment!['academicYearId'],
       if (assignment?['classId'] != null) 'classId': assignment!['classId'],
-      if (assignment?['sectionId'] != null) 'sectionId': assignment!['sectionId'],
-      if (assignment?['subjectId'] != null) 'subjectId': assignment!['subjectId'],
+      if (assignment?['sectionId'] != null)
+        'sectionId': assignment!['sectionId'],
+      if (assignment?['subjectId'] != null)
+        'subjectId': assignment!['subjectId'],
       'content': _currentContent(),
       'metadata': {
         ...((_currentDraft?['metadata'] as Map?) ?? const <String, Object?>{}),
@@ -649,21 +790,29 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
     final assignment = _assignment;
     return TeachingMaterialPdfData(
       type: _outputType,
-      title: _titleController.text.trim().isEmpty ? 'Untitled Draft' : _titleController.text.trim(),
+      title: _titleController.text.trim().isEmpty
+          ? 'Untitled Draft'
+          : _titleController.text.trim(),
       topic: _topic.text.trim().isEmpty ? 'Untitled topic' : _topic.text.trim(),
       overview: _overviewController.text.trim(),
       sections: _parseSections(_sectionsController.text)
-          .map((section) => TeachingMaterialSection(
-                heading: '${section['heading']}',
-                items: ((section['items'] as List?) ?? const []).map((e) => '$e').toList(),
-              ))
+          .map(
+            (section) => TeachingMaterialSection(
+              heading: '${section['heading']}',
+              items: ((section['items'] as List?) ?? const [])
+                  .map((e) => '$e')
+                  .toList(),
+            ),
+          )
           .toList(),
       checksForUnderstanding: _plainLines(_checksController.text),
       teacherNotes: _plainLines(_notesController.text),
       className: assignment?['className'] as String?,
       sectionName: assignment?['sectionName'] as String?,
       subjectName: assignment?['subjectName'] as String?,
-      language: _languageController.text.trim().isEmpty ? 'English' : _languageController.text.trim(),
+      language: _languageController.text.trim().isEmpty
+          ? 'English'
+          : _languageController.text.trim(),
     );
   }
 
@@ -689,7 +838,9 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
       if (heading == null && items.isEmpty) return;
       sections.add({
         'heading': heading ?? 'Section',
-        'items': items.isEmpty ? ['Review this section.'] : List<String>.from(items),
+        'items': items.isEmpty
+            ? ['Review this section.']
+            : List<String>.from(items),
       });
       items.clear();
     }
@@ -709,7 +860,10 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
     flush();
     return sections.isEmpty
         ? [
-            {'heading': 'Draft', 'items': ['Add draft content.']},
+            {
+              'heading': 'Draft',
+              'items': ['Add draft content.'],
+            },
           ]
         : sections;
   }
@@ -717,7 +871,11 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
   List<String> _plainLines(String text) {
     return text
         .split('\n')
-        .map((line) => line.trim().startsWith('- ') ? line.trim().substring(2) : line.trim())
+        .map(
+          (line) => line.trim().startsWith('- ')
+              ? line.trim().substring(2)
+              : line.trim(),
+        )
         .where((line) => line.isNotEmpty)
         .toList();
   }
@@ -733,9 +891,14 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
 
   Map<String, Object?>? _assignmentForDraft(Map<String, Object?> draft) {
     for (final assignment in widget.assignments) {
-      final classMatches = draft['classId'] == null || assignment['classId'] == draft['classId'];
-      final sectionMatches = draft['sectionId'] == null || assignment['sectionId'] == draft['sectionId'];
-      final subjectMatches = draft['subjectId'] == null || assignment['subjectId'] == draft['subjectId'];
+      final classMatches =
+          draft['classId'] == null || assignment['classId'] == draft['classId'];
+      final sectionMatches =
+          draft['sectionId'] == null ||
+          assignment['sectionId'] == draft['sectionId'];
+      final subjectMatches =
+          draft['subjectId'] == null ||
+          assignment['subjectId'] == draft['subjectId'];
       if (classMatches && sectionMatches && subjectMatches) return assignment;
     }
     return null;

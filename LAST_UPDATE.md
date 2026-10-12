@@ -1,5 +1,33 @@
 # Last Update (October 12, 2026)
 
+## Phase 7.3: Mobile UX Adaptation
+
+### Summary
+- Adapted the existing Flutter experience for Android phone widths while preserving desktop layouts.
+- Added Teacher Copilot to the teacher workspace navigation so the Phase 6 AI workflow is reachable from desktop tabs and the mobile drawer.
+- Refined narrow-width layouts for login, shared page headers, dialogs, attendance status controls, teacher My Day, My Week, My Classes, Attendance Register, and Teacher Copilot.
+- Kept the existing visual system intact: Switzer typography, monochrome surfaces, subtle borders, restrained accent color, and no decorative AI styling.
+- No backend, auth, database, secret, DNS, or production configuration changes were made.
+
+### Mobile Coverage Added
+- Added `apps/flutter_app/test/mobile_layout_test.dart` covering:
+  - shared page header action wrapping at 360px;
+  - teacher timetable mobile lesson list;
+  - teacher class card action wrapping;
+  - attendance register controls at 430px;
+  - Teacher Copilot stacked form/editor at 360px.
+
+### Local Verification
+- `pnpm api:typecheck`: PASS.
+- `pnpm api:test`: PASS, 32/32 tests across 4 files.
+- `cd apps/flutter_app && flutter analyze --no-fatal-infos`: PASS, no issues found.
+- `pnpm flutter:test`: PASS, 29/29 tests.
+
+### Native Build
+- Ready for the existing staging-only `Native Staging Builds` GitHub Actions workflow.
+- Expected Android artifact: `schoolic-android-apk-staging`.
+- Production frontend, production API, production database, production secrets, DNS, and domains remain untouched.
+
 ## Phase 7.2: Staging Account Provisioning & Native Login Completion
 
 ### Summary

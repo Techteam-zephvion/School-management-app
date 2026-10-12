@@ -26,8 +26,10 @@ class TeacherMyDayView extends StatelessWidget {
   final List<Map<String, Object?>> recentSessions;
   final String? teacherDisplayName;
   final String? teacherEmail;
-  final void Function(Map<String, Object?> assignment) onSelectAssignmentAndTakeAttendance;
-  final void Function(Map<String, Object?> entry) onSelectTimetableEntryAndTakeAttendance;
+  final void Function(Map<String, Object?> assignment)
+  onSelectAssignmentAndTakeAttendance;
+  final void Function(Map<String, Object?> entry)
+  onSelectTimetableEntryAndTakeAttendance;
   final VoidCallback onNavigateToRegister;
 
   @override
@@ -35,10 +37,11 @@ class TeacherMyDayView extends StatelessWidget {
     final nowFormatted = DateFormat('EEEE, MMMM d, y').format(DateTime.now());
     final todayIso = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-    final todayEntries = timetableEntries
-        .where((entry) => entry['dayOfWeek'] == DateTime.now().weekday)
-        .toList()
-      ..sort((a, b) => '${a['startTime']}'.compareTo('${b['startTime']}'));
+    final todayEntries =
+        timetableEntries
+            .where((entry) => entry['dayOfWeek'] == DateTime.now().weekday)
+            .toList()
+          ..sort((a, b) => '${a['startTime']}'.compareTo('${b['startTime']}'));
 
     final todaySessionSectionIds = recentSessions
         .where((s) => s['attendanceDate'] == todayIso)
@@ -46,16 +49,25 @@ class TeacherMyDayView extends StatelessWidget {
         .whereType<String>()
         .toSet();
 
-    final pendingEntries = todayEntries.where((entry) => !_isEntryCompleted(entry, todayIso)).toList();
+    final pendingEntries = todayEntries
+        .where((entry) => !_isEntryCompleted(entry, todayIso))
+        .toList();
 
-    final pendingAssignments = assignments.where((a) => !todaySessionSectionIds.contains(a['sectionId'])).toList();
+    final pendingAssignments = assignments
+        .where((a) => !todaySessionSectionIds.contains(a['sectionId']))
+        .toList();
 
     final completedCount = todayEntries.isNotEmpty
         ? todayEntries.length - pendingEntries.length
-        : assignments.where((a) => todaySessionSectionIds.contains(a['sectionId'])).length;
-    final pendingCount = todayEntries.isNotEmpty ? pendingEntries.length : pendingAssignments.length;
+        : assignments
+              .where((a) => todaySessionSectionIds.contains(a['sectionId']))
+              .length;
+    final pendingCount = todayEntries.isNotEmpty
+        ? pendingEntries.length
+        : pendingAssignments.length;
 
-    final greetingTarget = (teacherDisplayName != null && teacherDisplayName!.trim().isNotEmpty)
+    final greetingTarget =
+        (teacherDisplayName != null && teacherDisplayName!.trim().isNotEmpty)
         ? teacherDisplayName!.trim()
         : null;
     final descriptionText = greetingTarget != null
@@ -90,16 +102,24 @@ class TeacherMyDayView extends StatelessWidget {
                 ? null
                 : () {
                     if (pendingEntries.isNotEmpty) {
-                      onSelectTimetableEntryAndTakeAttendance(pendingEntries.first);
+                      onSelectTimetableEntryAndTakeAttendance(
+                        pendingEntries.first,
+                      );
                     } else if (todayEntries.isNotEmpty) {
-                      onSelectTimetableEntryAndTakeAttendance(todayEntries.first);
+                      onSelectTimetableEntryAndTakeAttendance(
+                        todayEntries.first,
+                      );
                     } else {
-                      final nextPending = pendingAssignments.isNotEmpty ? pendingAssignments.first : assignments.first;
+                      final nextPending = pendingAssignments.isNotEmpty
+                          ? pendingAssignments.first
+                          : assignments.first;
                       onSelectAssignmentAndTakeAttendance(nextPending);
                     }
                   },
             icon: const Icon(Icons.fact_check_outlined, size: 16),
-            label: Text(pendingCount > 0 ? 'Start attendance' : 'Open register'),
+            label: Text(
+              pendingCount > 0 ? 'Start attendance' : 'Open register',
+            ),
           ),
         ),
         const SizedBox(height: 20),
@@ -120,18 +140,25 @@ class TeacherMyDayView extends StatelessWidget {
             StatItemData(
               label: 'Pending Attendance',
               value: '$pendingCount',
-              helper: pendingCount > 0 ? 'Action required today' : 'All classes submitted',
+              helper: pendingCount > 0
+                  ? 'Action required today'
+                  : 'All classes submitted',
             ),
           ],
         ),
         const SizedBox(height: 28),
 
         // Actionable Attendance Attention Queue
-        _buildActionableAttention(pendingEntries, pendingAssignments),
+        _buildActionableAttention(context, pendingEntries, pendingAssignments),
         const SizedBox(height: 28),
 
         // Today's Assigned Cohorts & Schedule Overview
-        _buildTodaySchedule(todayEntries, todaySessionSectionIds, todayIso),
+        _buildTodaySchedule(
+          context,
+          todayEntries,
+          todaySessionSectionIds,
+          todayIso,
+        ),
         const SizedBox(height: 28),
 
         // Recent Attendance Sessions Table
@@ -143,14 +170,20 @@ class TeacherMyDayView extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: onNavigateToRegister,
-              child: const Text('All records →', style: TextStyle(fontSize: 13, color: AppColors.primaryText)),
+              child: const Text(
+                'All records →',
+                style: TextStyle(fontSize: 13, color: AppColors.primaryText),
+              ),
             ),
           ],
           columns: [
             AppTableColumn(
               header: 'Date',
               width: 110,
-              cellBuilder: (context, s) => Text('${s['attendanceDate'] ?? '—'}', style: AppTypography.compactTable),
+              cellBuilder: (context, s) => Text(
+                '${s['attendanceDate'] ?? '—'}',
+                style: AppTypography.compactTable,
+              ),
             ),
             AppTableColumn(
               header: 'Class & Section',
@@ -163,7 +196,8 @@ class TeacherMyDayView extends StatelessWidget {
             AppTableColumn(
               header: 'Type',
               width: 90,
-              cellBuilder: (context, s) => StatusBadge.fromStatusString('${s['kind'] ?? 'daily'}'),
+              cellBuilder: (context, s) =>
+                  StatusBadge.fromStatusString('${s['kind'] ?? 'daily'}'),
             ),
             AppTableColumn(
               header: 'Period',
@@ -190,26 +224,38 @@ class TeacherMyDayView extends StatelessWidget {
   }
 
   Widget _buildActionableAttention(
+    BuildContext context,
     List<Map<String, Object?>> pendingEntries,
     List<Map<String, Object?>> pendingAssignments,
   ) {
+    final isPhone = MediaQuery.of(context).size.width < 560;
     final hasTimetable = timetableEntries.isNotEmpty;
-    final pendingCount = hasTimetable ? pendingEntries.length : pendingAssignments.length;
+    final pendingCount = hasTimetable
+        ? pendingEntries.length
+        : pendingAssignments.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Text('Attendance Requiring Attention', style: AppTypography.subsectionHeading),
+            const Text(
+              'Attendance Requiring Attention',
+              style: AppTypography.subsectionHeading,
+            ),
             const SizedBox(width: 8),
             if (pendingCount > 0)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 1.5,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.statusWarning.withValues(alpha: 0.1),
                   borderRadius: AppRadii.rSm,
-                  border: Border.all(color: AppColors.statusWarning.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: AppColors.statusWarning.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Text(
                   '$pendingCount PENDING',
@@ -231,24 +277,52 @@ class TeacherMyDayView extends StatelessWidget {
           ),
           child: pendingCount == 0
               ? Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                  child: Row(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 18,
+                  ),
+                  child: Flex(
+                    direction: isPhone ? Axis.vertical : Axis.horizontal,
+                    crossAxisAlignment: isPhone
+                        ? CrossAxisAlignment.start
+                        : CrossAxisAlignment.center,
                     children: [
-                      const Icon(Icons.check_circle_outline, size: 20, color: AppColors.statusSuccess),
-                      const SizedBox(width: 14),
-                      const Expanded(
+                      const Icon(
+                        Icons.check_circle_outline,
+                        size: 20,
+                        color: AppColors.statusSuccess,
+                      ),
+                      SizedBox(
+                        width: isPhone ? 0 : 14,
+                        height: isPhone ? 10 : 0,
+                      ),
+                      const Flexible(
+                        fit: FlexFit.loose,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('All Assigned Classes Submitted', style: AppTypography.bodyMedium),
+                            Text(
+                              'All Assigned Classes Submitted',
+                              style: AppTypography.bodyMedium,
+                            ),
                             SizedBox(height: 2),
-                            Text('You have logged attendance for all your assigned class sections today.', style: AppTypography.bodySecondary),
+                            Text(
+                              'You have logged attendance for all your assigned class sections today.',
+                              style: AppTypography.bodySecondary,
+                            ),
                           ],
                         ),
                       ),
+                      if (isPhone)
+                        const SizedBox(height: 10)
+                      else
+                        const SizedBox(width: 12),
                       TextButton(
                         onPressed: onNavigateToRegister,
-                        child: const Text('Open register →', style: TextStyle(color: AppColors.primaryText)),
+                        child: const Text(
+                          'Open register →',
+                          style: TextStyle(color: AppColors.primaryText),
+                        ),
                       ),
                     ],
                   ),
@@ -256,25 +330,53 @@ class TeacherMyDayView extends StatelessWidget {
               : ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: hasTimetable ? pendingEntries.length : pendingAssignments.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1, color: AppColors.primaryBorder),
+                  itemCount: hasTimetable
+                      ? pendingEntries.length
+                      : pendingAssignments.length,
+                  separatorBuilder: (_, _) =>
+                      const Divider(height: 1, color: AppColors.primaryBorder),
                   itemBuilder: (context, index) {
-                    final item = hasTimetable ? pendingEntries[index] : pendingAssignments[index];
-                    final className = '${item['className']} - ${item['sectionName']}';
-                    final subject = item['subjectName'] != null ? '${item['subjectName']}' : 'General attendance';
-                    final time = hasTimetable ? '${_time(item['startTime'])}–${_time(item['endTime'])} • ' : '';
+                    final item = hasTimetable
+                        ? pendingEntries[index]
+                        : pendingAssignments[index];
+                    final className =
+                        '${item['className']} - ${item['sectionName']}';
+                    final subject = item['subjectName'] != null
+                        ? '${item['subjectName']}'
+                        : 'General attendance';
+                    final time = hasTimetable
+                        ? '${_time(item['startTime'])}–${_time(item['endTime'])} • '
+                        : '';
 
                     return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                      child: Row(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 14,
+                      ),
+                      child: Flex(
+                        direction: isPhone ? Axis.vertical : Axis.horizontal,
+                        crossAxisAlignment: isPhone
+                            ? CrossAxisAlignment.start
+                            : CrossAxisAlignment.center,
                         children: [
-                          const Icon(Icons.schedule_outlined, size: 18, color: AppColors.statusWarning),
-                          const SizedBox(width: 14),
-                          Expanded(
+                          const Icon(
+                            Icons.schedule_outlined,
+                            size: 18,
+                            color: AppColors.statusWarning,
+                          ),
+                          SizedBox(
+                            width: isPhone ? 0 : 14,
+                            height: isPhone ? 10 : 0,
+                          ),
+                          Flexible(
+                            fit: isPhone ? FlexFit.loose : FlexFit.tight,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(className, style: AppTypography.bodyMedium),
+                                Text(
+                                  className,
+                                  style: AppTypography.bodyMedium,
+                                ),
                                 const SizedBox(height: 2),
                                 Text(
                                   '$time$subject • Attendance has not yet been submitted for today.',
@@ -283,6 +385,10 @@ class TeacherMyDayView extends StatelessWidget {
                               ],
                             ),
                           ),
+                          if (isPhone)
+                            const SizedBox(height: 10)
+                          else
+                            const SizedBox(width: 12),
                           FilledButton.tonal(
                             onPressed: () => hasTimetable
                                 ? onSelectTimetableEntryAndTakeAttendance(item)
@@ -290,8 +396,14 @@ class TeacherMyDayView extends StatelessWidget {
                             style: FilledButton.styleFrom(
                               backgroundColor: AppColors.secondaryBackground,
                               foregroundColor: AppColors.primaryText,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             child: const Text('Record now →'),
                           ),
@@ -306,18 +418,23 @@ class TeacherMyDayView extends StatelessWidget {
   }
 
   Widget _buildTodaySchedule(
+    BuildContext context,
     List<Map<String, Object?>> todayEntries,
     Set<String> todaySessionSectionIds,
     String todayIso,
   ) {
     if (todayEntries.isNotEmpty) {
-      return _buildTimetableSchedule(todayEntries, todayIso);
+      return _buildTimetableSchedule(context, todayEntries, todayIso);
     }
+    final isPhone = MediaQuery.of(context).size.width < 560;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Today\'s Assigned Classes', style: AppTypography.subsectionHeading),
+        const Text(
+          'Today\'s Assigned Classes',
+          style: AppTypography.subsectionHeading,
+        ),
         const SizedBox(height: 12),
         if (assignments.isEmpty)
           const EmptyStateView(
@@ -336,16 +453,29 @@ class TeacherMyDayView extends StatelessWidget {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: assignments.length,
-              separatorBuilder: (_, _) => const Divider(height: 1, color: AppColors.primaryBorder),
+              separatorBuilder: (_, _) =>
+                  const Divider(height: 1, color: AppColors.primaryBorder),
               itemBuilder: (context, index) {
                 final assignment = assignments[index];
-                final isDone = todaySessionSectionIds.contains(assignment['sectionId']);
-                final className = '${assignment['className']} - ${assignment['sectionName']}';
-                final subject = assignment['subjectName'] != null ? '${assignment['subjectName']}' : 'General';
+                final isDone = todaySessionSectionIds.contains(
+                  assignment['sectionId'],
+                );
+                final className =
+                    '${assignment['className']} - ${assignment['sectionName']}';
+                final subject = assignment['subjectName'] != null
+                    ? '${assignment['subjectName']}'
+                    : 'General';
 
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  child: Row(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 14,
+                  ),
+                  child: Flex(
+                    direction: isPhone ? Axis.vertical : Axis.horizontal,
+                    crossAxisAlignment: isPhone
+                        ? CrossAxisAlignment.start
+                        : CrossAxisAlignment.center,
                     children: [
                       Container(
                         width: 36,
@@ -366,8 +496,12 @@ class TeacherMyDayView extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
+                      SizedBox(
+                        width: isPhone ? 0 : 14,
+                        height: isPhone ? 10 : 0,
+                      ),
+                      Flexible(
+                        fit: isPhone ? FlexFit.loose : FlexFit.tight,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -377,16 +511,27 @@ class TeacherMyDayView extends StatelessWidget {
                           ],
                         ),
                       ),
+                      if (isPhone)
+                        const SizedBox(height: 10)
+                      else
+                        const SizedBox(width: 12),
                       StatusBadge(
                         label: isDone ? 'COMPLETED' : 'PENDING',
                         tone: isDone ? BadgeTone.success : BadgeTone.warning,
                         icon: isDone ? Icons.check : Icons.schedule,
                       ),
-                      const SizedBox(width: 14),
+                      SizedBox(
+                        width: isPhone ? 0 : 14,
+                        height: isPhone ? 10 : 0,
+                      ),
                       OutlinedButton(
-                        onPressed: () => onSelectAssignmentAndTakeAttendance(assignment),
+                        onPressed: () =>
+                            onSelectAssignmentAndTakeAttendance(assignment),
                         style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           textStyle: const TextStyle(fontSize: 12),
                         ),
                         child: Text(isDone ? 'Review' : 'Take attendance'),
@@ -401,11 +546,19 @@ class TeacherMyDayView extends StatelessWidget {
     );
   }
 
-  Widget _buildTimetableSchedule(List<Map<String, Object?>> todayEntries, String todayIso) {
+  Widget _buildTimetableSchedule(
+    BuildContext context,
+    List<Map<String, Object?>> todayEntries,
+    String todayIso,
+  ) {
+    final isPhone = MediaQuery.of(context).size.width < 560;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Today\'s Timetable', style: AppTypography.subsectionHeading),
+        const Text(
+          'Today\'s Timetable',
+          style: AppTypography.subsectionHeading,
+        ),
         const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(
@@ -417,13 +570,21 @@ class TeacherMyDayView extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: todayEntries.length,
-            separatorBuilder: (_, _) => const Divider(height: 1, color: AppColors.primaryBorder),
+            separatorBuilder: (_, _) =>
+                const Divider(height: 1, color: AppColors.primaryBorder),
             itemBuilder: (context, index) {
               final entry = todayEntries[index];
               final isDone = _isEntryCompleted(entry, todayIso);
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                child: Row(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
+                child: Flex(
+                  direction: isPhone ? Axis.vertical : Axis.horizontal,
+                  crossAxisAlignment: isPhone
+                      ? CrossAxisAlignment.start
+                      : CrossAxisAlignment.center,
                   children: [
                     Container(
                       width: 68,
@@ -444,12 +605,16 @@ class TeacherMyDayView extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
+                    SizedBox(width: isPhone ? 0 : 14, height: isPhone ? 10 : 0),
+                    Flexible(
+                      fit: isPhone ? FlexFit.loose : FlexFit.tight,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('${entry['className']} - ${entry['sectionName']}', style: AppTypography.bodyMedium),
+                          Text(
+                            '${entry['className']} - ${entry['sectionName']}',
+                            style: AppTypography.bodyMedium,
+                          ),
                           const SizedBox(height: 2),
                           Text(
                             '${entry['subjectName']} • ${_time(entry['startTime'])}–${_time(entry['endTime'])}',
@@ -458,16 +623,24 @@ class TeacherMyDayView extends StatelessWidget {
                         ],
                       ),
                     ),
+                    if (isPhone)
+                      const SizedBox(height: 10)
+                    else
+                      const SizedBox(width: 12),
                     StatusBadge(
                       label: isDone ? 'COMPLETED' : 'PENDING',
                       tone: isDone ? BadgeTone.success : BadgeTone.warning,
                       icon: isDone ? Icons.check : Icons.schedule,
                     ),
-                    const SizedBox(width: 14),
+                    SizedBox(width: isPhone ? 0 : 14, height: isPhone ? 10 : 0),
                     OutlinedButton(
-                      onPressed: () => onSelectTimetableEntryAndTakeAttendance(entry),
+                      onPressed: () =>
+                          onSelectTimetableEntryAndTakeAttendance(entry),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         textStyle: const TextStyle(fontSize: 12),
                       ),
                       child: Text(isDone ? 'Review' : 'Take attendance'),
@@ -486,8 +659,14 @@ class TeacherMyDayView extends StatelessWidget {
     return recentSessions.any((session) {
       if (session['attendanceDate'] != todayIso) return false;
       if (session['sectionId'] != entry['sectionId']) return false;
-      if (entry['subjectId'] != null && session['subjectId'] != entry['subjectId']) return false;
-      if (entry['periodNumber'] != null && session['periodNumber'] != entry['periodNumber']) return false;
+      if (entry['subjectId'] != null &&
+          session['subjectId'] != entry['subjectId']) {
+        return false;
+      }
+      if (entry['periodNumber'] != null &&
+          session['periodNumber'] != entry['periodNumber']) {
+        return false;
+      }
       return true;
     });
   }

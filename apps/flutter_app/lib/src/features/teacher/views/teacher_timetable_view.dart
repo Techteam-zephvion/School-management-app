@@ -29,7 +29,9 @@ class TeacherTimetableView extends StatelessWidget {
   Widget build(BuildContext context) {
     final today = DateTime.now().weekday;
     final sorted = [...entries]..sort(_compareEntries);
-    final todaysLessons = sorted.where((entry) => entry['dayOfWeek'] == today).toList();
+    final todaysLessons = sorted
+        .where((entry) => entry['dayOfWeek'] == today)
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -48,48 +50,138 @@ class TeacherTimetableView extends StatelessWidget {
         const SizedBox(height: 20),
         _buildWeekGrid(sorted, today),
         const SizedBox(height: 24),
-        AppTable<Map<String, Object?>>(
-          title: 'Scheduled lessons',
-          subtitle: 'Teacher timetable entries from the current academic year',
-          items: sorted,
-          emptyMessage: 'No timetable entries assigned yet.',
-          columns: [
-            AppTableColumn(
-              header: 'Day',
-              width: 96,
-              cellBuilder: (context, row) => Text(_teacherTimetableDays[row['dayOfWeek']] ?? '—', style: AppTypography.compactTableMedium),
-            ),
-            AppTableColumn(
-              header: 'Time',
-              width: 120,
-              cellBuilder: (context, row) => Text('${_time(row['startTime'])}–${_time(row['endTime'])}', style: AppTypography.compactTable),
-            ),
-            AppTableColumn(
-              header: 'Class',
-              flex: 2,
-              cellBuilder: (context, row) => Text('${row['className']} ${row['sectionName']}', style: AppTypography.compactTableMedium),
-            ),
-            AppTableColumn(
-              header: 'Subject',
-              flex: 2,
-              cellBuilder: (context, row) => Text('${row['subjectName']}', style: AppTypography.compactTable),
-            ),
-            AppTableColumn(
-              header: '',
-              width: 120,
-              alignment: Alignment.centerRight,
-              cellBuilder: (context, row) => OutlinedButton(
-                onPressed: () => onTakeAttendance(row),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 640) {
+              return _buildMobileLessonList(sorted);
+            }
+            return AppTable<Map<String, Object?>>(
+              title: 'Scheduled lessons',
+              subtitle:
+                  'Teacher timetable entries from the current academic year',
+              items: sorted,
+              emptyMessage: 'No timetable entries assigned yet.',
+              columns: [
+                AppTableColumn(
+                  header: 'Day',
+                  width: 96,
+                  cellBuilder: (context, row) => Text(
+                    _teacherTimetableDays[row['dayOfWeek']] ?? '—',
+                    style: AppTypography.compactTableMedium,
+                  ),
                 ),
-                child: const Text('Attendance'),
-              ),
-            ),
-          ],
+                AppTableColumn(
+                  header: 'Time',
+                  width: 120,
+                  cellBuilder: (context, row) => Text(
+                    '${_time(row['startTime'])}–${_time(row['endTime'])}',
+                    style: AppTypography.compactTable,
+                  ),
+                ),
+                AppTableColumn(
+                  header: 'Class',
+                  flex: 2,
+                  cellBuilder: (context, row) => Text(
+                    '${row['className']} ${row['sectionName']}',
+                    style: AppTypography.compactTableMedium,
+                  ),
+                ),
+                AppTableColumn(
+                  header: 'Subject',
+                  flex: 2,
+                  cellBuilder: (context, row) => Text(
+                    '${row['subjectName']}',
+                    style: AppTypography.compactTable,
+                  ),
+                ),
+                AppTableColumn(
+                  header: '',
+                  width: 120,
+                  alignment: Alignment.centerRight,
+                  cellBuilder: (context, row) => OutlinedButton(
+                    onPressed: () => onTakeAttendance(row),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    child: const Text('Attendance'),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ],
+    );
+  }
+
+  Widget _buildMobileLessonList(List<Map<String, Object?>> sorted) {
+    if (sorted.isEmpty) return const SizedBox.shrink();
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.mainBackground,
+        border: Border.all(color: AppColors.primaryBorder),
+        borderRadius: AppRadii.rLg,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(14, 14, 14, 10),
+            child: Text(
+              'Scheduled lessons',
+              style: AppTypography.subsectionHeading,
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.primaryBorder),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: sorted.length,
+            separatorBuilder: (_, _) =>
+                const Divider(height: 1, color: AppColors.primaryBorder),
+            itemBuilder: (context, index) {
+              final row = sorted[index];
+              return Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      '${_teacherTimetableDays[row['dayOfWeek']] ?? 'Day'} • ${_time(row['startTime'])}–${_time(row['endTime'])}',
+                      style: AppTypography.metadata,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${row['className']} ${row['sectionName']}',
+                      style: AppTypography.bodyMedium,
+                    ),
+                    Text(
+                      '${row['subjectName']}',
+                      style: AppTypography.bodySecondary,
+                    ),
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: () => onTakeAttendance(row),
+                        icon: const Icon(Icons.fact_check_outlined, size: 15),
+                        label: const Text('Attendance'),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -102,8 +194,12 @@ class TeacherTimetableView extends StatelessWidget {
       );
     }
 
-    final hasWeekendLessons = sorted.any((entry) => (entry['dayOfWeek'] as int? ?? 0) >= 6);
-    final displayedDays = _teacherTimetableDays.entries.where((d) => d.key <= 5 || hasWeekendLessons).toList();
+    final hasWeekendLessons = sorted.any(
+      (entry) => (entry['dayOfWeek'] as int? ?? 0) >= 6,
+    );
+    final displayedDays = _teacherTimetableDays.entries
+        .where((d) => d.key <= 5 || hasWeekendLessons)
+        .toList();
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -117,13 +213,21 @@ class TeacherTimetableView extends StatelessWidget {
           spacing: 12,
           runSpacing: 12,
           children: displayedDays.map((day) {
-            final lessons = sorted.where((entry) => entry['dayOfWeek'] == day.key).toList();
+            final lessons = sorted
+                .where((entry) => entry['dayOfWeek'] == day.key)
+                .toList();
             return Container(
               width: cardWidth,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: day.key == today ? AppColors.secondaryBackground : AppColors.mainBackground,
-                border: Border.all(color: day.key == today ? AppColors.primaryText : AppColors.primaryBorder),
+                color: day.key == today
+                    ? AppColors.secondaryBackground
+                    : AppColors.mainBackground,
+                border: Border.all(
+                  color: day.key == today
+                      ? AppColors.primaryText
+                      : AppColors.primaryBorder,
+                ),
                 borderRadius: AppRadii.rLg,
               ),
               child: Column(
@@ -131,38 +235,63 @@ class TeacherTimetableView extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Expanded(child: Text(day.value, style: AppTypography.subsectionHeading)),
-                      if (day.key == today) const Icon(Icons.today_outlined, size: 14, color: AppColors.secondaryText),
+                      Expanded(
+                        child: Text(
+                          day.value,
+                          style: AppTypography.subsectionHeading,
+                        ),
+                      ),
+                      if (day.key == today)
+                        const Icon(
+                          Icons.today_outlined,
+                          size: 14,
+                          color: AppColors.secondaryText,
+                        ),
                     ],
                   ),
                   const SizedBox(height: 10),
                   if (lessons.isEmpty)
                     const Text('No lessons', style: AppTypography.metadata)
                   else
-                    ...lessons.map((lesson) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('${_time(lesson['startTime'])}–${_time(lesson['endTime'])}', style: AppTypography.metadata),
-                              const SizedBox(height: 2),
-                              Text('${lesson['className']} ${lesson['sectionName']}', style: AppTypography.bodyMedium),
-                              Text('${lesson['subjectName']}', style: AppTypography.bodySecondary),
-                              const SizedBox(height: 6),
-                              if (day.key == today)
-                                TextButton.icon(
-                                  onPressed: () => onTakeAttendance(lesson),
-                                  icon: const Icon(Icons.fact_check_outlined, size: 14),
-                                  label: const Text('Take attendance'),
-                                  style: TextButton.styleFrom(
-                                    padding: EdgeInsets.zero,
-                                    minimumSize: const Size(0, 28),
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  ),
+                    ...lessons.map(
+                      (lesson) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${_time(lesson['startTime'])}–${_time(lesson['endTime'])}',
+                              style: AppTypography.metadata,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${lesson['className']} ${lesson['sectionName']}',
+                              style: AppTypography.bodyMedium,
+                            ),
+                            Text(
+                              '${lesson['subjectName']}',
+                              style: AppTypography.bodySecondary,
+                            ),
+                            const SizedBox(height: 6),
+                            if (day.key == today)
+                              TextButton.icon(
+                                onPressed: () => onTakeAttendance(lesson),
+                                icon: const Icon(
+                                  Icons.fact_check_outlined,
+                                  size: 14,
                                 ),
-                            ],
-                          ),
-                        )),
+                                label: const Text('Take attendance'),
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: const Size(0, 28),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             );

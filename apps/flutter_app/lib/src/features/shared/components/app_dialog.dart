@@ -20,6 +20,9 @@ class AppDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final isNarrow = media.size.width < 520;
+
     return Dialog(
       backgroundColor: AppColors.mainBackground,
       elevation: 0,
@@ -27,9 +30,15 @@ class AppDialog extends StatelessWidget {
         borderRadius: AppRadii.rLg,
         side: const BorderSide(color: AppColors.primaryBorder),
       ),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isNarrow ? 12 : 20,
+        vertical: isNarrow ? 12 : 24,
+      ),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
+        constraints: BoxConstraints(
+          maxWidth: maxWidth,
+          maxHeight: media.size.height - (isNarrow ? 24 : 48),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -56,9 +65,15 @@ class AppDialog extends StatelessWidget {
                     iconSize: 18,
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    constraints: const BoxConstraints(
+                      minWidth: 28,
+                      minHeight: 28,
+                    ),
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: AppColors.secondaryText),
+                    icon: const Icon(
+                      Icons.close,
+                      color: AppColors.secondaryText,
+                    ),
                   ),
                 ],
               ),
@@ -77,15 +92,15 @@ class AppDialog extends StatelessWidget {
             if (actions != null && actions!.isNotEmpty) ...[
               const Divider(height: 1, color: AppColors.primaryBorder),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    for (int i = 0; i < actions!.length; i++) ...[
-                      if (i > 0) const SizedBox(width: 8),
-                      actions![i],
-                    ],
-                  ],
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
+                child: Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: actions!,
                 ),
               ),
             ],

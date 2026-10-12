@@ -25,13 +25,21 @@ class PageHeader extends StatelessWidget {
         final isNarrow = constraints.maxWidth < 640;
 
         final titleAndBadge = Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: isNarrow ? MainAxisSize.max : MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(title, style: AppTypography.pageTitle),
+            Flexible(
+              child: Text(
+                title,
+                style: isNarrow
+                    ? AppTypography.pageTitle.copyWith(fontSize: 23)
+                    : AppTypography.pageTitle,
+                softWrap: true,
+              ),
+            ),
             if (badge != null) ...[
               const SizedBox(width: 10),
-              badge!,
+              Flexible(flex: 0, child: badge!),
             ],
           ],
         );
@@ -42,32 +50,34 @@ class PageHeader extends StatelessWidget {
             titleAndBadge,
             if (description != null) ...[
               const SizedBox(height: 4),
-              Text(description!, style: AppTypography.bodySecondary),
+              Text(
+                description!,
+                style: AppTypography.bodySecondary,
+                softWrap: true,
+              ),
             ],
           ],
         );
 
-        final actionsBlock = (primaryAction != null || (secondaryActions?.isNotEmpty ?? false))
+        final actionsBlock =
+            (primaryAction != null || (secondaryActions?.isNotEmpty ?? false))
             ? Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 alignment: WrapAlignment.end,
-                children: [
-                  ...?secondaryActions,
-                  ?primaryAction,
-                ],
+                children: [...?secondaryActions, ?primaryAction],
               )
             : null;
 
         if (isNarrow) {
           return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               textBlock,
               if (actionsBlock != null) ...[
                 const SizedBox(height: 16),
-                actionsBlock,
+                Align(alignment: Alignment.centerLeft, child: actionsBlock),
               ],
             ],
           );

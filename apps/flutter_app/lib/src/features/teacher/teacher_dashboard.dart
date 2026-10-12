@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import '../shared/components/feedback_banner.dart';
 import 'views/teacher_attendance_view.dart';
 import 'views/teacher_classes_view.dart';
+import 'views/teacher_copilot_view.dart';
 import 'views/teacher_my_day_view.dart';
 import 'views/teacher_timetable_view.dart';
 
@@ -47,13 +48,16 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
       final results = await Future.wait([
         api.getList('/api/v1/teacher/assignments', session: session),
         api.getList('/api/v1/teacher/timetable', session: session),
-        api.getJson('/api/v1/teacher/attendance/summary', session: session).catchError((_) => {'sessions': []}),
+        api
+            .getJson('/api/v1/teacher/attendance/summary', session: session)
+            .catchError((_) => {'sessions': []}),
       ]);
 
       final assignments = results[0] as List<Map<String, Object?>>;
       final timetable = results[1] as List<Map<String, Object?>>;
       final summaryJson = results[2] as Map<String, Object?>;
-      final sessions = ((summaryJson['sessions'] as List?) ?? const []).cast<Map<String, Object?>>();
+      final sessions = ((summaryJson['sessions'] as List?) ?? const [])
+          .cast<Map<String, Object?>>();
 
       setState(() {
         _assignments = assignments;
@@ -86,7 +90,9 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
           assignment['sectionId'] == entry['sectionId'] &&
           assignment['subjectId'] == entry['subjectId'];
     });
-    final baseAssignment = matchingAssignments.isEmpty ? null : matchingAssignments.first;
+    final baseAssignment = matchingAssignments.isEmpty
+        ? null
+        : matchingAssignments.first;
 
     setState(() {
       _selectedAssignment = {
@@ -109,13 +115,16 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
   Widget build(BuildContext context) {
     final session = ref.watch(authControllerProvider).session;
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 850;
+    final isMobile = screenWidth < 1000;
 
     if (_loading) {
       return const Scaffold(
         backgroundColor: AppColors.mainBackground,
         body: Center(
-          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryText),
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColors.primaryText,
+          ),
         ),
       );
     }
@@ -136,7 +145,11 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
               if (isMobile) ...[
                 Builder(
                   builder: (ctx) => IconButton(
-                    icon: const Icon(Icons.menu, size: 20, color: AppColors.primaryText),
+                    icon: const Icon(
+                      Icons.menu,
+                      size: 20,
+                      color: AppColors.primaryText,
+                    ),
                     tooltip: 'Open navigation',
                     onPressed: () => Scaffold.of(ctx).openDrawer(),
                   ),
@@ -163,7 +176,11 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                 ),
                 child: const Text(
                   'TEACHER',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.secondaryText),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.secondaryText,
+                  ),
                 ),
               ),
               if (!isMobile) ...[
@@ -175,7 +192,13 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                 const SizedBox(width: 4),
                 _buildTabButton(2, 'My Classes', Icons.layers_outlined),
                 const SizedBox(width: 4),
-                _buildTabButton(3, 'Attendance Register', Icons.fact_check_outlined),
+                _buildTabButton(
+                  3,
+                  'Attendance Register',
+                  Icons.fact_check_outlined,
+                ),
+                const SizedBox(width: 4),
+                _buildTabButton(4, 'Copilot', Icons.auto_awesome_outlined),
               ],
 
               const Spacer(),
@@ -217,22 +240,28 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 32, vertical: isMobile ? 18 : 28),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1100),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (_error != null)
-                  FeedbackBanner(
-                    message: _error!,
-                    tone: FeedbackTone.error,
-                    onDismiss: () => setState(() => _error = null),
-                  ),
-                _buildActiveTabContent(),
-              ],
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 14 : 32,
+            vertical: isMobile ? 16 : 28,
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_error != null)
+                    FeedbackBanner(
+                      message: _error!,
+                      tone: FeedbackTone.error,
+                      onDismiss: () => setState(() => _error = null),
+                    ),
+                  _buildActiveTabContent(),
+                ],
+              ),
             ),
           ),
         ),
@@ -251,7 +280,9 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               alignment: Alignment.centerLeft,
               decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: AppColors.primaryBorder)),
+                border: Border(
+                  bottom: BorderSide(color: AppColors.primaryBorder),
+                ),
               ),
               child: Row(
                 children: [
@@ -267,7 +298,10 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                   ),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.secondaryBackground,
                       borderRadius: AppRadii.rSm,
@@ -275,7 +309,11 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                     ),
                     child: const Text(
                       'TEACHER',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.secondaryText),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.secondaryText,
+                      ),
                     ),
                   ),
                 ],
@@ -289,7 +327,16 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                   _drawerTabItem(0, 'My Day', Icons.dashboard_outlined),
                   _drawerTabItem(1, 'My Week', Icons.calendar_month_outlined),
                   _drawerTabItem(2, 'My Classes', Icons.layers_outlined),
-                  _drawerTabItem(3, 'Attendance Register', Icons.fact_check_outlined),
+                  _drawerTabItem(
+                    3,
+                    'Attendance Register',
+                    Icons.fact_check_outlined,
+                  ),
+                  _drawerTabItem(
+                    4,
+                    'Teacher Copilot',
+                    Icons.auto_awesome_outlined,
+                  ),
                 ],
               ),
             ),
@@ -333,7 +380,10 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                       Navigator.of(context).pop();
                       ref.read(authControllerProvider).signOut();
                     },
-                    icon: const Icon(Icons.logout, color: AppColors.secondaryText),
+                    icon: const Icon(
+                      Icons.logout,
+                      color: AppColors.secondaryText,
+                    ),
                   ),
                 ],
               ),
@@ -356,16 +406,24 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
         margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.secondaryBackground : Colors.transparent,
+          color: isSelected
+              ? AppColors.secondaryBackground
+              : Colors.transparent,
           borderRadius: AppRadii.rMd,
-          border: isSelected ? const Border(left: BorderSide(color: AppColors.primaryText, width: 2)) : null,
+          border: isSelected
+              ? const Border(
+                  left: BorderSide(color: AppColors.primaryText, width: 2),
+                )
+              : null,
         ),
         child: Row(
           children: [
             Icon(
               icon,
               size: 18,
-              color: isSelected ? AppColors.primaryText : AppColors.secondaryText,
+              color: isSelected
+                  ? AppColors.primaryText
+                  : AppColors.secondaryText,
             ),
             const SizedBox(width: 12),
             Text(
@@ -374,7 +432,9 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                 fontFamily: 'Switzer',
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
-                color: isSelected ? AppColors.primaryText : AppColors.secondaryText,
+                color: isSelected
+                    ? AppColors.primaryText
+                    : AppColors.secondaryText,
               ),
             ),
           ],
@@ -392,9 +452,13 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.secondaryBackground : Colors.transparent,
+          color: isSelected
+              ? AppColors.secondaryBackground
+              : Colors.transparent,
           borderRadius: AppRadii.rMd,
-          border: isSelected ? Border.all(color: AppColors.primaryBorder) : null,
+          border: isSelected
+              ? Border.all(color: AppColors.primaryBorder)
+              : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -402,7 +466,9 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
             Icon(
               icon,
               size: 16,
-              color: isSelected ? AppColors.primaryText : AppColors.secondaryText,
+              color: isSelected
+                  ? AppColors.primaryText
+                  : AppColors.secondaryText,
             ),
             const SizedBox(width: 8),
             Text(
@@ -411,7 +477,9 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                 fontFamily: 'Switzer',
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
-                color: isSelected ? AppColors.primaryText : AppColors.secondaryText,
+                color: isSelected
+                    ? AppColors.primaryText
+                    : AppColors.secondaryText,
               ),
             ),
           ],
@@ -431,8 +499,10 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
           recentSessions: _recentSessions,
           teacherDisplayName: session?.displayName,
           teacherEmail: session?.email,
-          onSelectAssignmentAndTakeAttendance: _selectAssignmentAndTakeAttendance,
-          onSelectTimetableEntryAndTakeAttendance: _selectTimetableEntryAndTakeAttendance,
+          onSelectAssignmentAndTakeAttendance:
+              _selectAssignmentAndTakeAttendance,
+          onSelectTimetableEntryAndTakeAttendance:
+              _selectTimetableEntryAndTakeAttendance,
           onNavigateToRegister: () => setState(() => _activeTab = 3),
         );
       case 1:
@@ -446,15 +516,20 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
           onTakeAttendance: _selectAssignmentAndTakeAttendance,
         );
       case 3:
-        final attendanceAssignments = _selectedAssignment == null || _assignments.contains(_selectedAssignment)
+        final attendanceAssignments =
+            _selectedAssignment == null ||
+                _assignments.contains(_selectedAssignment)
             ? _assignments
             : [_selectedAssignment!, ..._assignments];
         return TeacherAttendanceView(
           assignments: attendanceAssignments,
           selectedAssignment: _selectedAssignment,
-          onAssignmentChanged: (val) => setState(() => _selectedAssignment = val),
+          onAssignmentChanged: (val) =>
+              setState(() => _selectedAssignment = val),
           onAttendanceSaved: _loadData,
         );
+      case 4:
+        return TeacherCopilotView(assignments: _assignments);
       default:
         return const SizedBox.shrink();
     }

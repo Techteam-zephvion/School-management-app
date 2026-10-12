@@ -26,14 +26,17 @@ class TeacherAttendanceView extends ConsumerStatefulWidget {
   final VoidCallback onAttendanceSaved;
 
   @override
-  ConsumerState<TeacherAttendanceView> createState() => _TeacherAttendanceViewState();
+  ConsumerState<TeacherAttendanceView> createState() =>
+      _TeacherAttendanceViewState();
 }
 
 class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
   List<StudentRow> _roster = [];
   final Map<String, AttendanceStatus> _statuses = {};
   AttendanceKind _kind = AttendanceKind.daily;
-  final _date = TextEditingController(text: DateFormat('yyyy-MM-dd').format(DateTime.now()));
+  final _date = TextEditingController(
+    text: DateFormat('yyyy-MM-dd').format(DateTime.now()),
+  );
   final _period = TextEditingController(text: '1');
   final _searchController = TextEditingController();
   String? _selectedSubjectId;
@@ -56,7 +59,8 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
   @override
   void didUpdateWidget(covariant TeacherAttendanceView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.selectedAssignment != oldWidget.selectedAssignment && widget.selectedAssignment != null) {
+    if (widget.selectedAssignment != oldWidget.selectedAssignment &&
+        widget.selectedAssignment != null) {
       _loadRoster(widget.selectedAssignment!);
     }
   }
@@ -81,18 +85,20 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
     });
 
     try {
-      final query = Uri(queryParameters: {
-        'sectionId': assignment['sectionId'] as String,
-        'academicYearId': assignment['academicYearId'] as String,
-      }).query;
-      final rosterJson = await ref.read(apiClientProvider).getList(
-            '/api/v1/teacher/roster?$query',
-            session: session,
-          );
+      final query = Uri(
+        queryParameters: {
+          'sectionId': assignment['sectionId'] as String,
+          'academicYearId': assignment['academicYearId'] as String,
+        },
+      ).query;
+      final rosterJson = await ref
+          .read(apiClientProvider)
+          .getList('/api/v1/teacher/roster?$query', session: session);
       final roster = rosterJson.map(StudentRow.fromJson).toList();
       setState(() {
         _roster = roster;
-        if (assignment['periodNumber'] != null || assignment['subjectId'] != null) {
+        if (assignment['periodNumber'] != null ||
+            assignment['subjectId'] != null) {
           _kind = AttendanceKind.period;
           _period.text = '${assignment['periodNumber'] ?? 1}';
         }
@@ -102,7 +108,11 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
         }
         _statuses
           ..clear()
-          ..addEntries(roster.map((student) => MapEntry(student.id, AttendanceStatus.present)));
+          ..addEntries(
+            roster.map(
+              (student) => MapEntry(student.id, AttendanceStatus.present),
+            ),
+          );
       });
     } on ApiException catch (exception) {
       setState(() => _errorMessage = exception.message);
@@ -138,32 +148,37 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
         'academicYearId': assignment['academicYearId'],
         'classId': assignment['classId'],
         'sectionId': assignment['sectionId'],
-        'subjectId': _kind == AttendanceKind.period ? (_selectedSubjectId ?? assignment['subjectId']) : null,
+        'subjectId': _kind == AttendanceKind.period
+            ? (_selectedSubjectId ?? assignment['subjectId'])
+            : null,
         'kind': _kind.name,
         'attendanceDate': _date.text.trim(),
-        'periodNumber': _kind == AttendanceKind.period ? int.tryParse(_period.text.trim()) ?? 1 : null,
+        'periodNumber': _kind == AttendanceKind.period
+            ? int.tryParse(_period.text.trim()) ?? 1
+            : null,
         'records': _roster
             .map(
               (student) => {
                 'studentId': student.id,
-                'status': (_statuses[student.id] ?? AttendanceStatus.present).name,
+                'status':
+                    (_statuses[student.id] ?? AttendanceStatus.present).name,
               },
             )
             .toList(),
       };
 
-      final result = await ref.read(apiClientProvider).postJson(
-            '/api/v1/teacher/attendance',
-            body,
-            session: session,
-          );
+      final result = await ref
+          .read(apiClientProvider)
+          .postJson('/api/v1/teacher/attendance', body, session: session);
 
       final count = result['savedRecords'] ?? _roster.length;
-      final className = '${assignment['className']} - ${assignment['sectionName']}';
+      final className =
+          '${assignment['className']} - ${assignment['sectionName']}';
 
       setState(() {
         _hasUnsavedChanges = false;
-        _successMessage = 'Successfully recorded $count attendance records for $className on ${_date.text}.';
+        _successMessage =
+            'Successfully recorded $count attendance records for $className on ${_date.text}.';
       });
 
       widget.onAttendanceSaved();
@@ -178,13 +193,16 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
 
   @override
   Widget build(BuildContext context) {
+    final isPhone = MediaQuery.of(context).size.width < 560;
     final filteredRoster = _searchQuery.isEmpty
         ? _roster
         : _roster.where((student) {
             final name = student.fullName.toLowerCase();
             final adm = student.admissionNumber.toLowerCase();
             final roll = (student.rollNumber ?? '').toLowerCase();
-            return name.contains(_searchQuery) || adm.contains(_searchQuery) || roll.contains(_searchQuery);
+            return name.contains(_searchQuery) ||
+                adm.contains(_searchQuery) ||
+                roll.contains(_searchQuery);
           }).toList();
 
     // Calculate real-time totals
@@ -211,19 +229,29 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
       children: [
         PageHeader(
           title: 'Attendance Register',
-          description: 'Record daily or period-based roll call with real-time totals.',
+          description:
+              'Record daily or period-based roll call with real-time totals.',
           badge: _hasUnsavedChanges
               ? Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.statusWarning.withValues(alpha: 0.1),
                     borderRadius: AppRadii.rSm,
-                    border: Border.all(color: AppColors.statusWarning.withValues(alpha: 0.4)),
+                    border: Border.all(
+                      color: AppColors.statusWarning.withValues(alpha: 0.4),
+                    ),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.circle, size: 7, color: AppColors.statusWarning),
+                      Icon(
+                        Icons.circle,
+                        size: 7,
+                        color: AppColors.statusWarning,
+                      ),
                       SizedBox(width: 5),
                       Text(
                         'UNSAVED CHANGES',
@@ -239,12 +267,17 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
                 )
               : null,
           primaryAction: FilledButton.icon(
-            onPressed: _saving || _loadingRoster || _roster.isEmpty ? null : _saveAttendance,
+            onPressed: _saving || _loadingRoster || _roster.isEmpty
+                ? null
+                : _saveAttendance,
             icon: _saving
                 ? const SizedBox(
                     width: 14,
                     height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                 : const Icon(Icons.check, size: 16),
             label: Text(_saving ? 'Persisting...' : 'Save attendance'),
@@ -270,7 +303,7 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
 
         // Session controls bar
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(isPhone ? 12 : 16),
           decoration: BoxDecoration(
             color: AppColors.mainBackground,
             border: Border.all(color: AppColors.primaryBorder),
@@ -283,20 +316,28 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
             children: [
               // Class assignment selector
               SizedBox(
-                width: 320,
+                width: isPhone ? double.infinity : 320,
                 child: DropdownButtonFormField<Map<String, Object?>?>(
                   isExpanded: true,
                   initialValue: widget.selectedAssignment,
-                  decoration: const InputDecoration(labelText: 'Assigned section'),
-                  selectedItemBuilder: (context) => widget.assignments.map((assignment) {
-                    final sub = assignment['subjectName'] != null ? ' (${assignment['subjectName']})' : '';
+                  decoration: const InputDecoration(
+                    labelText: 'Assigned section',
+                  ),
+                  selectedItemBuilder: (context) => widget.assignments.map((
+                    assignment,
+                  ) {
+                    final sub = assignment['subjectName'] != null
+                        ? ' (${assignment['subjectName']})'
+                        : '';
                     return Text(
                       '${assignment['className']} - ${assignment['sectionName']}$sub',
                       overflow: TextOverflow.ellipsis,
                     );
                   }).toList(),
                   items: widget.assignments.map((assignment) {
-                    final sub = assignment['subjectName'] != null ? ' (${assignment['subjectName']})' : '';
+                    final sub = assignment['subjectName'] != null
+                        ? ' (${assignment['subjectName']})'
+                        : '';
                     return DropdownMenuItem<Map<String, Object?>?>(
                       value: assignment,
                       child: Text(
@@ -314,7 +355,7 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
 
               // Kind toggle
               SizedBox(
-                width: 220,
+                width: isPhone ? double.infinity : 220,
                 child: SegmentedButton<AttendanceKind>(
                   segments: const [
                     ButtonSegment(
@@ -338,7 +379,7 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
 
               // Date picker field
               SizedBox(
-                width: 150,
+                width: isPhone ? double.infinity : 150,
                 child: TextField(
                   controller: _date,
                   decoration: InputDecoration(
@@ -365,7 +406,7 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
               // Period and Subject fields if period attendance
               if (_kind == AttendanceKind.period) ...[
                 SizedBox(
-                  width: 100,
+                  width: isPhone ? 120 : 100,
                   child: TextField(
                     controller: _period,
                     keyboardType: TextInputType.number,
@@ -378,17 +419,30 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
                     final currentAssignment = widget.selectedAssignment;
                     final sectionAssignments = currentAssignment != null
                         ? widget.assignments
-                            .where((a) => a['sectionId'] == currentAssignment['sectionId'] && a['subjectId'] != null)
-                            .toList()
+                              .where(
+                                (a) =>
+                                    a['sectionId'] ==
+                                        currentAssignment['sectionId'] &&
+                                    a['subjectId'] != null,
+                              )
+                              .toList()
                         : <Map<String, Object?>>[];
-                    if (sectionAssignments.isEmpty) return const SizedBox.shrink();
+                    if (sectionAssignments.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
 
-                    final activeVal = _selectedSubjectId ?? currentAssignment?['subjectId'] as String?;
-                    final hasMatch = sectionAssignments.any((a) => a['subjectId'] == activeVal);
-                    final dropdownValue = hasMatch ? activeVal : sectionAssignments.first['subjectId'] as String?;
+                    final activeVal =
+                        _selectedSubjectId ??
+                        currentAssignment?['subjectId'] as String?;
+                    final hasMatch = sectionAssignments.any(
+                      (a) => a['subjectId'] == activeVal,
+                    );
+                    final dropdownValue = hasMatch
+                        ? activeVal
+                        : sectionAssignments.first['subjectId'] as String?;
 
                     return SizedBox(
-                      width: 180,
+                      width: isPhone ? double.infinity : 180,
                       child: DropdownButtonFormField<String>(
                         isExpanded: true,
                         initialValue: dropdownValue,
@@ -417,40 +471,71 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
 
         // Real-time Summary Tally & Bulk Actions
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          padding: EdgeInsets.symmetric(
+            horizontal: isPhone ? 14 : 20,
+            vertical: 14,
+          ),
           decoration: BoxDecoration(
             color: AppColors.secondaryBackground,
             border: Border.all(color: AppColors.primaryBorder),
             borderRadius: AppRadii.rLg,
           ),
-          child: Row(
+          child: Flex(
+            direction: isPhone ? Axis.vertical : Axis.horizontal,
+            crossAxisAlignment: isPhone
+                ? CrossAxisAlignment.stretch
+                : CrossAxisAlignment.center,
             children: [
-              Expanded(
-                child: Wrap(
-                  spacing: 16,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    _buildTally('TOTAL', '${_roster.length}', AppColors.primaryText),
-                    _buildTally('PRESENT', '$presentCount', AppColors.statusSuccess),
-                    _buildTally('ABSENT', '$absentCount', AppColors.statusError),
-                    _buildTally('LATE', '$lateCount', AppColors.statusWarning),
-                    _buildTally('EXCUSED', '$excusedCount', AppColors.statusInfo),
-                  ],
+              if (isPhone)
+                _buildTallyWrap(
+                  presentCount,
+                  absentCount,
+                  lateCount,
+                  excusedCount,
+                  isPhone: true,
+                )
+              else
+                Flexible(
+                  child: _buildTallyWrap(
+                    presentCount,
+                    absentCount,
+                    lateCount,
+                    excusedCount,
+                    isPhone: false,
+                  ),
                 ),
-              ),
+              if (isPhone) const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
+                runSpacing: 8,
                 children: [
                   OutlinedButton.icon(
-                    onPressed: _roster.isEmpty ? null : () => _markAll(AttendanceStatus.present),
-                    icon: const Icon(Icons.done_all, size: 14, color: AppColors.statusSuccess),
-                    label: const Text('All Present', style: TextStyle(fontSize: 12)),
+                    onPressed: _roster.isEmpty
+                        ? null
+                        : () => _markAll(AttendanceStatus.present),
+                    icon: const Icon(
+                      Icons.done_all,
+                      size: 14,
+                      color: AppColors.statusSuccess,
+                    ),
+                    label: const Text(
+                      'All Present',
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
                   OutlinedButton.icon(
-                    onPressed: _roster.isEmpty ? null : () => _markAll(AttendanceStatus.absent),
-                    icon: const Icon(Icons.close, size: 14, color: AppColors.statusError),
-                    label: const Text('All Absent', style: TextStyle(fontSize: 12)),
+                    onPressed: _roster.isEmpty
+                        ? null
+                        : () => _markAll(AttendanceStatus.absent),
+                    icon: const Icon(
+                      Icons.close,
+                      size: 14,
+                      color: AppColors.statusError,
+                    ),
+                    label: const Text(
+                      'All Absent',
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
                 ],
               ),
@@ -471,36 +556,61 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
             children: [
               // Search & table header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                child: Row(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isPhone ? 14 : 20,
+                  vertical: 14,
+                ),
+                child: Flex(
+                  direction: isPhone ? Axis.vertical : Axis.horizontal,
+                  crossAxisAlignment: isPhone
+                      ? CrossAxisAlignment.stretch
+                      : CrossAxisAlignment.center,
                   children: [
-                    Text('Student Roster (${_roster.length})', style: AppTypography.subsectionHeading),
-                    const Spacer(),
+                    Text(
+                      'Student Roster (${_roster.length})',
+                      style: AppTypography.subsectionHeading,
+                    ),
+                    if (isPhone) const SizedBox(height: 10) else const Spacer(),
                     SizedBox(
-                      width: 220,
-                      height: 32,
+                      width: isPhone ? double.infinity : 220,
+                      height: 40,
                       child: TextField(
                         controller: _searchController,
-                        onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
+                        onChanged: (val) => setState(
+                          () => _searchQuery = val.trim().toLowerCase(),
+                        ),
                         decoration: InputDecoration(
                           hintText: 'Filter by name or roll...',
                           hintStyle: AppTypography.metadata,
-                          prefixIcon: const Icon(Icons.search, size: 14, color: AppColors.mutedText),
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            size: 14,
+                            color: AppColors.mutedText,
+                          ),
                           suffixIcon: _searchQuery.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear, size: 12, color: AppColors.mutedText),
+                                  icon: const Icon(
+                                    Icons.clear,
+                                    size: 12,
+                                    color: AppColors.mutedText,
+                                  ),
                                   onPressed: () {
                                     _searchController.clear();
                                     setState(() => _searchQuery = '');
                                   },
                                 )
                               : null,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 8),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 0,
+                            horizontal: 8,
+                          ),
                           filled: true,
                           fillColor: AppColors.secondaryBackground,
                           border: OutlineInputBorder(
                             borderRadius: AppRadii.rMd,
-                            borderSide: const BorderSide(color: AppColors.primaryBorder),
+                            borderSide: const BorderSide(
+                              color: AppColors.primaryBorder,
+                            ),
                           ),
                         ),
                       ),
@@ -514,7 +624,10 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(40),
-                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryText),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primaryText,
+                    ),
                   ),
                 )
               else if (_roster.isEmpty)
@@ -527,7 +640,10 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
                 Padding(
                   padding: const EdgeInsets.all(32),
                   child: Center(
-                    child: Text('No students match "$_searchQuery"', style: AppTypography.bodySecondary),
+                    child: Text(
+                      'No students match "$_searchQuery"',
+                      style: AppTypography.bodySecondary,
+                    ),
                   ),
                 )
               else
@@ -535,58 +651,94 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: filteredRoster.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1, color: AppColors.primaryBorder),
+                  separatorBuilder: (_, _) =>
+                      const Divider(height: 1, color: AppColors.primaryBorder),
                   itemBuilder: (context, index) {
                     final student = filteredRoster[index];
-                    final currentStatus = _statuses[student.id] ?? AttendanceStatus.present;
+                    final currentStatus =
+                        _statuses[student.id] ?? AttendanceStatus.present;
 
                     return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      child: Row(
-                        children: [
-                          Container(
-                            constraints: const BoxConstraints(minWidth: 44, minHeight: 28),
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: AppColors.secondaryBackground,
-                              borderRadius: AppRadii.rSm,
-                              border: Border.all(color: AppColors.primaryBorder),
-                            ),
-                            child: Text(
-                              student.rollNumber ?? '${index + 1}',
-                              maxLines: 1,
-                              softWrap: false,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontFamily: AppTypography.fontFamily,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primaryText,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isPhone ? 14 : 20,
+                        vertical: isPhone ? 12 : 10,
+                      ),
+                      child: isPhone
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Text(student.fullName, style: AppTypography.compactTableMedium),
-                                Text(student.admissionNumber, style: AppTypography.metadata),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _rollBadge(
+                                      student.rollNumber ?? '${index + 1}',
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            student.fullName,
+                                            style: AppTypography
+                                                .compactTableMedium,
+                                            softWrap: true,
+                                          ),
+                                          Text(
+                                            student.admissionNumber,
+                                            style: AppTypography.metadata,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                AttendanceStatusGroup(
+                                  selectedStatus: currentStatus,
+                                  onChanged: (newStatus) {
+                                    setState(() {
+                                      _statuses[student.id] = newStatus;
+                                      _hasUnsavedChanges = true;
+                                    });
+                                  },
+                                ),
+                              ],
+                            )
+                          : Row(
+                              children: [
+                                _rollBadge(
+                                  student.rollNumber ?? '${index + 1}',
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        student.fullName,
+                                        style: AppTypography.compactTableMedium,
+                                      ),
+                                      Text(
+                                        student.admissionNumber,
+                                        style: AppTypography.metadata,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                AttendanceStatusGroup(
+                                  selectedStatus: currentStatus,
+                                  onChanged: (newStatus) {
+                                    setState(() {
+                                      _statuses[student.id] = newStatus;
+                                      _hasUnsavedChanges = true;
+                                    });
+                                  },
+                                ),
                               ],
                             ),
-                          ),
-                          AttendanceStatusGroup(
-                            selectedStatus: currentStatus,
-                            onChanged: (newStatus) {
-                              setState(() {
-                                _statuses[student.id] = newStatus;
-                                _hasUnsavedChanges = true;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
                     );
                   },
                 ),
@@ -594,6 +746,35 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _rollBadge(String label) {
+    return Container(
+      constraints: const BoxConstraints(
+        minWidth: 44,
+        minHeight: 30,
+        maxWidth: 72,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.secondaryBackground,
+        borderRadius: AppRadii.rSm,
+        border: Border.all(color: AppColors.primaryBorder),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontFamily: AppTypography.fontFamily,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: AppColors.primaryText,
+        ),
+      ),
     );
   }
 
@@ -612,6 +793,27 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
             color: color,
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildTallyWrap(
+    int presentCount,
+    int absentCount,
+    int lateCount,
+    int excusedCount, {
+    required bool isPhone,
+  }) {
+    return Wrap(
+      spacing: isPhone ? 10 : 16,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _buildTally('TOTAL', '${_roster.length}', AppColors.primaryText),
+        _buildTally('PRESENT', '$presentCount', AppColors.statusSuccess),
+        _buildTally('ABSENT', '$absentCount', AppColors.statusError),
+        _buildTally('LATE', '$lateCount', AppColors.statusWarning),
+        _buildTally('EXCUSED', '$excusedCount', AppColors.statusInfo),
       ],
     );
   }
