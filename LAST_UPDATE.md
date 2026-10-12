@@ -57,6 +57,12 @@
 - `pnpm api:test`: PASS, 32/32 tests passed across 4 files.
 - `pnpm flutter:build:web:staging`: PASS, compiled into `build/web_staging`.
 - `flutter build apk --release` (staging configuration): PASS, compiled `app-release.apk` (60.6MB), aapt verified label `Schoolic` and icon `@mipmap/ic_launcher`.
+- GitHub Actions Native Staging Builds: [Run 38279140837](https://github.com/Techteam-zephvion/School-management-app/actions/runs/38279140837) PASS (4/4 jobs passed: Validate, Linux, Android, Windows).
+  - Staging APK artifact: `schoolic-android-apk-staging` (`schoolic-staging-release.apk`)
+  - APK SHA-256: `65390bee5cc0c14d15154c7f2df7dc66e7fb03c59fc7074e0f0e2709eee7e476`
+  - Local verified copy: `/tmp/schoolic-branding-apk/schoolic-staging-release.apk`
+  - Linux artifacts: `schoolic-linux-deb-staging`, `schoolic-linux-staging`
+  - Windows artifacts: `schoolic-windows-installer-staging`, `schoolic-windows-staging`
 
 ---
 
