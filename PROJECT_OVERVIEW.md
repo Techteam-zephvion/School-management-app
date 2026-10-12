@@ -23,12 +23,13 @@ Schoolic is a lightweight, modern school management application designed for a f
 ---
 
 ## Tech Stack
-* **Frontend:** Flutter Web (Material 3, Flutter Riverpod, GoRouter).
+* **Frontend:** Flutter Web and native Flutter targets for Android, Windows, and Linux (Material 3, Flutter Riverpod, GoRouter).
 * **Backend API:** Hono / TypeScript (Cloudflare Workers runtime).
 * **Database:** Neon Serverless PostgreSQL.
 * **ORM:** Drizzle ORM.
 * **Authentication:** Neon Managed Auth / Better Auth with server-side session token verification and fail-closed security.
 * **Hosting:** Cloudflare Pages (Frontend Web) & Cloudflare Workers (Backend API).
+* **Native CI Artifacts:** Manual GitHub Actions staging workflow for Android APK, Windows ZIP, and Linux TAR.GZ builds.
 
 ---
 
@@ -72,6 +73,14 @@ graph TD
 | Staging | `APP_ENV` | Runtime environment mode | `staging` |
 | Staging | `CORS_ORIGIN` | Allowed web origins | `https://schoolic-staging.pages.dev` |
 | Staging | `NEON_AUTH_URL` | Neon Auth root endpoint | `https://ep-billowing-shadow-b56k9cl2.neonauth.c-7.us-east-2.aws.neon.tech/neondb` |
+| Staging | `AI_FEATURES_ENABLED` | Enables backend-only AI routes | `true` |
+| Staging | `AI_PROVIDER` | Server-side AI adapter type | `openai-compatible` |
+| Staging | `AI_MODEL` | Staging AI model | `qwen/qwen3.8-27b` |
+| Staging | `AI_BASE_URL` | Staging OpenAI-compatible base URL | `https://api.groq.com/openai/v1` |
+| Staging | `AI_MAX_OUTPUT_TOKENS` | Server-enforced output-token ceiling | `1200` |
+| Staging | `AI_TIMEOUT_MS` | Provider request timeout | `18000` |
+| Staging | `AI_REQUESTS_PER_USER` | Per-user generation limit | `20` |
+| Staging | `AI_REQUEST_WINDOW_MINUTES` | Per-user generation limit window | `60` |
 | Production | `APP_ENV` | Runtime environment mode | `production` |
 | Production | `CORS_ORIGIN` | Allowed web origins | `https://schoolic.pages.dev` |
 | Production | `NEON_AUTH_URL` | Neon Auth Base URL | `https://ep-polished-silence-b52ozwm7.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth` |
@@ -85,6 +94,9 @@ pnpm wrangler secret put DATABASE_URL --env staging
 
 # 2. Staging school bootstrap token
 pnpm wrangler secret put BOOTSTRAP_TOKEN --env staging
+
+# 3. Staging AI provider credential, server-side only
+pnpm wrangler secret put AI_API_KEY --env staging
 ```
 
 ---

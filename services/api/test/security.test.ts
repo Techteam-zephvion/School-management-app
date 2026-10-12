@@ -217,6 +217,7 @@ describe('Phase 2 — Security & Authentication Hardening', () => {
 
     it('denies teacher access to class roster of an unassigned section with 403', async () => {
       const teacherUser: AuthUser = {
+        appUserId: 'teacher-app-user-id',
         neonUserId: TEACHER_NEON_ID,
         email: 'teacher@schoolic.local',
         roles: ['teacher'],
@@ -243,6 +244,7 @@ describe('Phase 2 — Security & Authentication Hardening', () => {
 
     it('allows teacher access to class roster of an assigned section', async () => {
       const teacherUser: AuthUser = {
+        appUserId: 'teacher-app-user-id',
         neonUserId: TEACHER_NEON_ID,
         email: 'teacher@schoolic.local',
         roles: ['teacher'],

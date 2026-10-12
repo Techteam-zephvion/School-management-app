@@ -2,6 +2,7 @@ import { and, desc, eq, gte, lte, ne } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import {
   academicYears,
+  aiUsageEvents,
   appUsers,
   attendanceRecords,
   attendanceSessions,
@@ -12,6 +13,7 @@ import {
   studentEnrollments,
   students,
   subjects,
+  teacherMaterials,
   timetableEntries,
   teacherAssignments,
   userRoles,
@@ -27,10 +29,12 @@ import type {
   createStudentSchema,
   createSubjectSchema,
   createTeacherAssignmentSchema,
+  createTeacherMaterialSchema,
   createTimetableEntrySchema,
   createUserSchema,
   saveAttendanceSchema,
   timetableQuerySchema,
+  updateTeacherMaterialSchema,
   updateTimetableEntrySchema,
 } from '../http/validation';
 import type { z } from 'zod';
@@ -40,9 +44,81 @@ export type SchoolRepository = ReturnType<typeof createSchoolRepository>;
 type TimetableFilters = z.infer<typeof timetableQuerySchema>;
 type TimetableInput = z.infer<typeof createTimetableEntrySchema>;
 type TimetableUpdateInput = z.infer<typeof updateTimetableEntrySchema>;
+type TeacherMaterialInput = z.infer<typeof createTeacherMaterialSchema>;
+type TeacherMaterialUpdateInput = z.infer<typeof updateTeacherMaterialSchema>;
 
 export function createSchoolRepository(db: Db) {
   return {
+    async recordAiUsage(
+      user: AuthUser,
+      input: {
+        feature: string;
+        generationType?: string | null | undefined;
+        status: 'success' | 'failure' | 'limited';
+        latencyMs?: number | null | undefined;
+        inputTokens?: number | null | undefined;
+        outputTokens?: number | null | undefined;
+        totalTokens?: number | null | undefined;
+        model?: string | null | undefined;
+        errorCategory?: string | null | undefined;
+      },
+    ) {
+      const [created] = await db
+        .insert(aiUsageEvents)
+        .values({
+          schoolId: user.schoolId,
+          appUserId: user.appUserId,
+          staffId: user.staffId ?? null,
+          feature: input.feature,
+          generationType: input.generationType ?? null,
+          status: input.status,
+          latencyMs: input.latencyMs ?? null,
+          inputTokens: input.inputTokens ?? null,
+          outputTokens: input.outputTokens ?? null,
+          totalTokens: input.totalTokens ?? null,
+          model: input.model ?? null,
+          errorCategory: input.errorCategory ?? null,
+        })
+        .returning({ id: aiUsageEvents.id });
+      return created;
+    },
+
+    async countAiUsageSince(user: AuthUser, since: Date) {
+      const rows = await db
+        .select({ id: aiUsageEvents.id })
+        .from(aiUsageEvents)
+        .where(
+          and(
+            eq(aiUsageEvents.schoolId, user.schoolId),
+            eq(aiUsageEvents.appUserId, user.appUserId),
+            gte(aiUsageEvents.createdAt, since),
+          ),
+        )
+        .limit(10000);
+      return rows.length;
+    },
+
+    async aiUsageSummary(
+      user: AuthUser,
+      filters: {
+        startDate?: string | undefined;
+        endDate?: string | undefined;
+      },
+    ) {
+      const conditions = [eq(aiUsageEvents.schoolId, user.schoolId)];
+      if (filters.startDate) conditions.push(gte(aiUsageEvents.createdAt, new Date(`${filters.startDate}T00:00:00.000Z`)));
+      if (filters.endDate) conditions.push(lte(aiUsageEvents.createdAt, new Date(`${filters.endDate}T23:59:59.999Z`)));
+
+      const rows = await db
+        .select()
+        .from(aiUsageEvents)
+        .where(and(...conditions))
+        .orderBy(desc(aiUsageEvents.createdAt))
+        .limit(5000);
+
+      return summarizeAiUsage(rows);
+    },
+
     async overview(user: AuthUser) {
       const [school] = await db.select().from(schools).where(eq(schools.id, user.schoolId)).limit(1);
       const [year] = await db
@@ -143,6 +219,12 @@ export function createSchoolRepository(db: Db) {
     },
 
     async listStudents(user: AuthUser) {
+      const [activeYear] = await db
+        .select({ id: academicYears.id })
+        .from(academicYears)
+        .where(and(eq(academicYears.schoolId, user.schoolId), eq(academicYears.isActive, true)))
+        .limit(1);
+
       return db
         .select({
           id: students.id,
@@ -152,11 +234,23 @@ export function createSchoolRepository(db: Db) {
           guardianPhone: students.guardianPhone,
           classId: studentEnrollments.classId,
           sectionId: studentEnrollments.sectionId,
+          className: classes.name,
+          sectionName: sections.name,
           academicYearId: studentEnrollments.academicYearId,
           rollNumber: studentEnrollments.rollNumber,
         })
         .from(students)
-        .leftJoin(studentEnrollments, eq(studentEnrollments.studentId, students.id))
+        .leftJoin(
+          studentEnrollments,
+          activeYear
+            ? and(
+                eq(studentEnrollments.studentId, students.id),
+                eq(studentEnrollments.academicYearId, activeYear.id),
+              )
+            : eq(studentEnrollments.studentId, students.id),
+        )
+        .leftJoin(classes, eq(classes.id, studentEnrollments.classId))
+        .leftJoin(sections, eq(sections.id, studentEnrollments.sectionId))
         .where(eq(students.schoolId, user.schoolId))
         .limit(500);
     },
@@ -328,10 +422,12 @@ export function createSchoolRepository(db: Db) {
           assignment: teacherAssignments,
           className: classes.name,
           sectionName: sections.name,
+          subjectName: subjects.name,
         })
         .from(teacherAssignments)
         .innerJoin(classes, eq(teacherAssignments.classId, classes.id))
         .innerJoin(sections, eq(teacherAssignments.sectionId, sections.id))
+        .leftJoin(subjects, eq(teacherAssignments.subjectId, subjects.id))
         .where(and(eq(teacherAssignments.schoolId, user.schoolId), eq(teacherAssignments.staffId, user.staffId)))
         .limit(100);
 
@@ -339,6 +435,7 @@ export function createSchoolRepository(db: Db) {
         ...r.assignment,
         className: r.className,
         sectionName: r.sectionName,
+        subjectName: r.subjectName,
       }));
     },
 
@@ -348,6 +445,139 @@ export function createSchoolRepository(db: Db) {
         ...filters,
         staffId: user.staffId,
       });
+    },
+
+    async listTeacherMaterials(user: AuthUser) {
+      if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
+      const rows = await db
+        .select({
+          material: teacherMaterials,
+          className: classes.name,
+          sectionName: sections.name,
+          subjectName: subjects.name,
+        })
+        .from(teacherMaterials)
+        .leftJoin(classes, eq(teacherMaterials.classId, classes.id))
+        .leftJoin(sections, eq(teacherMaterials.sectionId, sections.id))
+        .leftJoin(subjects, eq(teacherMaterials.subjectId, subjects.id))
+        .where(and(eq(teacherMaterials.schoolId, user.schoolId), eq(teacherMaterials.ownerStaffId, user.staffId)))
+        .orderBy(desc(teacherMaterials.updatedAt))
+        .limit(100);
+
+      return rows.map(materialWithLabels);
+    },
+
+    async getTeacherMaterial(user: AuthUser, id: string) {
+      if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
+      const [row] = await db
+        .select({
+          material: teacherMaterials,
+          className: classes.name,
+          sectionName: sections.name,
+          subjectName: subjects.name,
+        })
+        .from(teacherMaterials)
+        .leftJoin(classes, eq(teacherMaterials.classId, classes.id))
+        .leftJoin(sections, eq(teacherMaterials.sectionId, sections.id))
+        .leftJoin(subjects, eq(teacherMaterials.subjectId, subjects.id))
+        .where(
+          and(
+            eq(teacherMaterials.schoolId, user.schoolId),
+            eq(teacherMaterials.ownerStaffId, user.staffId),
+            eq(teacherMaterials.id, id),
+          ),
+        )
+        .limit(1);
+
+      if (!row) throw new ApiError(404, 'Teaching material not found');
+      return materialWithLabels(row);
+    },
+
+    async createTeacherMaterial(user: AuthUser, input: TeacherMaterialInput) {
+      if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
+      await assertTeacherMaterialContext(db, user, input);
+
+      const [created] = await db
+        .insert(teacherMaterials)
+        .values({
+          schoolId: user.schoolId,
+          ownerStaffId: user.staffId,
+          academicYearId: input.academicYearId ?? null,
+          classId: input.classId ?? null,
+          sectionId: input.sectionId ?? null,
+          subjectId: input.subjectId ?? null,
+          type: input.type,
+          title: input.title,
+          topic: input.topic,
+          difficulty: input.difficulty,
+          language: input.language,
+          durationMinutes: input.durationMinutes ?? null,
+          questionCount: input.questionCount ?? null,
+          content: input.content,
+          metadata: input.metadata ?? {},
+        })
+        .returning();
+
+      if (!created) throw new ApiError(500, 'Unable to save teaching material');
+      return this.getTeacherMaterial(user, created.id);
+    },
+
+    async updateTeacherMaterial(user: AuthUser, id: string, input: TeacherMaterialUpdateInput) {
+      const existing = await this.getTeacherMaterial(user, id);
+      const next = {
+        academicYearId: input.academicYearId ?? (existing.academicYearId as string | null) ?? undefined,
+        classId: input.classId ?? (existing.classId as string | null) ?? undefined,
+        sectionId: input.sectionId ?? (existing.sectionId as string | null) ?? undefined,
+        subjectId: input.subjectId ?? (existing.subjectId as string | null) ?? undefined,
+      };
+      await assertTeacherMaterialContext(db, user, next);
+
+      const [updated] = await db
+        .update(teacherMaterials)
+        .set({
+          ...(input.type ? { type: input.type } : {}),
+          ...(input.title ? { title: input.title } : {}),
+          ...(input.topic ? { topic: input.topic } : {}),
+          ...(input.difficulty ? { difficulty: input.difficulty } : {}),
+          ...(input.language ? { language: input.language } : {}),
+          ...(input.academicYearId !== undefined ? { academicYearId: input.academicYearId ?? null } : {}),
+          ...(input.classId !== undefined ? { classId: input.classId ?? null } : {}),
+          ...(input.sectionId !== undefined ? { sectionId: input.sectionId ?? null } : {}),
+          ...(input.subjectId !== undefined ? { subjectId: input.subjectId ?? null } : {}),
+          ...(input.durationMinutes !== undefined ? { durationMinutes: input.durationMinutes ?? null } : {}),
+          ...(input.questionCount !== undefined ? { questionCount: input.questionCount ?? null } : {}),
+          ...(input.content ? { content: input.content } : {}),
+          ...(input.metadata ? { metadata: input.metadata } : {}),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(teacherMaterials.schoolId, user.schoolId),
+            eq(teacherMaterials.ownerStaffId, user.staffId!),
+            eq(teacherMaterials.id, id),
+          ),
+        )
+        .returning({ id: teacherMaterials.id });
+
+      if (!updated) throw new ApiError(404, 'Teaching material not found');
+      return this.getTeacherMaterial(user, id);
+    },
+
+    async deleteTeacherMaterial(user: AuthUser, id: string) {
+      if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
+      const [deleted] = await db
+        .delete(teacherMaterials)
+        .where(
+          and(
+            eq(teacherMaterials.schoolId, user.schoolId),
+            eq(teacherMaterials.ownerStaffId, user.staffId),
+            eq(teacherMaterials.id, id),
+          ),
+        )
+        .returning({ id: teacherMaterials.id });
+
+      if (!deleted) throw new ApiError(404, 'Teaching material not found');
+      return deleted;
     },
 
     async rosterForSection(user: AuthUser, sectionId: string, academicYearId: string) {
@@ -526,6 +756,38 @@ export function createSchoolRepository(db: Db) {
       };
     },
 
+    async attendanceInsightDataset(
+      user: AuthUser,
+      filters: {
+        startDate: string;
+        endDate: string;
+        classId?: string | undefined;
+        sectionId?: string | undefined;
+      },
+    ) {
+      const previous = previousRange(filters.startDate, filters.endDate);
+      const currentRows = await attendanceRows(db, user, filters);
+      const previousRows = await attendanceRows(db, user, {
+        ...filters,
+        startDate: previous.startDate,
+        endDate: previous.endDate,
+      });
+      const expected = await expectedTimetableSessions(db, user, filters);
+
+      const currentMetrics = summarizeAttendanceRows(currentRows, expected.total);
+      const previousMetrics = summarizeAttendanceRows(previousRows, 0);
+      const sectionMetrics = sectionBreakdown(currentRows, previousRows, expected.bySection);
+
+      return {
+        range: filters,
+        previousRange: previous,
+        metrics: currentMetrics,
+        previousMetrics,
+        sectionMetrics,
+        generatedAt: new Date().toISOString(),
+      };
+    },
+
     async studentAttendanceSummary(user: AuthUser, studentId: string) {
       const [student] = await db
         .select()
@@ -591,6 +853,345 @@ export function createSchoolRepository(db: Db) {
       };
     },
   };
+}
+
+type AttendanceInsightRow = {
+  sessionId: string;
+  attendanceDate: string;
+  kind: 'daily' | 'period';
+  periodNumber: number | null;
+  classId: string;
+  sectionId: string;
+  subjectId: string | null;
+  className: string;
+  sectionName: string;
+  status: 'present' | 'absent' | 'late' | 'excused';
+};
+
+async function attendanceRows(
+  db: Db,
+  user: AuthUser,
+  filters: {
+    startDate: string;
+    endDate: string;
+    classId?: string | undefined;
+    sectionId?: string | undefined;
+  },
+): Promise<AttendanceInsightRow[]> {
+  const conditions = [
+    eq(attendanceSessions.schoolId, user.schoolId),
+    gte(attendanceSessions.attendanceDate, filters.startDate),
+    lte(attendanceSessions.attendanceDate, filters.endDate),
+  ];
+  if (filters.classId) conditions.push(eq(attendanceSessions.classId, filters.classId));
+  if (filters.sectionId) conditions.push(eq(attendanceSessions.sectionId, filters.sectionId));
+
+  const rows = await db
+    .select({
+      sessionId: attendanceSessions.id,
+      attendanceDate: attendanceSessions.attendanceDate,
+      kind: attendanceSessions.kind,
+      periodNumber: attendanceSessions.periodNumber,
+      classId: attendanceSessions.classId,
+      sectionId: attendanceSessions.sectionId,
+      subjectId: attendanceSessions.subjectId,
+      className: classes.name,
+      sectionName: sections.name,
+      status: attendanceRecords.status,
+    })
+    .from(attendanceRecords)
+    .innerJoin(attendanceSessions, eq(attendanceRecords.sessionId, attendanceSessions.id))
+    .innerJoin(classes, eq(attendanceSessions.classId, classes.id))
+    .innerJoin(sections, eq(attendanceSessions.sectionId, sections.id))
+    .where(and(...conditions))
+    .limit(5000);
+
+  return rows;
+}
+
+async function expectedTimetableSessions(
+  db: Db,
+  user: AuthUser,
+  filters: {
+    startDate: string;
+    endDate: string;
+    classId?: string | undefined;
+    sectionId?: string | undefined;
+  },
+) {
+  const conditions = [eq(timetableEntries.schoolId, user.schoolId)];
+  if (filters.classId) conditions.push(eq(timetableEntries.classId, filters.classId));
+  if (filters.sectionId) conditions.push(eq(timetableEntries.sectionId, filters.sectionId));
+
+  const entries = await db
+    .select({
+      sectionId: timetableEntries.sectionId,
+      dayOfWeek: timetableEntries.dayOfWeek,
+    })
+    .from(timetableEntries)
+    .where(and(...conditions))
+    .limit(1000);
+
+  const bySection = new Map<string, number>();
+  let total = 0;
+  for (const date of datesBetween(filters.startDate, filters.endDate)) {
+    const day = schoolicDayOfWeek(date);
+    for (const entry of entries) {
+      if (entry.dayOfWeek !== day) continue;
+      total++;
+      bySection.set(entry.sectionId, (bySection.get(entry.sectionId) ?? 0) + 1);
+    }
+  }
+
+  return { total, bySection };
+}
+
+function summarizeAttendanceRows(rows: AttendanceInsightRow[], expectedSessions: number) {
+  const sessions = new Set(rows.map((row) => row.sessionId));
+  const counts = { present: 0, absent: 0, late: 0, excused: 0 };
+  for (const row of rows) counts[row.status]++;
+  const totalRecords = counts.present + counts.absent + counts.late + counts.excused;
+  const attendancePercentage = totalRecords === 0 ? null : Math.round(((counts.present + counts.late) / totalRecords) * 1000) / 10;
+  return {
+    submittedSessions: sessions.size,
+    expectedSessions,
+    pendingSessions: Math.max(expectedSessions - sessions.size, 0),
+    totalRecords,
+    ...counts,
+    attendancePercentage,
+    denominator: 'present + absent + late + excused attendance records; late counts as attended',
+  };
+}
+
+function sectionBreakdown(
+  currentRows: AttendanceInsightRow[],
+  previousRows: AttendanceInsightRow[],
+  expectedBySection: Map<string, number>,
+) {
+  const current = groupBySection(currentRows);
+  const previous = groupBySection(previousRows);
+  return [...current.values()]
+    .map((section) => {
+      const prev = previous.get(section.sectionId);
+      const expected = expectedBySection.get(section.sectionId) ?? 0;
+      return {
+        ...section,
+        expectedSessions: expected,
+        pendingSessions: Math.max(expected - section.submittedSessions, 0),
+        previousAttendancePercentage: prev?.attendancePercentage ?? null,
+        attendanceChangePoints:
+          section.attendancePercentage === null || prev?.attendancePercentage === null || prev?.attendancePercentage === undefined
+            ? null
+            : Math.round((section.attendancePercentage - prev.attendancePercentage) * 10) / 10,
+      };
+    })
+    .sort((a, b) => (a.attendancePercentage ?? 101) - (b.attendancePercentage ?? 101))
+    .slice(0, 10);
+}
+
+function groupBySection(rows: AttendanceInsightRow[]) {
+  const map = new Map<
+    string,
+    {
+      sectionId: string;
+      label: string;
+      submittedSessions: number;
+      totalRecords: number;
+      present: number;
+      absent: number;
+      late: number;
+      excused: number;
+      attendancePercentage: number | null;
+    }
+  >();
+  const sessionsBySection = new Map<string, Set<string>>();
+
+  for (const row of rows) {
+    if (!map.has(row.sectionId)) {
+      map.set(row.sectionId, {
+        sectionId: row.sectionId,
+        label: `${row.className} ${row.sectionName}`,
+        submittedSessions: 0,
+        totalRecords: 0,
+        present: 0,
+        absent: 0,
+        late: 0,
+        excused: 0,
+        attendancePercentage: null,
+      });
+      sessionsBySection.set(row.sectionId, new Set());
+    }
+    const item = map.get(row.sectionId)!;
+    sessionsBySection.get(row.sectionId)!.add(row.sessionId);
+    item.totalRecords++;
+    item[row.status]++;
+  }
+
+  for (const [sectionId, item] of map.entries()) {
+    item.submittedSessions = sessionsBySection.get(sectionId)?.size ?? 0;
+    item.attendancePercentage =
+      item.totalRecords === 0 ? null : Math.round(((item.present + item.late) / item.totalRecords) * 1000) / 10;
+  }
+
+  return map;
+}
+
+function previousRange(startDate: string, endDate: string) {
+  const start = parseDate(startDate);
+  const end = parseDate(endDate);
+  const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+  const previousEnd = new Date(start);
+  previousEnd.setUTCDate(previousEnd.getUTCDate() - 1);
+  const previousStart = new Date(previousEnd);
+  previousStart.setUTCDate(previousStart.getUTCDate() - days + 1);
+  return { startDate: toIsoDate(previousStart), endDate: toIsoDate(previousEnd) };
+}
+
+function datesBetween(startDate: string, endDate: string) {
+  const dates: Date[] = [];
+  const cursor = parseDate(startDate);
+  const end = parseDate(endDate);
+  while (cursor <= end) {
+    dates.push(new Date(cursor));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return dates;
+}
+
+function schoolicDayOfWeek(date: Date) {
+  const day = date.getUTCDay();
+  return day === 0 ? 7 : day;
+}
+
+function parseDate(value: string) {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+function toIsoDate(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+function materialWithLabels(row: {
+  material: typeof teacherMaterials.$inferSelect;
+  className: string | null;
+  sectionName: string | null;
+  subjectName: string | null;
+}) {
+  return {
+    ...row.material,
+    className: row.className,
+    sectionName: row.sectionName,
+    subjectName: row.subjectName,
+  };
+}
+
+function summarizeAiUsage(rows: Array<typeof aiUsageEvents.$inferSelect>) {
+  const byFeature = new Map<string, { feature: string; requests: number; successes: number; failures: number; inputTokens: number | null; outputTokens: number | null; totalTokens: number | null; averageLatencyMs: number | null }>();
+  const byGenerationType = new Map<string, { generationType: string; requests: number; successes: number; failures: number }>();
+  const daily = new Map<string, { date: string; requests: number; successes: number; failures: number }>();
+  let successes = 0;
+  let failures = 0;
+  let limited = 0;
+  let inputTokens: number | null = null;
+  let outputTokens: number | null = null;
+  let totalTokens: number | null = null;
+  let latencyTotal = 0;
+  let latencyCount = 0;
+
+  const addTokens = (current: number | null, value: number | null) => (value === null ? current : (current ?? 0) + value);
+
+  for (const row of rows) {
+    if (row.status === 'success') successes++;
+    else if (row.status === 'limited') limited++;
+    else failures++;
+
+    inputTokens = addTokens(inputTokens, row.inputTokens);
+    outputTokens = addTokens(outputTokens, row.outputTokens);
+    totalTokens = addTokens(totalTokens, row.totalTokens);
+    if (row.latencyMs !== null) {
+      latencyTotal += row.latencyMs;
+      latencyCount++;
+    }
+
+    const feature = byFeature.get(row.feature) ?? {
+      feature: row.feature,
+      requests: 0,
+      successes: 0,
+      failures: 0,
+      inputTokens: null,
+      outputTokens: null,
+      totalTokens: null,
+      averageLatencyMs: null,
+    };
+    feature.requests++;
+    if (row.status === 'success') feature.successes++;
+    else feature.failures++;
+    feature.inputTokens = addTokens(feature.inputTokens, row.inputTokens);
+    feature.outputTokens = addTokens(feature.outputTokens, row.outputTokens);
+    feature.totalTokens = addTokens(feature.totalTokens, row.totalTokens);
+    byFeature.set(row.feature, feature);
+
+    if (row.generationType) {
+      const type = byGenerationType.get(row.generationType) ?? {
+        generationType: row.generationType,
+        requests: 0,
+        successes: 0,
+        failures: 0,
+      };
+      type.requests++;
+      if (row.status === 'success') type.successes++;
+      else type.failures++;
+      byGenerationType.set(row.generationType, type);
+    }
+
+    const day = row.createdAt.toISOString().slice(0, 10);
+    const bucket = daily.get(day) ?? { date: day, requests: 0, successes: 0, failures: 0 };
+    bucket.requests++;
+    if (row.status === 'success') bucket.successes++;
+    else bucket.failures++;
+    daily.set(day, bucket);
+  }
+
+  return {
+    totals: {
+      requests: rows.length,
+      successes,
+      failures,
+      limited,
+      inputTokens,
+      outputTokens,
+      totalTokens,
+      averageLatencyMs: latencyCount === 0 ? null : Math.round(latencyTotal / latencyCount),
+    },
+    byFeature: [...byFeature.values()],
+    byGenerationType: [...byGenerationType.values()],
+    daily: [...daily.values()].sort((a, b) => a.date.localeCompare(b.date)),
+  };
+}
+
+async function assertTeacherMaterialContext(
+  db: Db,
+  user: AuthUser,
+  input: {
+    academicYearId?: string | undefined;
+    classId?: string | undefined;
+    sectionId?: string | undefined;
+    subjectId?: string | undefined;
+  },
+) {
+  if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
+  if (!input.academicYearId && !input.classId && !input.sectionId && !input.subjectId) return;
+
+  const conditions = [eq(teacherAssignments.schoolId, user.schoolId), eq(teacherAssignments.staffId, user.staffId)];
+  if (input.academicYearId) conditions.push(eq(teacherAssignments.academicYearId, input.academicYearId));
+  if (input.classId) conditions.push(eq(teacherAssignments.classId, input.classId));
+  if (input.sectionId) conditions.push(eq(teacherAssignments.sectionId, input.sectionId));
+  if (input.subjectId) conditions.push(eq(teacherAssignments.subjectId, input.subjectId));
+
+  const [assignment] = await db.select({ id: teacherAssignments.id }).from(teacherAssignments).where(and(...conditions)).limit(1);
+  if (!assignment) {
+    throw new ApiError(403, 'Selected class, section, or subject is not assigned to this teacher.');
+  }
 }
 
 async function assertTeacherCanTakeAttendance(

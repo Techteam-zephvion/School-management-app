@@ -12,11 +12,13 @@ class StudentAttendanceDialog extends ConsumerStatefulWidget {
   const StudentAttendanceDialog({
     required this.studentId,
     required this.studentName,
+    this.initialData,
     super.key,
   });
 
   final String studentId;
   final String studentName;
+  final Map<String, Object?>? initialData;
 
   @override
   ConsumerState<StudentAttendanceDialog> createState() => _StudentAttendanceDialogState();
@@ -30,7 +32,12 @@ class _StudentAttendanceDialogState extends ConsumerState<StudentAttendanceDialo
   @override
   void initState() {
     super.initState();
-    _load();
+    if (widget.initialData != null) {
+      _data = widget.initialData;
+      _loading = false;
+    } else {
+      _load();
+    }
   }
 
   Future<void> _load() async {
@@ -60,12 +67,17 @@ class _StudentAttendanceDialogState extends ConsumerState<StudentAttendanceDialo
   @override
   Widget build(BuildContext context) {
     final records = ((_data?['records'] as List?) ?? const []).cast<Map<String, Object?>>();
-    final rate = _data?['attendanceRate'] != null ? '${_data!['attendanceRate']}%' : '—';
-    final total = _data?['totalSessions']?.toString() ?? '0';
-    final present = _data?['presentCount']?.toString() ?? '0';
-    final absent = _data?['absentCount']?.toString() ?? '0';
-    final lateCount = _data?['lateCount']?.toString() ?? '0';
-    final excused = _data?['excusedCount']?.toString() ?? '0';
+    final stats = (_data?['stats'] as Map<String, Object?>?) ?? _data;
+    final totalSessionsNum = stats?['totalSessions'] is num
+        ? (stats!['totalSessions'] as num).toInt()
+        : int.tryParse(stats?['totalSessions']?.toString() ?? '0') ?? 0;
+    final rateVal = stats?['attendanceRate'];
+    final rate = totalSessionsNum > 0 && rateVal != null ? '$rateVal%' : '—';
+    final total = totalSessionsNum.toString();
+    final present = (stats?['present'] ?? stats?['presentCount'])?.toString() ?? '0';
+    final absent = (stats?['absent'] ?? stats?['absentCount'])?.toString() ?? '0';
+    final lateCount = (stats?['late'] ?? stats?['lateCount'])?.toString() ?? '0';
+    final excused = (stats?['excused'] ?? stats?['excusedCount'])?.toString() ?? '0';
 
     return AppDialog(
       title: widget.studentName,
@@ -155,7 +167,7 @@ class _StudentAttendanceDialogState extends ConsumerState<StudentAttendanceDialo
                                 children: [
                                   SizedBox(
                                     width: 90,
-                                    child: Text('${r['date'] ?? ''}', style: AppTypography.compactTable),
+                                    child: Text('${r['date'] ?? r['attendanceDate'] ?? ''}', style: AppTypography.compactTable),
                                   ),
                                   Expanded(
                                     child: Column(

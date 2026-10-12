@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
+import '../../core/models.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../shared/components/feedback_banner.dart';
@@ -107,6 +108,8 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(authControllerProvider).session;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 850;
 
     if (_loading) {
       return const Scaffold(
@@ -119,6 +122,7 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
 
     return Scaffold(
       backgroundColor: AppColors.mainBackground,
+      drawer: isMobile ? _buildTeacherDrawer(session) : null,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(52),
         child: Container(
@@ -126,9 +130,19 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
             color: AppColors.mainBackground,
             border: Border(bottom: BorderSide(color: AppColors.primaryBorder)),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 24),
           child: Row(
             children: [
+              if (isMobile) ...[
+                Builder(
+                  builder: (ctx) => IconButton(
+                    icon: const Icon(Icons.menu, size: 20, color: AppColors.primaryText),
+                    tooltip: 'Open navigation',
+                    onPressed: () => Scaffold.of(ctx).openDrawer(),
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
               const Text(
                 'schoolic.',
                 style: TextStyle(
@@ -152,16 +166,17 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                   style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.secondaryText),
                 ),
               ),
-              const SizedBox(width: 24),
-
-              // Navigation tab buttons
-              _buildTabButton(0, 'My Day', Icons.dashboard_outlined),
-              const SizedBox(width: 4),
-              _buildTabButton(1, 'My Week', Icons.calendar_month_outlined),
-              const SizedBox(width: 4),
-              _buildTabButton(2, 'My Classes', Icons.layers_outlined),
-              const SizedBox(width: 4),
-              _buildTabButton(3, 'Attendance Register', Icons.fact_check_outlined),
+              if (!isMobile) ...[
+                const SizedBox(width: 24),
+                // Navigation tab buttons
+                _buildTabButton(0, 'My Day', Icons.dashboard_outlined),
+                const SizedBox(width: 4),
+                _buildTabButton(1, 'My Week', Icons.calendar_month_outlined),
+                const SizedBox(width: 4),
+                _buildTabButton(2, 'My Classes', Icons.layers_outlined),
+                const SizedBox(width: 4),
+                _buildTabButton(3, 'Attendance Register', Icons.fact_check_outlined),
+              ],
 
               const Spacer(),
 
@@ -172,20 +187,25 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                 onPressed: _loadData,
                 icon: const Icon(Icons.refresh, color: AppColors.secondaryText),
               ),
-              const SizedBox(width: 8),
 
-              Container(width: 1, height: 16, color: AppColors.primaryBorder),
-              const SizedBox(width: 14),
-
-              Text(
-                session?.email ?? 'teacher@schoolic.local',
-                style: const TextStyle(
-                  fontFamily: 'Switzer',
-                  fontSize: 13,
-                  color: AppColors.secondaryText,
+              if (!isMobile) ...[
+                const SizedBox(width: 8),
+                Container(width: 1, height: 16, color: AppColors.primaryBorder),
+                const SizedBox(width: 14),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 180),
+                  child: Text(
+                    session?.displayName ?? session?.email ?? 'Faculty',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Switzer',
+                      fontSize: 13,
+                      color: AppColors.secondaryText,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
+                const SizedBox(width: 8),
+              ],
 
               IconButton(
                 tooltip: 'Sign out',
@@ -198,7 +218,7 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+        padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 32, vertical: isMobile ? 18 : 28),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1100),
@@ -220,15 +240,156 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
     );
   }
 
+  Widget _buildTeacherDrawer(AuthSession? session) {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: 52,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              alignment: Alignment.centerLeft,
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: AppColors.primaryBorder)),
+              ),
+              child: Row(
+                children: [
+                  const Text(
+                    'schoolic.',
+                    style: TextStyle(
+                      fontFamily: 'Switzer',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.4,
+                      color: AppColors.primaryText,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondaryBackground,
+                      borderRadius: AppRadii.rSm,
+                      border: Border.all(color: AppColors.primaryBorder),
+                    ),
+                    child: const Text(
+                      'TEACHER',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.secondaryText),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  _drawerTabItem(0, 'My Day', Icons.dashboard_outlined),
+                  _drawerTabItem(1, 'My Week', Icons.calendar_month_outlined),
+                  _drawerTabItem(2, 'My Classes', Icons.layers_outlined),
+                  _drawerTabItem(3, 'Attendance Register', Icons.fact_check_outlined),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: AppColors.primaryBorder),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (session?.displayName != null)
+                          Text(
+                            session!.displayName!,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'Switzer',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.primaryText,
+                            ),
+                          ),
+                        Text(
+                          session?.email ?? 'teacher@schoolic.local',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'Switzer',
+                            fontSize: 12,
+                            color: AppColors.secondaryText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Sign out',
+                    iconSize: 18,
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      ref.read(authControllerProvider).signOut();
+                    },
+                    icon: const Icon(Icons.logout, color: AppColors.secondaryText),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _drawerTabItem(int index, String label, IconData icon) {
+    final isSelected = _activeTab == index;
+    return InkWell(
+      onTap: () {
+        setState(() => _activeTab = index);
+        Navigator.of(context).pop();
+      },
+      child: Container(
+        height: 40,
+        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.secondaryBackground : Colors.transparent,
+          borderRadius: AppRadii.rMd,
+          border: isSelected ? const Border(left: BorderSide(color: AppColors.primaryText, width: 2)) : null,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? AppColors.primaryText : AppColors.secondaryText,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Switzer',
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
+                color: isSelected ? AppColors.primaryText : AppColors.secondaryText,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTabButton(int index, String label, IconData icon) {
     final isSelected = _activeTab == index;
 
     return InkWell(
       onTap: () => setState(() => _activeTab = index),
       borderRadius: AppRadii.rMd,
-      child: AnimatedContainer(
-        duration: AppMotion.quick,
-        curve: AppMotion.curve,
+      child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.secondaryBackground : Colors.transparent,
@@ -240,16 +401,16 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
           children: [
             Icon(
               icon,
-              size: 15,
+              size: 16,
               color: isSelected ? AppColors.primaryText : AppColors.secondaryText,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
                 fontFamily: 'Switzer',
                 fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
                 color: isSelected ? AppColors.primaryText : AppColors.secondaryText,
               ),
             ),
@@ -268,7 +429,8 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
           assignments: _assignments,
           timetableEntries: _timetable,
           recentSessions: _recentSessions,
-          teacherEmail: session?.email ?? 'Faculty',
+          teacherDisplayName: session?.displayName,
+          teacherEmail: session?.email,
           onSelectAssignmentAndTakeAttendance: _selectAssignmentAndTakeAttendance,
           onSelectTimetableEntryAndTakeAttendance: _selectTimetableEntryAndTakeAttendance,
           onNavigateToRegister: () => setState(() => _activeTab = 3),

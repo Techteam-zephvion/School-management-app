@@ -1,11 +1,14 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { generateJsonWithUsage } from '../ai/client';
 import { createDb } from '../db/client';
 import { requireRole } from '../http/auth';
+import { ApiError } from '../http/errors';
 import { createSchoolRepository } from '../repositories/school-repository';
 import type { AppBindings } from '../types';
 import {
+  aiAttendanceInsightsSchema,
   createAcademicYearSchema,
   createClassSchema,
   createSectionSchema,
@@ -33,6 +36,26 @@ const attendanceSummaryQuerySchema = z.object({
   classId: z.string().uuid().optional(),
   sectionId: z.string().uuid().optional(),
   format: z.enum(['json', 'csv']).optional(),
+});
+
+const aiUsageQuerySchema = z.object({
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid startDate format (expected YYYY-MM-DD)').optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid endDate format (expected YYYY-MM-DD)').optional(),
+});
+
+const aiFindingSchema = z.object({
+  title: z.string().max(120),
+  observation: z.string().max(500),
+  supportingFigures: z.array(z.string().max(160)).max(4),
+  followUp: z.string().max(240),
+  evidenceLabel: z.string().max(120).optional(),
+});
+
+const aiAttendanceInsightResponseSchema = z.object({
+  overview: z.string().max(700),
+  observedChanges: z.array(aiFindingSchema).max(5),
+  recommendedFollowUp: z.array(z.string().max(180)).max(5),
+  limitations: z.array(z.string().max(180)).max(5),
 });
 
 function sanitizeCsvValue(val: unknown): string {
@@ -185,6 +208,127 @@ adminRoutes.get('/attendance-summary', zValidator('query', attendanceSummaryQuer
 
   return c.json(summary);
 });
+
+adminRoutes.get('/ai/usage', zValidator('query', aiUsageQuerySchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.aiUsageSummary(c.get('authUser'), c.req.valid('query')));
+});
+
+adminRoutes.post('/ai/attendance-insights', zValidator('json', aiAttendanceInsightsSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const input = c.req.valid('json');
+  const authUser = c.get('authUser');
+  await enforceAiLimit(repo, authUser, c.env, 'attendance_insights');
+  const dataset = await repo.attendanceInsightDataset(c.get('authUser'), input);
+
+  const startedAt = Date.now();
+  let modelResult;
+  try {
+    const generated = await generateJsonWithUsage(c.env, {
+      maxTokens: 1000,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are Schoolic Insights, an attendance operations analyst. Use only the supplied JSON facts. Do not invent counts, dates, names, causes, diagnoses, or predictions. Return strict JSON matching the requested shape.',
+        },
+        {
+          role: 'user',
+          content: JSON.stringify({
+            task: 'Explain verified attendance and operations metrics for a school administrator.',
+            outputShape: {
+              overview: 'string',
+              observedChanges: [
+                {
+                  title: 'string',
+                  observation: 'string',
+                  supportingFigures: ['string'],
+                  followUp: 'string',
+                  evidenceLabel: 'string',
+                },
+              ],
+              recommendedFollowUp: ['string'],
+              limitations: ['string'],
+            },
+            rules: [
+              'Every quantitative statement must match the supplied metrics.',
+              'Say insufficient data when there are too few sessions or records.',
+              'Separate observed facts from possible explanations.',
+              'Do not mention individual students.',
+            ],
+            facts: dataset,
+          }),
+        },
+      ],
+      schema: aiAttendanceInsightResponseSchema,
+    });
+    modelResult = generated.data;
+    await repo.recordAiUsage(authUser, {
+      feature: 'schoolic_insights',
+      generationType: 'attendance_insights',
+      status: 'success',
+      ...generated.usage,
+    });
+  } catch (error) {
+    await repo.recordAiUsage(authUser, {
+      feature: 'schoolic_insights',
+      generationType: 'attendance_insights',
+      status: 'failure',
+      latencyMs: Date.now() - startedAt,
+      model: c.env.AI_MODEL ?? null,
+      errorCategory: errorCategory(error),
+    });
+    throw error;
+  }
+
+  return c.json({
+    ...modelResult,
+    metrics: dataset.metrics,
+    previousMetrics: dataset.previousMetrics,
+    sectionMetrics: dataset.sectionMetrics,
+    range: dataset.range,
+    previousRange: dataset.previousRange,
+    reportPath: `/api/v1/admin/attendance-summary?${new URLSearchParams({
+      startDate: input.startDate,
+      endDate: input.endDate,
+      ...(input.classId ? { classId: input.classId } : {}),
+      ...(input.sectionId ? { sectionId: input.sectionId } : {}),
+    }).toString()}`,
+  });
+});
+
+async function enforceAiLimit(
+  repo: ReturnType<typeof createSchoolRepository>,
+  user: AppBindings['Variables']['authUser'],
+  env: AppBindings['Bindings'],
+  generationType: string,
+) {
+  const limit = numberFromEnv(env.AI_REQUESTS_PER_USER, 20);
+  const windowMinutes = numberFromEnv(env.AI_REQUEST_WINDOW_MINUTES, 60);
+  const since = new Date(Date.now() - windowMinutes * 60 * 1000);
+  const used = await repo.countAiUsageSince(user, since);
+  if (used >= limit) {
+    await repo.recordAiUsage(user, {
+      feature: 'schoolic_insights',
+      generationType,
+      status: 'limited',
+      errorCategory: 'quota_exceeded',
+    });
+    throw new ApiError(429, 'AI generation limit reached. Please try again later.');
+  }
+}
+
+function numberFromEnv(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function errorCategory(error: unknown) {
+  if (error instanceof Error && error.message.toLowerCase().includes('limit')) return 'quota_exceeded';
+  if (error instanceof Error && error.message.toLowerCase().includes('timeout')) return 'timeout';
+  if (error instanceof Error && error.message.toLowerCase().includes('rate')) return 'rate_limited';
+  return 'provider_error';
+}
 
 adminRoutes.get(
   '/students/:id/attendance-summary',

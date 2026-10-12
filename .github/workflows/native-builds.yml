@@ -1,0 +1,309 @@
+name: Native Staging Builds
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Build target environment
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_CHANNEL: master
+  SCHOOLIC_API_BASE_URL: https://schoolic-api-staging.schoolic-api.workers.dev
+  SCHOOLIC_NEON_AUTH_URL: https://ep-billowing-shadow-b56k9cl2.neonauth.c-7.us-east-2.aws.neon.tech/neondb
+
+jobs:
+  validate:
+    name: Validate API and Flutter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.10.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v3
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Flutter dependencies
+        working-directory: apps/flutter_app
+        run: flutter pub get
+
+      - name: API type check
+        run: pnpm api:typecheck
+
+      - name: API tests
+        run: pnpm api:test
+
+      - name: Flutter analyze
+        working-directory: apps/flutter_app
+        run: flutter analyze
+
+      - name: Flutter tests
+        run: pnpm flutter:test
+
+      - name: Validation summary
+        run: |
+          flutter_version="$(flutter --version | head -n 1)"
+          {
+            echo "## Validation"
+            echo "- API type check: passed"
+            echo "- API tests: passed"
+            echo "- Flutter analyze: passed"
+            echo "- Flutter tests: passed"
+            echo "- Flutter: ${flutter_version}"
+            echo "- Target: staging"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  android:
+    name: Android APK
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v3
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: Install Flutter dependencies
+        working-directory: apps/flutter_app
+        run: flutter pub get
+
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
+
+      - name: Build staging debug APK
+        working-directory: apps/flutter_app
+        run: >
+          flutter build apk --debug
+          --dart-define=API_BASE_URL=${{ env.SCHOOLIC_API_BASE_URL }}
+          --dart-define=NEON_AUTH_URL=${{ env.SCHOOLIC_NEON_AUTH_URL }}
+          --dart-define=SCHOOLIC_ALLOW_DEV_SIGN_IN=false
+
+      - name: Package Android artifact
+        run: |
+          mkdir -p artifacts/android
+          cp apps/flutter_app/build/app/outputs/flutter-apk/app-debug.apk artifacts/android/schoolic-staging-debug.apk
+          cat > artifacts/android/README.txt <<'EOF'
+          Schoolic Android staging APK
+
+          Environment: staging
+          API: https://schoolic-api-staging.schoolic-api.workers.dev
+          Auth: staging Neon Auth
+          Build type: debug APK for internal testing only
+
+          Install:
+          1. Download schoolic-staging-debug.apk from this artifact.
+          2. Transfer it to an Android device or emulator.
+          3. Allow installation from the chosen source when Android prompts.
+          4. Open Schoolic and sign in with staging credentials.
+
+          This APK is debug-signed. A release-signed APK will require a signing keystore
+          and passwords supplied through GitHub Secrets in a later release phase.
+          EOF
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v5
+        with:
+          name: schoolic-android-apk-staging
+          path: artifacts/android/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Android summary
+        run: |
+          apk_size="$(du -h artifacts/android/schoolic-staging-debug.apk | cut -f1)"
+          {
+            echo "## Android"
+            echo "- Artifact: schoolic-android-apk-staging"
+            echo "- File: schoolic-staging-debug.apk"
+            echo "- Size: ${apk_size}"
+            echo "- Build mode: debug APK"
+            echo "- Environment: staging"
+            echo "- Runner: ubuntu-latest"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  windows:
+    name: Windows ZIP
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v3
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: Install Flutter dependencies
+        working-directory: apps/flutter_app
+        run: flutter pub get
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Build staging Windows app
+        working-directory: apps/flutter_app
+        run: >
+          flutter build windows --release
+          --dart-define=API_BASE_URL=${{ env.SCHOOLIC_API_BASE_URL }}
+          --dart-define=NEON_AUTH_URL=${{ env.SCHOOLIC_NEON_AUTH_URL }}
+          --dart-define=SCHOOLIC_ALLOW_DEV_SIGN_IN=false
+
+      - name: Package Windows artifact
+        shell: pwsh
+        run: |
+          $release = "apps/flutter_app/build/windows/x64/runner/Release"
+          $artifact = "artifacts/windows"
+          New-Item -ItemType Directory -Force -Path $artifact | Out-Null
+          @"
+          Schoolic Windows staging build
+
+          Environment: staging
+          API: https://schoolic-api-staging.schoolic-api.workers.dev
+          Auth: staging Neon Auth
+          Build type: release ZIP for internal testing only
+
+          Run:
+          1. Extract schoolic-windows-staging.zip.
+          2. Keep the extracted files together in the same directory.
+          3. Launch schoolic.exe.
+          4. Sign in with staging credentials.
+
+          This bundle is not code-signed and is not an installer. Windows may show an
+          untrusted-app warning until signing is configured in a later release phase.
+          "@ | Out-File -FilePath "$release/README.txt" -Encoding utf8
+          Compress-Archive -Path "$release/*" -DestinationPath "$artifact/schoolic-windows-staging.zip" -Force
+
+      - name: Upload Windows ZIP
+        uses: actions/upload-artifact@v5
+        with:
+          name: schoolic-windows-staging
+          path: artifacts/windows/schoolic-windows-staging.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Windows summary
+        shell: pwsh
+        run: |
+          $zipSize = (Get-Item "artifacts/windows/schoolic-windows-staging.zip").Length
+          $zipSizeMb = [Math]::Round($zipSize / 1MB, 2)
+          "## Windows" >> $env:GITHUB_STEP_SUMMARY
+          "- Artifact: schoolic-windows-staging" >> $env:GITHUB_STEP_SUMMARY
+          "- File: schoolic-windows-staging.zip" >> $env:GITHUB_STEP_SUMMARY
+          "- Size: ${zipSizeMb} MB" >> $env:GITHUB_STEP_SUMMARY
+          "- Build mode: release bundle" >> $env:GITHUB_STEP_SUMMARY
+          "- Environment: staging" >> $env:GITHUB_STEP_SUMMARY
+          "- Runner: windows-latest" >> $env:GITHUB_STEP_SUMMARY
+
+  linux:
+    name: Linux TAR.GZ
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v3
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: Install Flutter dependencies
+        working-directory: apps/flutter_app
+        run: flutter pub get
+
+      - name: Enable Linux desktop
+        run: flutter config --enable-linux-desktop
+
+      - name: Build staging Linux app
+        working-directory: apps/flutter_app
+        run: >
+          flutter build linux --release
+          --dart-define=API_BASE_URL=${{ env.SCHOOLIC_API_BASE_URL }}
+          --dart-define=NEON_AUTH_URL=${{ env.SCHOOLIC_NEON_AUTH_URL }}
+          --dart-define=SCHOOLIC_ALLOW_DEV_SIGN_IN=false
+
+      - name: Package Linux artifact
+        run: |
+          mkdir -p artifacts/linux
+          bundle="apps/flutter_app/build/linux/x64/release/bundle"
+          cat > "$bundle/README.txt" <<'EOF'
+          Schoolic Linux staging build
+
+          Environment: staging
+          API: https://schoolic-api-staging.schoolic-api.workers.dev
+          Auth: staging Neon Auth
+          Build type: release TAR.GZ for internal testing only
+
+          Run:
+          1. Extract schoolic-linux-staging.tar.gz.
+          2. Keep the extracted files together in the same directory.
+          3. Run ./schoolic from the extracted bundle.
+          4. Sign in with staging credentials.
+
+          Target: Linux x64 on the GitHub ubuntu-latest runner. The host system needs
+          compatible GTK, glibc, and standard desktop runtime libraries.
+          EOF
+          tar -czf artifacts/linux/schoolic-linux-staging.tar.gz -C "$bundle" .
+
+      - name: Upload Linux TAR.GZ
+        uses: actions/upload-artifact@v5
+        with:
+          name: schoolic-linux-staging
+          path: artifacts/linux/schoolic-linux-staging.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Linux summary
+        run: |
+          tar_size="$(du -h artifacts/linux/schoolic-linux-staging.tar.gz | cut -f1)"
+          {
+            echo "## Linux"
+            echo "- Artifact: schoolic-linux-staging"
+            echo "- File: schoolic-linux-staging.tar.gz"
+            echo "- Size: ${tar_size}"
+            echo "- Build mode: release bundle"
+            echo "- Environment: staging"
+            echo "- Runner: ubuntu-latest"
+          } >> "$GITHUB_STEP_SUMMARY"

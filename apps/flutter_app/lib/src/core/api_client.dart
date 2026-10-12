@@ -67,6 +67,7 @@ class ApiClient {
     final json = await getJson('/api/v1/me', bearerToken: bearerToken, devSession: devSession);
     return AuthSession(
       email: json['email'] as String,
+      displayName: json['displayName'] as String?,
       roles: ((json['roles'] as List?) ?? const [])
           .map((role) => AppRole.values.byName(role as String))
           .toList(),
@@ -121,6 +122,20 @@ class ApiClient {
     required AuthSession session,
   }) async {
     final response = await _httpClient.put(
+      Uri.parse('${AppConfig.apiBaseUrl}$path'),
+      headers: _headers(bearerToken: session.bearerToken, devSession: session),
+      body: jsonEncode(body),
+    );
+    _ensureSuccess(response);
+    return _decode(response);
+  }
+
+  Future<Map<String, Object?>> patchJson(
+    String path,
+    Map<String, Object?> body, {
+    required AuthSession session,
+  }) async {
+    final response = await _httpClient.patch(
       Uri.parse('${AppConfig.apiBaseUrl}$path'),
       headers: _headers(bearerToken: session.bearerToken, devSession: session),
       body: jsonEncode(body),

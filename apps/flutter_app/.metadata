@@ -15,7 +15,13 @@ migration:
     - platform: root
       create_revision: dcc305b5fb95acad54cf3238a5d15072f77a5862
       base_revision: dcc305b5fb95acad54cf3238a5d15072f77a5862
-    - platform: web
+    - platform: android
+      create_revision: dcc305b5fb95acad54cf3238a5d15072f77a5862
+      base_revision: dcc305b5fb95acad54cf3238a5d15072f77a5862
+    - platform: linux
+      create_revision: dcc305b5fb95acad54cf3238a5d15072f77a5862
+      base_revision: dcc305b5fb95acad54cf3238a5d15072f77a5862
+    - platform: windows
       create_revision: dcc305b5fb95acad54cf3238a5d15072f77a5862
       base_revision: dcc305b5fb95acad54cf3238a5d15072f77a5862
 

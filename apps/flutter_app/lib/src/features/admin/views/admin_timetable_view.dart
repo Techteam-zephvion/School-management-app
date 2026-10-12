@@ -136,17 +136,25 @@ class _AdminTimetableViewState extends State<AdminTimetableView> {
               cellBuilder: (context, row) => Wrap(
                 spacing: 2,
                 children: [
-                  IconButton(
-                    tooltip: 'Edit lesson',
-                    iconSize: 16,
-                    onPressed: () => _openEntryDialog(existing: row),
-                    icon: const Icon(Icons.edit_outlined),
+                  Semantics(
+                    button: true,
+                    label: 'Edit lesson for ${row['className']} ${row['sectionName']}',
+                    child: IconButton(
+                      tooltip: 'Edit lesson for ${row['className']} ${row['sectionName']}',
+                      iconSize: 16,
+                      onPressed: () => _openEntryDialog(existing: row),
+                      icon: const Icon(Icons.edit_outlined),
+                    ),
                   ),
-                  IconButton(
-                    tooltip: 'Delete lesson',
-                    iconSize: 16,
-                    onPressed: () => _deleteEntry(row),
-                    icon: const Icon(Icons.delete_outline),
+                  Semantics(
+                    button: true,
+                    label: 'Delete lesson for ${row['className']} ${row['sectionName']}',
+                    child: IconButton(
+                      tooltip: 'Delete lesson for ${row['className']} ${row['sectionName']}',
+                      iconSize: 16,
+                      onPressed: () => _deleteEntry(row),
+                      icon: const Icon(Icons.delete_outline),
+                    ),
                   ),
                 ],
               ),
@@ -224,13 +232,21 @@ class _AdminTimetableViewState extends State<AdminTimetableView> {
       );
     }
 
+    final hasWeekendLessons = filtered.any((entry) => (entry['dayOfWeek'] as int? ?? 0) >= 6);
+    final displayedDays = _days.entries.where((d) => d.key <= 5 || hasWeekendLessons).toList();
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 900;
-        final dayWidgets = _days.entries.map((day) {
+        final colCount = hasWeekendLessons ? 7 : 5;
+        final cardWidth = isWide
+            ? (constraints.maxWidth - (12 * (colCount - 1))) / colCount
+            : constraints.maxWidth;
+
+        final dayWidgets = displayedDays.map((day) {
           final lessons = filtered.where((entry) => entry['dayOfWeek'] == day.key).toList();
           return Container(
-            width: isWide ? (constraints.maxWidth - 48) / 5 : constraints.maxWidth,
+            width: cardWidth,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: AppColors.mainBackground,
@@ -267,6 +283,16 @@ class _AdminTimetableViewState extends State<AdminTimetableView> {
     );
   }
 
+  String _allOptionLabel(String label) {
+    return switch (label) {
+      'Class' => 'All Classes',
+      'Section' => 'All Sections',
+      'Teacher' => 'All Teachers',
+      'Subject' => 'All Subjects',
+      _ => 'All ${label}s',
+    };
+  }
+
   Widget _select(
     String label,
     String? value,
@@ -277,10 +303,11 @@ class _AdminTimetableViewState extends State<AdminTimetableView> {
     return SizedBox(
       width: 180,
       child: DropdownButtonFormField<String?>(
+        isExpanded: true,
         initialValue: value,
         decoration: InputDecoration(labelText: label),
         items: [
-          DropdownMenuItem<String?>(value: null, child: Text('All $label')),
+          DropdownMenuItem<String?>(value: null, child: Text(_allOptionLabel(label))),
           ...options.map((option) => DropdownMenuItem<String?>(value: option['id'] as String, child: Text('${option[labelKey] ?? option['name']}'))),
         ],
         onChanged: onChanged,

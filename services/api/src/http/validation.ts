@@ -145,3 +145,68 @@ export const saveAttendanceSchema = z
       });
     }
   });
+
+export const aiAttendanceInsightsSchema = z
+  .object({
+    startDate: z.iso.date(),
+    endDate: z.iso.date(),
+    classId: z.uuid().optional(),
+    sectionId: z.uuid().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.endDate < value.startDate) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'endDate must be on or after startDate',
+        path: ['endDate'],
+      });
+    }
+  });
+
+export const teacherCopilotSchema = z.object({
+  outputType: z.enum(['lesson_plan', 'worksheet', 'quiz']),
+  topic: z.string().trim().min(3).max(160),
+  subjectId: z.uuid().optional(),
+  classId: z.uuid().optional(),
+  sectionId: z.uuid().optional(),
+  durationMinutes: z.number().int().min(10).max(120).default(40),
+  questionCount: z.number().int().min(3).max(30).default(10),
+  difficulty: z.enum(['introductory', 'standard', 'advanced']).default('standard'),
+  instructions: z.string().trim().max(500).optional(),
+  language: z.string().trim().min(2).max(40).default('English'),
+});
+
+export const teacherMaterialContentSchema = z.object({
+  overview: z.string().trim().min(1).max(2000),
+  sections: z
+    .array(
+      z.object({
+        heading: z.string().trim().min(1).max(120),
+        items: z.array(z.string().trim().min(1).max(600)).min(1).max(20),
+      }),
+    )
+    .min(1)
+    .max(12),
+  checksForUnderstanding: z.array(z.string().trim().min(1).max(300)).max(12).default([]),
+  teacherNotes: z.array(z.string().trim().min(1).max(500)).max(12).default([]),
+});
+
+export const createTeacherMaterialSchema = z.object({
+  type: z.enum(['lesson_plan', 'worksheet', 'quiz']),
+  title: z.string().trim().min(1).max(160),
+  topic: z.string().trim().min(3).max(160),
+  academicYearId: z.uuid().optional(),
+  classId: z.uuid().optional(),
+  sectionId: z.uuid().optional(),
+  subjectId: z.uuid().optional(),
+  difficulty: z.enum(['introductory', 'standard', 'advanced']).default('standard'),
+  language: z.string().trim().min(2).max(40).default('English'),
+  durationMinutes: z.number().int().min(10).max(120).optional(),
+  questionCount: z.number().int().min(3).max(30).optional(),
+  content: teacherMaterialContentSchema,
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const updateTeacherMaterialSchema = createTeacherMaterialSchema.partial().extend({
+  content: teacherMaterialContentSchema.optional(),
+});

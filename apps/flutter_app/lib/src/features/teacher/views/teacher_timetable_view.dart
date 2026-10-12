@@ -102,17 +102,24 @@ class TeacherTimetableView extends StatelessWidget {
       );
     }
 
+    final hasWeekendLessons = sorted.any((entry) => (entry['dayOfWeek'] as int? ?? 0) >= 6);
+    final displayedDays = _teacherTimetableDays.entries.where((d) => d.key <= 5 || hasWeekendLessons).toList();
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 900;
+        final colCount = hasWeekendLessons ? 7 : 5;
+        final cardWidth = isWide
+            ? (constraints.maxWidth - (12 * (colCount - 1))) / colCount
+            : constraints.maxWidth;
+
         return Wrap(
           spacing: 12,
           runSpacing: 12,
-          children: _teacherTimetableDays.entries.map((day) {
+          children: displayedDays.map((day) {
             final lessons = sorted.where((entry) => entry['dayOfWeek'] == day.key).toList();
-            final width = isWide ? (constraints.maxWidth - 48) / 5 : constraints.maxWidth;
             return Container(
-              width: width,
+              width: cardWidth,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: day.key == today ? AppColors.secondaryBackground : AppColors.mainBackground,

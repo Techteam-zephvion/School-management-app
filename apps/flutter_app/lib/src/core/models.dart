@@ -9,11 +9,13 @@ class AuthSession {
     required this.email,
     required this.roles,
     required this.schoolId,
+    this.displayName,
     this.bearerToken,
     this.devNeonUserId,
   });
 
   final String email;
+  final String? displayName;
   final List<AppRole> roles;
   final String schoolId;
   final String? bearerToken;
@@ -24,6 +26,7 @@ class AuthSession {
 
   Map<String, Object?> toJson() => {
         'email': email,
+        'displayName': displayName,
         'roles': roles.map((role) => role.name).toList(),
         'schoolId': schoolId,
         'bearerToken': bearerToken,
@@ -32,6 +35,7 @@ class AuthSession {
 
   static AuthSession fromJson(Map<String, Object?> json) => AuthSession(
         email: json['email'] as String,
+        displayName: json['displayName'] as String?,
         roles: ((json['roles'] as List?) ?? const [])
             .map((role) => AppRole.values.byName(role as String))
             .toList(),

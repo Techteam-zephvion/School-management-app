@@ -64,23 +64,6 @@ class AdminOverviewView extends StatelessWidget {
         PageHeader(
           title: 'Overview',
           description: 'Your school at a glance • $nowFormatted',
-          badge: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppColors.secondaryBackground,
-              borderRadius: AppRadii.rSm,
-              border: Border.all(color: AppColors.primaryBorder),
-            ),
-            child: Text(
-              activeYearName,
-              style: const TextStyle(
-                fontFamily: AppTypography.fontFamily,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppColors.primaryText,
-              ),
-            ),
-          ),
           primaryAction: FilledButton.icon(
             onPressed: onOpenAddStudent,
             icon: const Icon(Icons.add, size: 16),
@@ -180,6 +163,24 @@ class AdminOverviewView extends StatelessWidget {
     );
   }
 
+  String _cohortLabel(Map<String, Object?> section) {
+    final classId = section['classId'] as String?;
+    final sectionName = (section['name'] as String?)?.trim();
+    final matchingClass = classes.cast<Map<String, Object?>?>().firstWhere(
+      (c) => c?['id'] == classId,
+      orElse: () => null,
+    );
+    final className = (matchingClass?['name'] as String?)?.trim();
+    if (className != null && className.isNotEmpty && sectionName != null && sectionName.isNotEmpty) {
+      return '$className - $sectionName';
+    } else if (className != null && className.isNotEmpty) {
+      return className;
+    } else if (sectionName != null && sectionName.isNotEmpty) {
+      return 'Section $sectionName';
+    }
+    return 'Unassigned Cohort';
+  }
+
   Widget _buildOperationalAttention(
     List<Map<String, Object?>> unrecordedSections,
     List<Map<String, Object?>> unassignedSections,
@@ -223,7 +224,7 @@ class AdminOverviewView extends StatelessWidget {
                 _attentionTile(
                   icon: Icons.schedule_outlined,
                   title: 'Daily Attendance Pending (${unrecordedSections.length} sections)',
-                  subtitle: '${unrecordedSections.map((s) => s['name']).take(4).join(', ')}${unrecordedSections.length > 4 ? '...' : ''} have not logged attendance today.',
+                  subtitle: '${unrecordedSections.map(_cohortLabel).take(4).join(', ')}${unrecordedSections.length > 4 ? '...' : ''} have not logged attendance today.',
                   actionLabel: 'Check register →',
                   onTap: () => onNavigateToSection('attendance'),
                   isAlert: true,
@@ -234,7 +235,7 @@ class AdminOverviewView extends StatelessWidget {
                 _attentionTile(
                   icon: Icons.assignment_ind_outlined,
                   title: 'Unassigned Sections (${unassignedSections.length} cohorts)',
-                  subtitle: 'Class sections without an active assigned teacher mapping.',
+                  subtitle: '${unassignedSections.map(_cohortLabel).take(4).join(', ')}${unassignedSections.length > 4 ? '...' : ''} without an active assigned teacher mapping.',
                   actionLabel: 'Assign faculty →',
                   onTap: () => onNavigateToSection('assignments'),
                   isAlert: true,

@@ -13,7 +13,8 @@ class TeacherMyDayView extends StatelessWidget {
     required this.assignments,
     required this.timetableEntries,
     required this.recentSessions,
-    required this.teacherEmail,
+    this.teacherDisplayName,
+    this.teacherEmail,
     required this.onSelectAssignmentAndTakeAttendance,
     required this.onSelectTimetableEntryAndTakeAttendance,
     required this.onNavigateToRegister,
@@ -23,7 +24,8 @@ class TeacherMyDayView extends StatelessWidget {
   final List<Map<String, Object?>> assignments;
   final List<Map<String, Object?>> timetableEntries;
   final List<Map<String, Object?>> recentSessions;
-  final String teacherEmail;
+  final String? teacherDisplayName;
+  final String? teacherEmail;
   final void Function(Map<String, Object?> assignment) onSelectAssignmentAndTakeAttendance;
   final void Function(Map<String, Object?> entry) onSelectTimetableEntryAndTakeAttendance;
   final VoidCallback onNavigateToRegister;
@@ -53,12 +55,19 @@ class TeacherMyDayView extends StatelessWidget {
         : assignments.where((a) => todaySessionSectionIds.contains(a['sectionId'])).length;
     final pendingCount = todayEntries.isNotEmpty ? pendingEntries.length : pendingAssignments.length;
 
+    final greetingTarget = (teacherDisplayName != null && teacherDisplayName!.trim().isNotEmpty)
+        ? teacherDisplayName!.trim()
+        : null;
+    final descriptionText = greetingTarget != null
+        ? '$nowFormatted • Daily teaching briefing for $greetingTarget'
+        : '$nowFormatted • Daily teaching briefing';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         PageHeader(
           title: 'My Day',
-          description: '$nowFormatted • Daily teaching briefing for $teacherEmail',
+          description: descriptionText,
           badge: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(

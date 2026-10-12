@@ -180,9 +180,11 @@ export const authenticate = createMiddleware<AppBindings>(async (c, next) => {
       appUserId: appUsers.id,
       schoolId: appUsers.schoolId,
       email: appUsers.email,
+      displayName: appUsers.displayName,
       isActive: appUsers.isActive,
       role: userRoles.role,
       staffId: staff.id,
+      staffName: staff.fullName,
     })
     .from(appUsers)
     .leftJoin(userRoles, eq(userRoles.userId, appUsers.id))
@@ -196,11 +198,13 @@ export const authenticate = createMiddleware<AppBindings>(async (c, next) => {
   const first = rows[0]!;
   const roles = rows.map((row) => row.role).filter((role): role is Role => Boolean(role));
   const authUser: AuthUser = {
+    appUserId: first.appUserId,
     neonUserId: sessionUser.id,
     email: first.email || sessionUser.email,
     schoolId: first.schoolId,
     roles,
     staffId: first.staffId,
+    displayName: first.staffName || first.displayName || null,
   };
 
   c.set('authUser', authUser);

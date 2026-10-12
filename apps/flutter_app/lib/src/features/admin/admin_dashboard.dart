@@ -13,7 +13,9 @@ import 'dialogs/add_student_dialog.dart';
 import 'dialogs/student_attendance_dialog.dart';
 import 'views/admin_assignments_view.dart';
 import 'views/admin_attendance_view.dart';
+import 'views/admin_ai_usage_view.dart';
 import 'views/admin_classes_view.dart';
+import 'views/admin_insights_view.dart';
 import 'views/admin_overview_view.dart';
 import 'views/admin_reports_view.dart';
 import 'views/admin_settings_view.dart';
@@ -24,6 +26,8 @@ import 'views/admin_timetable_view.dart';
 enum AdminNavSection {
   overview,
   attendance,
+  insights,
+  aiUsage,
   students,
   staff,
   classesAndSubjects,
@@ -243,18 +247,25 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
       );
     }
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 850;
+
     return Scaffold(
       backgroundColor: AppColors.mainBackground,
+      drawer: isMobile ? Drawer(child: _buildSidebar(isDrawer: true)) : null,
       body: Row(
         children: [
-          _buildSidebar(),
+          if (!isMobile) _buildSidebar(isDrawer: false),
           Expanded(
             child: Column(
               children: [
-                _buildTopBar(),
+                _buildTopBar(isMobile: isMobile),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 16 : 32,
+                      vertical: isMobile ? 18 : 28,
+                    ),
                     child: Center(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 1200),
@@ -282,132 +293,170 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     );
   }
 
-  Widget _buildSidebar() {
-    return AnimatedContainer(
-      duration: AppMotion.comfortable,
-      curve: AppMotion.curve,
-      width: _sidebarCollapsed ? 64.0 : 230.0,
+  Widget _buildSidebar({bool isDrawer = false}) {
+    final session = ref.watch(authControllerProvider).session;
+    return Container(
+      width: isDrawer ? 280.0 : (_sidebarCollapsed ? 64.0 : 230.0),
       decoration: const BoxDecoration(
         color: AppColors.mainBackground,
         border: Border(right: BorderSide(color: AppColors.primaryBorder)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            height: 52,
-            padding: EdgeInsets.symmetric(horizontal: _sidebarCollapsed ? 12 : 20),
-            alignment: Alignment.centerLeft,
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.primaryBorder)),
-            ),
-            child: _sidebarCollapsed
-                ? const Center(
-                    child: Text(
-                      's.',
-                      style: TextStyle(
-                        fontFamily: 'Switzer',
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryText,
-                      ),
-                    ),
-                  )
-                : Row(
-                    children: [
-                      const Text(
-                        'schoolic.',
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: 52,
+              padding: EdgeInsets.symmetric(horizontal: (!isDrawer && _sidebarCollapsed) ? 12 : 20),
+              alignment: Alignment.centerLeft,
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: AppColors.primaryBorder)),
+              ),
+              child: (!isDrawer && _sidebarCollapsed)
+                  ? const Center(
+                      child: Text(
+                        's.',
                         style: TextStyle(
                           fontFamily: 'Switzer',
-                          fontSize: 18,
+                          fontSize: 20,
                           fontWeight: FontWeight.w600,
-                          letterSpacing: -0.4,
                           color: AppColors.primaryText,
                         ),
                       ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.secondaryBackground,
-                          borderRadius: AppRadii.rSm,
-                          border: Border.all(color: AppColors.primaryBorder),
-                        ),
-                        child: const Text(
-                          'ADMIN',
+                    )
+                  : Row(
+                      children: [
+                        const Text(
+                          'schoolic.',
                           style: TextStyle(
-                            fontSize: 10,
+                            fontFamily: 'Switzer',
+                            fontSize: 18,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.secondaryText,
+                            letterSpacing: -0.4,
+                            color: AppColors.primaryText,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-          ),
-          const SizedBox(height: 12),
-          _sidebarItem(AdminNavSection.overview, Icons.grid_view_outlined, 'Overview'),
-          _sidebarItem(AdminNavSection.attendance, Icons.fact_check_outlined, 'Attendance'),
-          _sidebarItem(AdminNavSection.students, Icons.people_outline, 'Students'),
-          _sidebarItem(AdminNavSection.staff, Icons.badge_outlined, 'Staff'),
-          _sidebarItem(AdminNavSection.classesAndSubjects, Icons.layers_outlined, 'Classes & Subjects'),
-          _sidebarItem(AdminNavSection.teacherAssignments, Icons.assignment_ind_outlined, 'Teacher Assignments'),
-          _sidebarItem(AdminNavSection.timetable, Icons.calendar_month_outlined, 'Timetable'),
-          _sidebarItem(AdminNavSection.reports, Icons.analytics_outlined, 'Reports'),
-          const Spacer(),
-          const Divider(height: 1, color: AppColors.primaryBorder),
-          _sidebarItem(AdminNavSection.settings, Icons.settings_outlined, 'Settings'),
-          InkWell(
-            onTap: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
-            child: Container(
-              height: 44,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              alignment: Alignment.center,
-              child: Row(
-                mainAxisAlignment: _sidebarCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondaryBackground,
+                            borderRadius: AppRadii.rSm,
+                            border: Border.all(color: AppColors.primaryBorder),
+                          ),
+                          child: const Text(
+                            'ADMIN',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.secondaryText,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
                 children: [
-                  Icon(
-                    _sidebarCollapsed ? Icons.keyboard_double_arrow_right : Icons.keyboard_double_arrow_left,
-                    size: 16,
-                    color: AppColors.mutedText,
-                  ),
-                  if (!_sidebarCollapsed) ...[
-                    const SizedBox(width: 12),
-                    const Text('Collapse sidebar', style: AppTypography.metadata),
-                  ],
+                  _sidebarItem(AdminNavSection.overview, Icons.grid_view_outlined, 'Overview', isDrawer: isDrawer),
+                  _sidebarItem(AdminNavSection.attendance, Icons.fact_check_outlined, 'Attendance', isDrawer: isDrawer),
+                  _sidebarItem(AdminNavSection.insights, Icons.auto_awesome_outlined, 'Insights', isDrawer: isDrawer),
+                  _sidebarItem(AdminNavSection.aiUsage, Icons.speed_outlined, 'AI Usage', isDrawer: isDrawer),
+                  _sidebarItem(AdminNavSection.students, Icons.people_outline, 'Students', isDrawer: isDrawer),
+                  _sidebarItem(AdminNavSection.staff, Icons.badge_outlined, 'Staff', isDrawer: isDrawer),
+                  _sidebarItem(AdminNavSection.classesAndSubjects, Icons.layers_outlined, 'Classes & Subjects', isDrawer: isDrawer),
+                  _sidebarItem(AdminNavSection.teacherAssignments, Icons.assignment_ind_outlined, 'Teacher Assignments', isDrawer: isDrawer),
+                  _sidebarItem(AdminNavSection.timetable, Icons.calendar_month_outlined, 'Timetable', isDrawer: isDrawer),
+                  _sidebarItem(AdminNavSection.reports, Icons.analytics_outlined, 'Reports', isDrawer: isDrawer),
+                  _sidebarItem(AdminNavSection.settings, Icons.settings_outlined, 'Settings', isDrawer: isDrawer),
                 ],
               ),
             ),
-          ),
-        ],
+            const Divider(height: 1, color: AppColors.primaryBorder),
+            if (isDrawer)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        session?.email ?? 'admin@schoolic.local',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontFamily: 'Switzer', fontSize: 13, color: AppColors.secondaryText),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Sign out',
+                      iconSize: 18,
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        ref.read(authControllerProvider).signOut();
+                      },
+                      icon: const Icon(Icons.logout, color: AppColors.secondaryText),
+                    ),
+                  ],
+                ),
+              )
+            else
+              InkWell(
+                onTap: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisAlignment: _sidebarCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+                    children: [
+                      Icon(
+                        _sidebarCollapsed ? Icons.keyboard_double_arrow_right : Icons.keyboard_double_arrow_left,
+                        size: 16,
+                        color: AppColors.mutedText,
+                      ),
+                      if (!_sidebarCollapsed) ...[
+                        const SizedBox(width: 12),
+                        const Text('Collapse sidebar', style: AppTypography.metadata),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _sidebarItem(AdminNavSection section, IconData icon, String label) {
+  Widget _sidebarItem(AdminNavSection section, IconData icon, String label, {bool isDrawer = false}) {
     final active = _activeSection == section;
+    final collapsed = !isDrawer && _sidebarCollapsed;
     return Tooltip(
-      message: _sidebarCollapsed ? label : '',
+      message: collapsed ? label : '',
       child: InkWell(
-        onTap: () => setState(() => _activeSection = section),
+        onTap: () {
+          setState(() => _activeSection = section);
+          if (isDrawer) Navigator.of(context).pop();
+        },
         child: Container(
           height: 38,
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-          padding: EdgeInsets.symmetric(horizontal: _sidebarCollapsed ? 12 : 12),
+          padding: EdgeInsets.symmetric(horizontal: collapsed ? 12 : 12),
           decoration: BoxDecoration(
             color: active ? AppColors.secondaryBackground : Colors.transparent,
             borderRadius: AppRadii.rMd,
             border: active ? const Border(left: BorderSide(color: AppColors.primaryText, width: 2)) : null,
           ),
           child: Row(
-            mainAxisAlignment: _sidebarCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+            mainAxisAlignment: collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
             children: [
               Icon(
                 icon,
                 size: 18,
                 color: active ? AppColors.primaryText : AppColors.secondaryText,
               ),
-              if (!_sidebarCollapsed) ...[
+              if (!collapsed) ...[
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -429,19 +478,29 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar({bool isMobile = false}) {
     final session = ref.watch(authControllerProvider).session;
     final yearName = _years.isNotEmpty ? '${_years.first['name'] ?? '2026-2027'}' : '2026-2027';
 
     return Container(
       height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 24),
       decoration: const BoxDecoration(
         color: AppColors.mainBackground,
         border: Border(bottom: BorderSide(color: AppColors.primaryBorder)),
       ),
       child: Row(
         children: [
+          if (isMobile) ...[
+            Builder(
+              builder: (ctx) => IconButton(
+                icon: const Icon(Icons.menu, size: 20, color: AppColors.primaryText),
+                tooltip: 'Open navigation',
+                onPressed: () => Scaffold.of(ctx).openDrawer(),
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
           Text(
             _sectionTitle(_activeSection),
             style: const TextStyle(
@@ -451,54 +510,64 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
               color: AppColors.primaryText,
             ),
           ),
-          const SizedBox(width: 20),
-          Container(width: 1, height: 16, color: AppColors.primaryBorder),
-          const SizedBox(width: 20),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.primaryBorder),
-              borderRadius: AppRadii.rMd,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.calendar_today_outlined, size: 12, color: AppColors.secondaryText),
-                const SizedBox(width: 6),
-                Text(
-                  yearName,
-                  style: const TextStyle(
-                    fontFamily: 'Switzer',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.primaryText,
+          if (!isMobile) ...[
+            const SizedBox(width: 20),
+            Container(width: 1, height: 16, color: AppColors.primaryBorder),
+            const SizedBox(width: 20),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.primaryBorder),
+                borderRadius: AppRadii.rMd,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.calendar_today_outlined, size: 12, color: AppColors.secondaryText),
+                  const SizedBox(width: 6),
+                  Text(
+                    yearName,
+                    style: const TextStyle(
+                      fontFamily: 'Switzer',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primaryText,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
           const Spacer(),
-          IconButton(
-            tooltip: 'System activity',
-            iconSize: 18,
-            onPressed: _openNotificationsDialog,
-            icon: const Icon(Icons.notifications_none_outlined, color: AppColors.secondaryText),
-          ),
-          const SizedBox(width: 4),
+          if (!isMobile) ...[
+            IconButton(
+              tooltip: 'System activity',
+              iconSize: 18,
+              onPressed: _openNotificationsDialog,
+              icon: const Icon(Icons.notifications_none_outlined, color: AppColors.secondaryText),
+            ),
+            const SizedBox(width: 4),
+          ],
           IconButton(
             tooltip: 'Refresh data',
             iconSize: 18,
             onPressed: _load,
             icon: const Icon(Icons.refresh, color: AppColors.secondaryText),
           ),
-          const SizedBox(width: 12),
-          Container(width: 1, height: 16, color: AppColors.primaryBorder),
-          const SizedBox(width: 16),
-          Text(
-            session?.email ?? 'admin@schoolic.local',
-            style: const TextStyle(fontFamily: 'Switzer', fontSize: 13, color: AppColors.secondaryText),
-          ),
-          const SizedBox(width: 8),
+          if (!isMobile) ...[
+            const SizedBox(width: 12),
+            Container(width: 1, height: 16, color: AppColors.primaryBorder),
+            const SizedBox(width: 16),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: Text(
+                session?.email ?? 'admin@schoolic.local',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontFamily: 'Switzer', fontSize: 13, color: AppColors.secondaryText),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           IconButton(
             tooltip: 'Sign out',
             iconSize: 16,
@@ -516,6 +585,10 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         return 'Overview';
       case AdminNavSection.attendance:
         return 'Attendance Register';
+      case AdminNavSection.insights:
+        return 'Insights';
+      case AdminNavSection.aiUsage:
+        return 'AI Usage';
       case AdminNavSection.students:
         return 'Students';
       case AdminNavSection.staff:
@@ -549,6 +622,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           onNavigateToSection: (section) => setState(() {
             _activeSection = switch (section) {
               'attendance' => AdminNavSection.attendance,
+              'insights' => AdminNavSection.insights,
               'students' => AdminNavSection.students,
               'staff' => AdminNavSection.staff,
               'classes' => AdminNavSection.classesAndSubjects,
@@ -588,9 +662,18 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           },
           onExportCsv: _exportSummariesCsv,
         );
+      case AdminNavSection.insights:
+        return AdminInsightsView(
+          classes: _classes,
+          sections: _sections,
+        );
+      case AdminNavSection.aiUsage:
+        return const AdminAiUsageView();
       case AdminNavSection.students:
         return AdminStudentsView(
           students: _students,
+          classes: _classes,
+          sections: _sections,
           onOpenAddStudent: _openAddStudentDialog,
           onOpenStudentProfile: _showStudentDialog,
         );

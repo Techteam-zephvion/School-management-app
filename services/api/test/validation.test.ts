@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createTimetableEntrySchema, saveAttendanceSchema, updateTimetableEntrySchema } from '../src/http/validation';
+import {
+  aiAttendanceInsightsSchema,
+  createTeacherMaterialSchema,
+  createTimetableEntrySchema,
+  saveAttendanceSchema,
+  teacherCopilotSchema,
+  updateTimetableEntrySchema,
+} from '../src/http/validation';
 
 const uuid = '00000000-0000-4000-8000-000000000001';
 
@@ -72,5 +79,69 @@ describe('timetable validation', () => {
   it('allows partial updates while validating complete time changes', () => {
     expect(updateTimetableEntrySchema.safeParse({ label: 'Lab' }).success).toBe(true);
     expect(updateTimetableEntrySchema.safeParse({ startTime: '11:00', endTime: '10:30' }).success).toBe(false);
+  });
+});
+
+describe('AI feature validation', () => {
+  it('accepts bounded admin insight filters', () => {
+    const parsed = aiAttendanceInsightsSchema.parse({
+      startDate: '2026-10-01',
+      endDate: '2026-10-10',
+      classId: uuid,
+    });
+
+    expect(parsed.endDate).toBe('2026-10-10');
+  });
+
+  it('rejects admin insight ranges that end before they start', () => {
+    const parsed = aiAttendanceInsightsSchema.safeParse({
+      startDate: '2026-10-10',
+      endDate: '2026-10-01',
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it('defaults safe teacher copilot options', () => {
+    const parsed = teacherCopilotSchema.parse({
+      outputType: 'quiz',
+      topic: 'Linear equations',
+    });
+
+    expect(parsed.durationMinutes).toBe(40);
+    expect(parsed.questionCount).toBe(10);
+    expect(parsed.difficulty).toBe('standard');
+    expect(parsed.language).toBe('English');
+  });
+
+  it('rejects oversized teacher copilot output requests', () => {
+    const parsed = teacherCopilotSchema.safeParse({
+      outputType: 'worksheet',
+      topic: 'Fractions',
+      durationMinutes: 240,
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it('accepts structured teacher material drafts for persistence', () => {
+    const parsed = createTeacherMaterialSchema.parse({
+      type: 'lesson_plan',
+      title: 'Fractions warmup',
+      topic: 'Fractions',
+      difficulty: 'standard',
+      classId: uuid,
+      sectionId: uuid,
+      subjectId: uuid,
+      content: {
+        overview: 'A short draft.',
+        sections: [{ heading: 'Start', items: ['Review equivalent fractions.'] }],
+        checksForUnderstanding: ['Ask students to simplify 2/4.'],
+        teacherNotes: ['Expected answer: 1/2.'],
+      },
+    });
+
+    expect(parsed.language).toBe('English');
+    expect(parsed.content.sections[0]?.heading).toBe('Start');
   });
 });

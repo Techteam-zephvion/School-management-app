@@ -36,6 +36,7 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
   final _date = TextEditingController(text: DateFormat('yyyy-MM-dd').format(DateTime.now()));
   final _period = TextEditingController(text: '1');
   final _searchController = TextEditingController();
+  String? _selectedSubjectId;
 
   bool _loadingRoster = false;
   bool _saving = false;
@@ -95,6 +96,7 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
           _kind = AttendanceKind.period;
           _period.text = '${assignment['periodNumber'] ?? 1}';
         }
+        _selectedSubjectId = assignment['subjectId'] as String?;
         if (assignment['attendanceDate'] != null) {
           _date.text = '${assignment['attendanceDate']}';
         }
@@ -136,7 +138,7 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
         'academicYearId': assignment['academicYearId'],
         'classId': assignment['classId'],
         'sectionId': assignment['sectionId'],
-        'subjectId': _kind == AttendanceKind.period ? assignment['subjectId'] : null,
+        'subjectId': _kind == AttendanceKind.period ? (_selectedSubjectId ?? assignment['subjectId']) : null,
         'kind': _kind.name,
         'attendanceDate': _date.text.trim(),
         'periodNumber': _kind == AttendanceKind.period ? int.tryParse(_period.text.trim()) ?? 1 : null,
@@ -360,8 +362,8 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
                 ),
               ),
 
-              // Period field if period attendance
-              if (_kind == AttendanceKind.period)
+              // Period and Subject fields if period attendance
+              if (_kind == AttendanceKind.period) ...[
                 SizedBox(
                   width: 100,
                   child: TextField(
@@ -371,6 +373,43 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
                     onChanged: (_) => setState(() => _hasUnsavedChanges = true),
                   ),
                 ),
+                Builder(
+                  builder: (context) {
+                    final currentAssignment = widget.selectedAssignment;
+                    final sectionAssignments = currentAssignment != null
+                        ? widget.assignments
+                            .where((a) => a['sectionId'] == currentAssignment['sectionId'] && a['subjectId'] != null)
+                            .toList()
+                        : <Map<String, Object?>>[];
+                    if (sectionAssignments.isEmpty) return const SizedBox.shrink();
+
+                    final activeVal = _selectedSubjectId ?? currentAssignment?['subjectId'] as String?;
+                    final hasMatch = sectionAssignments.any((a) => a['subjectId'] == activeVal);
+                    final dropdownValue = hasMatch ? activeVal : sectionAssignments.first['subjectId'] as String?;
+
+                    return SizedBox(
+                      width: 180,
+                      child: DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        initialValue: dropdownValue,
+                        decoration: const InputDecoration(labelText: 'Subject'),
+                        items: sectionAssignments.map((a) {
+                          return DropdownMenuItem<String>(
+                            value: a['subjectId'] as String,
+                            child: Text('${a['subjectName'] ?? 'Subject'}'),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          setState(() {
+                            _selectedSubjectId = val;
+                            _hasUnsavedChanges = true;
+                          });
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ],
             ],
           ),
         ),
@@ -506,8 +545,8 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
                       child: Row(
                         children: [
                           Container(
-                            width: 28,
-                            height: 28,
+                            constraints: const BoxConstraints(minWidth: 44, minHeight: 28),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               color: AppColors.secondaryBackground,
@@ -516,6 +555,9 @@ class _TeacherAttendanceViewState extends ConsumerState<TeacherAttendanceView> {
                             ),
                             child: Text(
                               student.rollNumber ?? '${index + 1}',
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontFamily: AppTypography.fontFamily,
                                 fontSize: 12,

@@ -123,8 +123,8 @@ class _ClassRosterDialogState extends ConsumerState<ClassRosterDialog> {
                             child: Row(
                               children: [
                                 Container(
-                                  width: 28,
-                                  height: 28,
+                                  constraints: const BoxConstraints(minWidth: 44, minHeight: 28),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
                                     color: AppColors.secondaryBackground,
@@ -133,6 +133,9 @@ class _ClassRosterDialogState extends ConsumerState<ClassRosterDialog> {
                                   ),
                                   child: Text(
                                     student.rollNumber ?? '${index + 1}',
+                                    maxLines: 1,
+                                    softWrap: false,
+                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       fontFamily: AppTypography.fontFamily,
                                       fontSize: 12,
