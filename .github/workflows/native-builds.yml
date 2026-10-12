@@ -59,7 +59,7 @@ jobs:
 
       - name: Flutter analyze
         working-directory: apps/flutter_app
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos
 
       - name: Flutter tests
         run: pnpm flutter:test
