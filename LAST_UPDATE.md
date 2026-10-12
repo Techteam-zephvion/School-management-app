@@ -4,18 +4,29 @@
 
 - Added Flutter native platform scaffolding for Android, Windows, and Linux in the existing `apps/flutter_app` project.
 - Added manual-only GitHub Actions workflow `.github/workflows/native-builds.yml` for staging native builds.
-- Native artifacts produced by the workflow:
-  - Android debug APK: `schoolic-android-apk-staging`.
-  - Windows release bundle ZIP: `schoolic-windows-staging`.
-  - Linux x64 release bundle TAR.GZ: `schoolic-linux-staging`.
+- Successful GitHub Actions run: `38228984470` (`https://github.com/Techteam-zephvion/School-management-app/actions/runs/38228984470`).
+- Native artifacts produced by the workflow, retained for 14 days:
+  - Android debug APK: `schoolic-android-apk-staging` (`schoolic-staging-debug.apk`, 162,950,060 bytes downloaded; artifact archive 80.07 MiB).
+  - Windows release bundle ZIP: `schoolic-windows-staging` (`schoolic-windows-staging.zip`, 15,293,006 bytes downloaded; artifact archive 14.57 MiB).
+  - Linux x64 release bundle TAR.GZ: `schoolic-linux-staging` (`schoolic-linux-staging.tar.gz`, 13,104,210 bytes downloaded; artifact archive 12.47 MiB).
 - Native builds use the staging API `https://schoolic-api-staging.schoolic-api.workers.dev` and staging Neon Auth URL through the existing Dart define mechanism.
 - Staging native builds set `SCHOOLIC_ALLOW_DEV_SIGN_IN=false`; no database URLs, AI keys, bootstrap tokens, or server-only secrets are embedded in Flutter artifacts.
 - Added Android internet permission, Schoolic app names for native windows, a native CSV file fallback, and cookie preservation for Neon Auth on non-web clients.
+- Android scaffold uses package ID `com.schoolic.schoolic`, JDK 17, Gradle wrapper `9.3.1`, and Android Gradle Plugin `9.1.1`.
 - Local verification before GitHub Actions trigger:
   - `pnpm api:typecheck` passed.
   - `pnpm api:test` passed: 4 files, 32 tests.
   - `cd apps/flutter_app && flutter analyze` passed.
   - `pnpm flutter:test` passed: 15 tests.
+- GitHub Actions verification:
+  - Validate API and Flutter: passed in 1m01s.
+  - Linux TAR.GZ: passed in 2m00s.
+  - Android APK: passed in 4m33s.
+  - Windows ZIP: passed in 3m18s.
+- Spot-checked downloaded artifacts:
+  - Android APK contains Flutter assets and the staging API URL.
+  - Windows ZIP contains `schoolic.exe`, `flutter_windows.dll`, `pdfium.dll`, `printing_plugin.dll`, Flutter assets, Switzer fonts, and README.
+  - Linux TAR.GZ contains `schoolic`, Flutter runtime libraries, printing/pdf libraries, Flutter assets, Switzer fonts, and README.
 - Production frontend, API, database, secrets, DNS, and domain settings were not modified.
 
 ---
