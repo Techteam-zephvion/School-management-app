@@ -1,5 +1,98 @@
 # Last Update (October 12, 2026)
 
+## Phase 7.1: Distribution Packages & Native Authentication Fix
+
+### Summary
+- Produced distribution-ready staging packages for Android (optimized release APK and App Bundle), Windows (Inno Setup installer and portable ZIP), and Linux (Debian `.deb` package and portable TAR.GZ bundle).
+- Investigated and diagnosed the Android APK login failure displaying **"Invalid email and password."**
+- Hardened Flutter native authentication transport, cookie preservation, Ed25519 token handling, and error discrimination.
+- Validated all 6 native distribution packages via GitHub Actions workflow run `38244528532` (`https://github.com/Techteam-zephvion/School-management-app/actions/runs/38244528532`) at commit `947a843`.
+- Retained strict environment isolation: zero production mutations, no secrets in source/logs, and all native targets configured strictly for staging.
+
+### Authentication Investigation & Fix
+1. **Diagnosis & Root Cause:**
+   - The compiled APK was verified to point strictly to staging endpoints: API `https://schoolic-api-staging.schoolic-api.workers.dev` and Neon Auth `https://ep-billowing-shadow-b56k9cl2.neonauth.c-7.us-east-2.aws.neon.tech/neondb`.
+   - Neon Auth returns HTTP 401 `{"message":"Invalid email or password","code":"INVALID_EMAIL_OR_PASSWORD"}` when the credentials do not exist in the staging Neon Auth instance (`ep-billowing-shadow-b56k9cl2`).
+   - Synthetic demo accounts (`admin@portfolio.schoolic.test`, `teacher@portfolio.schoolic.test`) exist in production (`br-rapid-lake-b5g9wtix` via `production-demo-seed.sql`), but not in staging Neon Auth with known passwords.
+   - When a new account is registered in staging Neon Auth (e.g. `teacher@portfolio.schoolic.test`), the native HTTP flow successfully completes credential authentication, receives the session cookie, mints an Ed25519 JWT from `/auth/token`, and sends it to the Schoolic API.
+   - The Schoolic API validates the JWT signature against the staging JWKS, but returns HTTP 403 `{"error":"User is not provisioned for this pilot"}` because `appUsers` in the isolated staging database (`nameless-dust-81736720`, branch `br-floral-mountain-b5s114go`) lacks a mapping for that `neonUserId`.
+   - The staging bootstrap endpoint (`POST /api/v1/bootstrap/school`) is protected by `BOOTSTRAP_TOKEN` (stored in Cloudflare Workers secrets, not locally accessible). Per guidelines, bootstrap tokens are not bypassed or invented.
+2. **Native Transport & Error Discrimination Fixes:**
+   - `auth_transport_stub.dart`:
+     - Added cookie attribute stripping (`Expires`, `Max-Age`, `Path`, `Domain`, `SameSite`, `Secure`, `HttpOnly`, `Partitioned`) to prevent attributes from being parsed as cookie names.
+     - Added safe JSON decoding to handle non-JSON responses (e.g. gateway HTML errors) without throwing `FormatException`.
+     - Added distinct error discrimination: HTTP 401 returns user-friendly credential errors; HTTP 403 preserves the exact API message (e.g. `"User is not provisioned for this pilot"`); HTTP 500+ returns service unavailable. Errors are never disguised.
+     - Added `clearAuthCookies()` to purge stale session tokens before initiating sign-in.
+   - `api_client.dart`:
+     - Normalized email (`trim().toLowerCase()`).
+     - Added client-side validation for empty email and password.
+     - Added network exception handling (`http.ClientException`, `SocketException`) mapped to HTTP 503 `ApiException`.
+     - Added constructor overrides `neonAuthUrlOverride` and `apiBaseUrlOverride` for dependency injection and testing.
+   - `providers.dart`:
+     - Hardened `AuthController` to clear session on failure so the login UI cleanly renders `FeedbackBanner` error feedback without getting stuck in loading.
+3. **Automated Test Suite:**
+   - Created `apps/flutter_app/test/auth_test.dart` with 9 unit tests covering:
+     - URL composition and trailing slash normalization.
+     - Local validation for empty email/password and unconfigured auth URLs.
+     - 401 invalid credential discrimination.
+     - 403 unprovisioned pilot error preservation without disguising as bad credentials.
+     - 500/502 gateway HTML error safety without `FormatException`.
+     - Network failure mapping to 503.
+     - End-to-end native session flow: cookie extraction, cookie forwarding without attribute leakage, token retrieval, and user session mapping.
+     - Session cookie purging via `clearAuthCookies()`.
+   - Test results:
+     - `pnpm api:typecheck`: 0 errors.
+     - `pnpm api:test`: 32/32 tests passed across 4 files.
+     - `flutter analyze --no-fatal-infos`: 0 issues found.
+     - `pnpm flutter:test`: 24/24 tests passed across `auth_test.dart` and `widget_test.dart`.
+
+### Staging Distribution Artifacts (GitHub Actions Run 38244528532)
+- **Workflow Run:** `https://github.com/Techteam-zephvion/School-management-app/actions/runs/38244528532`
+- **Commit:** `947a843`
+- **Artifacts:**
+  1. **Android Release APK (`schoolic-android-apk-staging`):**
+     - File: `schoolic-staging-release.apk`
+     - Size: 53,605,503 bytes (51.12 MiB)
+     - SHA-256: `3fd18d5d9955bbe6a4cd365875359192deba12985a62ae1e3a18eb8824a2e8f6`
+     - Signing: development-signed fallback (keystore secret not configured in repository)
+     - Package: `com.schoolic.schoolic`, Version: `1.0.0+6.947a843`
+     - Verification: Universal AOT release build with `arm64-v8a`, `armeabi-v7a`, `x86_64` native code; no debug `kernel_blob.bin`; staging API embedded.
+  2. **Android App Bundle (`schoolic-android-aab-staging`):**
+     - File: `schoolic-staging-release.aab`
+     - Size: 52,913,669 bytes (50.46 MiB)
+     - SHA-256: `433e5d80639dbf71ce69e5dfdc05edfd75385a85f85bd5e5177c9e64603e6a01`
+     - Signing: development-signed fallback
+  3. **Windows Installer (`schoolic-windows-installer-staging`):**
+     - File: `schoolic-windows-staging-setup.exe`
+     - Size: 12,783,601 bytes (12.19 MiB)
+     - SHA-256: `0634a0fdbd2946ff229134005005dd8ff566dcd3c47da38a8654fd5d2c298881`
+     - Signing: unsigned installer
+     - Inno Setup configuration: installs to `{localappdata}\Programs\Schoolic Staging` without requiring UAC admin elevation; Start Menu shortcut; silent install/uninstall tested on `windows-latest`.
+  4. **Windows ZIP (`schoolic-windows-staging`):**
+     - File: `schoolic-windows-staging.zip`
+     - Size: 15,299,529 bytes (14.59 MiB)
+     - SHA-256: `9ebc5228537bf41c6a198be7f241b3a82dd9e62ee4e98c1c1e41e208b4db6cc8`
+     - Contents: `schoolic.exe`, `flutter_windows.dll`, `pdfium.dll`, `printing_plugin.dll`, Flutter assets, Switzer fonts, README.txt.
+  5. **Linux DEB Package (`schoolic-linux-deb-staging`):**
+     - File: `schoolic-linux-staging.deb`
+     - Size: 10,698,088 bytes (10.20 MiB)
+     - SHA-256: `bf8e7ffcc58a28e53a620c6595457752bebaa2ef1df6acd44db8d26cc710d942`
+     - Architecture: `amd64`
+     - Dependencies: `libc6, libstdc++6, libgtk-3-0t64 | libgtk-3-0, libglib2.0-0t64 | libglib2.0-0, liblzma5`
+     - Verification: Installed and removed cleanly via `dpkg`/`apt` on `ubuntu-latest`; desktop entry at `/usr/share/applications/schoolic-staging.desktop`.
+  6. **Linux TAR.GZ (`schoolic-linux-staging`):**
+     - File: `schoolic-linux-staging.tar.gz`
+     - Size: 13,106,231 bytes (12.50 MiB)
+     - SHA-256: `a24e7b42a4eb04914b0550d845f2a67632afda0e7727db19baae34dc9fbd10ba`
+     - Contents: `schoolic`, Flutter runtime libraries, printing/pdf libraries, Flutter assets, Switzer fonts, README.txt.
+
+### Safety & Guardrails
+- **Production Isolation**: Zero modifications to production Cloudflare Worker (`schoolic-api`), production Pages (`schoolic.pages.dev`), production database (`dark-frost-36120929`), DNS, or custom domains.
+- **Secrets & Credentials**: No passwords, tokens, API keys, database URLs, or signing secrets were committed or exposed.
+- **Fail-Closed Security**: `SCHOOLIC_ALLOW_DEV_SIGN_IN=false` remains enforced on all staging native builds.
+
+---
+
 ## Phase 7.0: GitHub Actions Native Build Pipeline
 
 - Added Flutter native platform scaffolding for Android, Windows, and Linux in the existing `apps/flutter_app` project.
