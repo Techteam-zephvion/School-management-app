@@ -1,5 +1,65 @@
 # Last Update (October 12, 2026)
 
+## Phase 7.2: Staging Account Provisioning & Native Login Completion
+
+### Summary
+- Resolved the remaining staging authentication blocker by provisioning real Neon Auth identities into Schoolic application-user mappings on the verified staging Neon project `nameless-dust-81736720`, branch `br-floral-mountain-b5s114go`.
+- Reused the existing synthetic staging school instead of creating another tenant:
+  - School: `Schoolic Synthetic Staging`
+  - Code: `STAGE-1791645656627`
+  - School ID: `a2cc33fd-7791-494f-8db5-c66ff1a8e12f`
+- Preserved the staging `BOOTSTRAP_TOKEN` protection and did not read, print, rotate, bypass, or weaken it.
+- Production resources were not touched.
+
+### Provisioned Staging Accounts
+- Administrator:
+  - Email: `admin@portfolio.schoolic.test`
+  - Neon Auth user ID: `9b1195a5-7910-4eca-bf86-60ed91ce8ee1`
+  - Schoolic app user ID: `48137d9b-cdc3-4ac6-b7b1-77df96292f50`
+  - Role: `admin`
+- Teacher:
+  - Email: `teacher-login@portfolio.schoolic.test`
+  - Neon Auth user ID: `8e419083-745c-4719-8d7f-51cc31655cdc`
+  - Schoolic app user ID: `618755fb-71b1-4a01-a0b7-58bc1fb77038`
+  - Staff ID: `21358f00-c0e2-4d4f-8d69-b8164c8e88c9`
+  - Role: `teacher`
+  - Assignment: existing synthetic academic year `2026-2027`, class `=Stage Class`, section `A`, subject `Mathematics`, daily attendance enabled.
+- No passwords, session cookies, JWTs, database URLs, bootstrap tokens, or Cloudflare/Neon credentials were committed or documented.
+
+### Live Staging Verification
+- Administrator real auth flow:
+  - Neon Auth email/password sign-in: PASS.
+  - `/auth/token` JWT issuance: PASS.
+  - `GET /api/v1/me`: PASS, returned `admin`.
+  - `GET /api/v1/admin/overview`: PASS.
+- Teacher real auth flow:
+  - Neon Auth email/password sign-in: PASS.
+  - `/auth/token` JWT issuance: PASS.
+  - `GET /api/v1/me`: PASS, returned `teacher` with linked `staffId`.
+  - `GET /api/v1/teacher/assignments`: PASS, returned one authorized assignment.
+  - `GET /api/v1/teacher/roster` for assigned section: PASS, returned two synthetic students.
+  - `GET /api/v1/teacher/roster` for unassigned section: PASS, denied with HTTP 403.
+  - `GET /api/v1/admin/overview` as teacher: PASS, denied with HTTP 403.
+- Negative authorization checks:
+  - Invalid credentials rejected by Neon Auth with HTTP 401: PASS.
+  - Authenticated but unmapped Neon Auth user denied by Schoolic API with HTTP 403: PASS.
+  - Staging development-bypass headers rejected with HTTP 401: PASS.
+- Native APK physical login:
+  - BLOCKED: `adb devices` showed no connected Android device or emulator in the current environment.
+  - The same native auth transport path remains covered by `apps/flutter_app/test/auth_test.dart`, and live HTTP verification confirmed the deployed staging auth/API flow.
+
+### Test Results
+- `pnpm api:typecheck`: PASS.
+- `pnpm api:test`: PASS, 32/32 tests across 4 files.
+- `cd apps/flutter_app && flutter analyze --no-fatal-infos`: PASS, no issues found.
+- `pnpm flutter:test`: PASS, 24/24 tests.
+
+### Safety & Guardrails
+- Verified staging project before database operations: `schoolic-staging` / `nameless-dust-81736720`.
+- Verified staging branch before database operations: `main` / `br-floral-mountain-b5s114go`.
+- Did not use the repository `.neon` file for staging work because it points at the production project `dark-frost-36120929`.
+- Did not modify production Neon project `dark-frost-36120929`, production Worker `schoolic-api`, production Pages site `schoolic.pages.dev`, production secrets, DNS, or domains.
+
 ## Phase 7.1: Distribution Packages & Native Authentication Fix
 
 ### Summary
