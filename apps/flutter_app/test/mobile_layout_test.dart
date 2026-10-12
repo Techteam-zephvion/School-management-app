@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:schoolic/src/core/theme.dart';
+import 'package:schoolic/src/features/admin/views/admin_settings_view.dart';
 import 'package:schoolic/src/features/shared/components/page_header.dart';
 import 'package:schoolic/src/features/teacher/views/teacher_attendance_view.dart';
 import 'package:schoolic/src/features/teacher/views/teacher_classes_view.dart';
@@ -146,6 +147,29 @@ void main() {
 
     expect(find.text('Teacher Copilot'), findsOneWidget);
     expect(find.text('Generate'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Admin settings stack long values at phone width', (
+    tester,
+  ) async {
+    await _pumpAtWidth(
+      tester,
+      390,
+      const AdminSettingsView(
+        years: [
+          {'name': '2026-2027'},
+        ],
+        schoolName: 'Schoolic Synthetic Staging',
+      ),
+    );
+
+    expect(find.text('System Settings'), findsOneWidget);
+    expect(find.text('Institutional Configuration'), findsOneWidget);
+    expect(
+      find.text('Cloudflare Workers (Hono TypeScript Runtime)'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 }

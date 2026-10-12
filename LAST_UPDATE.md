@@ -1,5 +1,65 @@
 # Last Update (October 12, 2026)
 
+## Schoolic Branding — Official `S.` Logo, Favicon & Application Icons
+
+### Summary
+- Implemented Schoolic's official minimalist logo mark across the application: uppercase letter `S` followed by a period (`S.`).
+- Rendered using the bundled Fontshare Switzer font family (`Switzer-Bold.ttf`, 700 weight) for crisp geometry, optimal optical weight balance with the period, and distinct legibility down to 16x16.
+- Created reproducible source assets in `apps/flutter_app/assets/branding/` using mathematical vector outlines from FreeType and high-resolution antialiased rasterization.
+- Integrated the official mark into Flutter Web (favicon, PWA icons, maskable icons, Apple touch icon, manifest.json, index.html).
+- Integrated official launcher icons into Android (all density mipmaps plus Android 8.0+ adaptive vector icon with centered 52dp mark within the 72dp safe zone).
+- Integrated official icon for Linux packaging via the existing desktop entry and pixmap pipeline.
+- Prepared multi-resolution Windows icon handoff (`schoolic.ico` containing 16, 24, 32, 48, 64, 128, 256 px frames) and updated Windows runner resources without touching the Windows build or packaging scripts.
+- Integrated `SchoolicLogo` shared component into Login, Teacher workspace (header & mobile drawer), and Administrator workspace (sidebar & drawer).
+- Preserved application name `Schoolic` everywhere; preserved all staging configurations; zero production modifications.
+
+### Source & Distribution Asset Paths
+- **Vector source masters:**
+  - `apps/flutter_app/assets/branding/schoolic-logo.svg` (standalone `S.` wordmark, viewBox 0 0 810 712, `#111111`)
+  - `apps/flutter_app/assets/branding/schoolic-icon.svg` (application launcher icon, viewBox 0 0 1024 1024, `#000000` rounded square with white `S.`)
+- **Raster masters & icon sizes:**
+  - `apps/flutter_app/assets/branding/schoolic-icon-1024.png` (1024x1024)
+  - `apps/flutter_app/assets/branding/schoolic-icon-512.png` (512x512)
+  - `apps/flutter_app/assets/branding/schoolic-icon-256.png` (256x256)
+  - `apps/flutter_app/assets/branding/schoolic-icon-192.png` (192x192)
+  - `apps/flutter_app/assets/branding/schoolic-icon-180.png` (180x180)
+  - `apps/flutter_app/assets/branding/schoolic-icon-48.png` (48x48)
+  - `apps/flutter_app/assets/branding/schoolic-icon-32.png` (32x32)
+  - `apps/flutter_app/assets/branding/schoolic-icon-16.png` (16x16)
+  - `apps/flutter_app/assets/branding/schoolic-logo-black.png` (1620x1424 transparent)
+  - `apps/flutter_app/assets/branding/schoolic-logo-white.png` (1620x1424 transparent)
+- **Windows handoff:**
+  - `apps/flutter_app/assets/branding/schoolic.ico` (multi-resolution: 16, 24, 32, 48, 64, 128, 256)
+  - `apps/flutter_app/windows/runner/resources/app_icon.ico` (updated)
+- **Web PWA & Favicon:**
+  - `apps/flutter_app/web/favicon.png` (32x32)
+  - `apps/flutter_app/web/icons/Icon-192.png` (192x192)
+  - `apps/flutter_app/web/icons/Icon-512.png` (512x512)
+  - `apps/flutter_app/web/icons/Icon-maskable-192.png` (192x192 full-bleed safe zone)
+  - `apps/flutter_app/web/icons/Icon-maskable-512.png` (512x512 full-bleed safe zone)
+  - `apps/flutter_app/web/icons/apple-touch-icon.png` (180x180)
+- **Android Launcher:**
+  - `apps/flutter_app/android/app/src/main/res/mipmap-mdpi/ic_launcher.png` (48x48)
+  - `apps/flutter_app/android/app/src/main/res/mipmap-hdpi/ic_launcher.png` (72x72)
+  - `apps/flutter_app/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png` (96x96)
+  - `apps/flutter_app/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png` (144x144)
+  - `apps/flutter_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png` (192x192)
+  - `apps/flutter_app/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml` (Adaptive icon)
+  - `apps/flutter_app/android/app/src/main/res/values/ic_launcher_background.xml` (`#000000`)
+  - `apps/flutter_app/android/app/src/main/res/drawable/ic_launcher_foreground.xml` (Centered white `S.` vector drawable)
+- **Asset generation script:**
+  - `apps/flutter_app/scripts/generate_branding_assets.py`
+
+### Verification Results
+- `cd apps/flutter_app && flutter analyze --no-fatal-infos`: PASS, 0 issues found.
+- `cd apps/flutter_app && flutter test`: PASS, 33/33 tests passed (including safe area and SchoolicLogo tests).
+- `pnpm api:typecheck`: PASS, 0 issues found.
+- `pnpm api:test`: PASS, 32/32 tests passed across 4 files.
+- `pnpm flutter:build:web:staging`: PASS, compiled into `build/web_staging`.
+- `flutter build apk --release` (staging configuration): PASS, compiled `app-release.apk` (60.6MB), aapt verified label `Schoolic` and icon `@mipmap/ic_launcher`.
+
+---
+
 ## Phase 7.3: Mobile UX Adaptation
 
 ### Summary

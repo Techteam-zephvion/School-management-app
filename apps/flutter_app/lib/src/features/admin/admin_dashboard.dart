@@ -8,6 +8,7 @@ import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../shared/components/app_dialog.dart';
 import '../shared/components/feedback_banner.dart';
+import '../shared/components/schoolic_logo.dart';
 import 'dialogs/add_staff_dialog.dart';
 import 'dialogs/add_student_dialog.dart';
 import 'dialogs/student_attendance_dialog.dart';
@@ -99,13 +100,16 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         api.getList('/api/v1/admin/students', session: session),
         api.getList('/api/v1/admin/teacher-assignments', session: session),
         api.getList('/api/v1/admin/timetable', session: session),
-        api.getJson('/api/v1/admin/overview', session: session).then((res) {
-          final school = res['school'] as Map<String, Object?>?;
-          if (school != null && school['name'] != null) {
-            _schoolName = school['name'] as String;
-          }
-          return <Map<String, Object?>>[];
-        }).catchError((_) => <Map<String, Object?>>[]),
+        api
+            .getJson('/api/v1/admin/overview', session: session)
+            .then((res) {
+              final school = res['school'] as Map<String, Object?>?;
+              if (school != null && school['name'] != null) {
+                _schoolName = school['name'] as String;
+              }
+              return <Map<String, Object?>>[];
+            })
+            .catchError((_) => <Map<String, Object?>>[]),
       ]);
       setState(() {
         _years = results[0];
@@ -132,15 +136,23 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     if (session == null) return;
     try {
       final queryParams = <String, String>{
-        if (_selectedClassId != null && _selectedClassId!.isNotEmpty) 'classId': _selectedClassId!,
-        if (_selectedSectionId != null && _selectedSectionId!.isNotEmpty) 'sectionId': _selectedSectionId!,
-        if (_startDate.text.trim().isNotEmpty) 'startDate': _startDate.text.trim(),
+        if (_selectedClassId != null && _selectedClassId!.isNotEmpty)
+          'classId': _selectedClassId!,
+        if (_selectedSectionId != null && _selectedSectionId!.isNotEmpty)
+          'sectionId': _selectedSectionId!,
+        if (_startDate.text.trim().isNotEmpty)
+          'startDate': _startDate.text.trim(),
         if (_endDate.text.trim().isNotEmpty) 'endDate': _endDate.text.trim(),
       };
-      final qs = queryParams.isEmpty ? '' : '?${Uri(queryParameters: queryParams).query}';
-      final res = await ref.read(apiClientProvider).getJson('/api/v1/admin/attendance-summary$qs', session: session);
+      final qs = queryParams.isEmpty
+          ? ''
+          : '?${Uri(queryParameters: queryParams).query}';
+      final res = await ref
+          .read(apiClientProvider)
+          .getJson('/api/v1/admin/attendance-summary$qs', session: session);
       setState(() {
-        _summaries = ((res['sessions'] as List?) ?? const []).cast<Map<String, Object?>>();
+        _summaries = ((res['sessions'] as List?) ?? const [])
+            .cast<Map<String, Object?>>();
       });
     } on ApiException catch (exception) {
       setState(() => _error = exception.message);
@@ -164,7 +176,14 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   void _exportSummariesCsv() {
     if (_summaries.isEmpty) return;
     final headers = ['Date', 'Class', 'Section', 'Kind', 'Period', 'Teacher'];
-    final keys = ['attendanceDate', 'className', 'sectionName', 'kind', 'periodNumber', 'staffName'];
+    final keys = [
+      'attendanceDate',
+      'className',
+      'sectionName',
+      'kind',
+      'periodNumber',
+      'staffName',
+    ];
     final buffer = StringBuffer()..writeln(headers.join(','));
     for (final row in _summaries) {
       final line = keys.map((k) => _sanitizeCsvCell(row[k])).join(',');
@@ -213,9 +232,18 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _activityTile('Today', 'Attendance register synchronized for ${_summaries.length} sessions.'),
-            _activityTile('Active Term', '${_classes.length} classes and ${_sections.length} sections active.'),
-            _activityTile('Faculty', '${_staff.length} staff members and ${_assignments.length} assignments.'),
+            _activityTile(
+              'Today',
+              'Attendance register synchronized for ${_summaries.length} sessions.',
+            ),
+            _activityTile(
+              'Active Term',
+              '${_classes.length} classes and ${_sections.length} sections active.',
+            ),
+            _activityTile(
+              'Faculty',
+              '${_staff.length} staff members and ${_assignments.length} assignments.',
+            ),
           ],
         ),
       ),
@@ -242,13 +270,18 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
       return const Scaffold(
         backgroundColor: AppColors.mainBackground,
         body: Center(
-          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryText),
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColors.primaryText,
+          ),
         ),
       );
     }
 
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 850;
+
+    final safePadding = MediaQuery.paddingOf(context);
 
     return Scaffold(
       backgroundColor: AppColors.mainBackground,
@@ -259,12 +292,17 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           Expanded(
             child: Column(
               children: [
-                _buildTopBar(isMobile: isMobile),
+                _buildTopBar(
+                  isMobile: isMobile,
+                  topInset: safePadding.top,
+                ),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isMobile ? 16 : 32,
-                      vertical: isMobile ? 18 : 28,
+                    padding: EdgeInsets.fromLTRB(
+                      isMobile ? 16 : 32,
+                      isMobile ? 20 : 28,
+                      isMobile ? 16 : 32,
+                      (isMobile ? 24 : 28) + safePadding.bottom,
                     ),
                     child: Center(
                       child: ConstrainedBox(
@@ -307,38 +345,26 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           children: [
             Container(
               height: 52,
-              padding: EdgeInsets.symmetric(horizontal: (!isDrawer && _sidebarCollapsed) ? 12 : 20),
+              padding: EdgeInsets.symmetric(
+                horizontal: (!isDrawer && _sidebarCollapsed) ? 12 : 20,
+              ),
               alignment: Alignment.centerLeft,
               decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: AppColors.primaryBorder)),
+                border: Border(
+                  bottom: BorderSide(color: AppColors.primaryBorder),
+                ),
               ),
               child: (!isDrawer && _sidebarCollapsed)
-                  ? const Center(
-                      child: Text(
-                        's.',
-                        style: TextStyle(
-                          fontFamily: 'Switzer',
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primaryText,
-                        ),
-                      ),
-                    )
+                  ? const Center(child: SchoolicLogo(size: 20))
                   : Row(
                       children: [
-                        const Text(
-                          'schoolic.',
-                          style: TextStyle(
-                            fontFamily: 'Switzer',
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: -0.4,
-                            color: AppColors.primaryText,
-                          ),
-                        ),
+                        const SchoolicLogo(size: 20),
                         const Spacer(),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.secondaryBackground,
                             borderRadius: AppRadii.rSm,
@@ -361,17 +387,72 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
-                  _sidebarItem(AdminNavSection.overview, Icons.grid_view_outlined, 'Overview', isDrawer: isDrawer),
-                  _sidebarItem(AdminNavSection.attendance, Icons.fact_check_outlined, 'Attendance', isDrawer: isDrawer),
-                  _sidebarItem(AdminNavSection.insights, Icons.auto_awesome_outlined, 'Insights', isDrawer: isDrawer),
-                  _sidebarItem(AdminNavSection.aiUsage, Icons.speed_outlined, 'AI Usage', isDrawer: isDrawer),
-                  _sidebarItem(AdminNavSection.students, Icons.people_outline, 'Students', isDrawer: isDrawer),
-                  _sidebarItem(AdminNavSection.staff, Icons.badge_outlined, 'Staff', isDrawer: isDrawer),
-                  _sidebarItem(AdminNavSection.classesAndSubjects, Icons.layers_outlined, 'Classes & Subjects', isDrawer: isDrawer),
-                  _sidebarItem(AdminNavSection.teacherAssignments, Icons.assignment_ind_outlined, 'Teacher Assignments', isDrawer: isDrawer),
-                  _sidebarItem(AdminNavSection.timetable, Icons.calendar_month_outlined, 'Timetable', isDrawer: isDrawer),
-                  _sidebarItem(AdminNavSection.reports, Icons.analytics_outlined, 'Reports', isDrawer: isDrawer),
-                  _sidebarItem(AdminNavSection.settings, Icons.settings_outlined, 'Settings', isDrawer: isDrawer),
+                  _sidebarItem(
+                    AdminNavSection.overview,
+                    Icons.grid_view_outlined,
+                    'Overview',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
+                    AdminNavSection.attendance,
+                    Icons.fact_check_outlined,
+                    'Attendance',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
+                    AdminNavSection.insights,
+                    Icons.auto_awesome_outlined,
+                    'Insights',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
+                    AdminNavSection.aiUsage,
+                    Icons.speed_outlined,
+                    'AI Usage',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
+                    AdminNavSection.students,
+                    Icons.people_outline,
+                    'Students',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
+                    AdminNavSection.staff,
+                    Icons.badge_outlined,
+                    'Staff',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
+                    AdminNavSection.classesAndSubjects,
+                    Icons.layers_outlined,
+                    'Classes & Subjects',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
+                    AdminNavSection.teacherAssignments,
+                    Icons.assignment_ind_outlined,
+                    'Teacher Assignments',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
+                    AdminNavSection.timetable,
+                    Icons.calendar_month_outlined,
+                    'Timetable',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
+                    AdminNavSection.reports,
+                    Icons.analytics_outlined,
+                    'Reports',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
+                    AdminNavSection.settings,
+                    Icons.settings_outlined,
+                    'Settings',
+                    isDrawer: isDrawer,
+                  ),
                 ],
               ),
             ),
@@ -385,7 +466,11 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                       child: Text(
                         session?.email ?? 'admin@schoolic.local',
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontFamily: 'Switzer', fontSize: 13, color: AppColors.secondaryText),
+                        style: const TextStyle(
+                          fontFamily: 'Switzer',
+                          fontSize: 13,
+                          color: AppColors.secondaryText,
+                        ),
                       ),
                     ),
                     IconButton(
@@ -395,29 +480,40 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                         Navigator.of(context).pop();
                         ref.read(authControllerProvider).signOut();
                       },
-                      icon: const Icon(Icons.logout, color: AppColors.secondaryText),
+                      icon: const Icon(
+                        Icons.logout,
+                        color: AppColors.secondaryText,
+                      ),
                     ),
                   ],
                 ),
               )
             else
               InkWell(
-                onTap: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
+                onTap: () =>
+                    setState(() => _sidebarCollapsed = !_sidebarCollapsed),
                 child: Container(
                   height: 44,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   alignment: Alignment.center,
                   child: Row(
-                    mainAxisAlignment: _sidebarCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+                    mainAxisAlignment: _sidebarCollapsed
+                        ? MainAxisAlignment.center
+                        : MainAxisAlignment.start,
                     children: [
                       Icon(
-                        _sidebarCollapsed ? Icons.keyboard_double_arrow_right : Icons.keyboard_double_arrow_left,
+                        _sidebarCollapsed
+                            ? Icons.keyboard_double_arrow_right
+                            : Icons.keyboard_double_arrow_left,
                         size: 16,
                         color: AppColors.mutedText,
                       ),
                       if (!_sidebarCollapsed) ...[
                         const SizedBox(width: 12),
-                        const Text('Collapse sidebar', style: AppTypography.metadata),
+                        const Text(
+                          'Collapse sidebar',
+                          style: AppTypography.metadata,
+                        ),
                       ],
                     ],
                   ),
@@ -429,7 +525,12 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     );
   }
 
-  Widget _sidebarItem(AdminNavSection section, IconData icon, String label, {bool isDrawer = false}) {
+  Widget _sidebarItem(
+    AdminNavSection section,
+    IconData icon,
+    String label, {
+    bool isDrawer = false,
+  }) {
     final active = _activeSection == section;
     final collapsed = !isDrawer && _sidebarCollapsed;
     return Tooltip(
@@ -446,10 +547,16 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           decoration: BoxDecoration(
             color: active ? AppColors.secondaryBackground : Colors.transparent,
             borderRadius: AppRadii.rMd,
-            border: active ? const Border(left: BorderSide(color: AppColors.primaryText, width: 2)) : null,
+            border: active
+                ? const Border(
+                    left: BorderSide(color: AppColors.primaryText, width: 2),
+                  )
+                : null,
           ),
           child: Row(
-            mainAxisAlignment: collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+            mainAxisAlignment: collapsed
+                ? MainAxisAlignment.center
+                : MainAxisAlignment.start,
             children: [
               Icon(
                 icon,
@@ -466,7 +573,9 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                       fontFamily: 'Switzer',
                       fontSize: 13,
                       fontWeight: active ? FontWeight.w500 : FontWeight.w400,
-                      color: active ? AppColors.primaryText : AppColors.secondaryText,
+                      color: active
+                          ? AppColors.primaryText
+                          : AppColors.secondaryText,
                     ),
                   ),
                 ),
@@ -478,103 +587,135 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
     );
   }
 
-  Widget _buildTopBar({bool isMobile = false}) {
+  Widget _buildTopBar({bool isMobile = false, double topInset = 0}) {
     final session = ref.watch(authControllerProvider).session;
-    final yearName = _years.isNotEmpty ? '${_years.first['name'] ?? '2026-2027'}' : '2026-2027';
+    final yearName = _years.isNotEmpty
+        ? '${_years.first['name'] ?? '2026-2027'}'
+        : '2026-2027';
 
     return Container(
-      height: 52,
-      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 24),
+      height: 52 + topInset,
+      padding: EdgeInsets.fromLTRB(
+        isMobile ? 8 : 24,
+        topInset,
+        isMobile ? 8 : 24,
+        0,
+      ),
       decoration: const BoxDecoration(
         color: AppColors.mainBackground,
         border: Border(bottom: BorderSide(color: AppColors.primaryBorder)),
       ),
-      child: Row(
-        children: [
-          if (isMobile) ...[
-            Builder(
-              builder: (ctx) => IconButton(
-                icon: const Icon(Icons.menu, size: 20, color: AppColors.primaryText),
-                tooltip: 'Open navigation',
-                onPressed: () => Scaffold.of(ctx).openDrawer(),
-              ),
-            ),
-            const SizedBox(width: 4),
-          ],
-          Text(
-            _sectionTitle(_activeSection),
-            style: const TextStyle(
-              fontFamily: 'Switzer',
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: AppColors.primaryText,
-            ),
-          ),
-          if (!isMobile) ...[
-            const SizedBox(width: 20),
-            Container(width: 1, height: 16, color: AppColors.primaryBorder),
-            const SizedBox(width: 20),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.primaryBorder),
-                borderRadius: AppRadii.rMd,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.calendar_today_outlined, size: 12, color: AppColors.secondaryText),
-                  const SizedBox(width: 6),
-                  Text(
-                    yearName,
-                    style: const TextStyle(
-                      fontFamily: 'Switzer',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.primaryText,
-                    ),
+      child: SizedBox(
+        height: 52,
+        child: Row(
+          children: [
+            if (isMobile) ...[
+              Builder(
+                builder: (ctx) => IconButton(
+                  icon: const Icon(
+                    Icons.menu,
+                    size: 20,
+                    color: AppColors.primaryText,
                   ),
-                ],
+                  tooltip: 'Open navigation',
+                  onPressed: () => Scaffold.of(ctx).openDrawer(),
+                ),
               ),
-            ),
-          ],
-          const Spacer(),
-          if (!isMobile) ...[
-            IconButton(
-              tooltip: 'System activity',
-              iconSize: 18,
-              onPressed: _openNotificationsDialog,
-              icon: const Icon(Icons.notifications_none_outlined, color: AppColors.secondaryText),
-            ),
-            const SizedBox(width: 4),
-          ],
-          IconButton(
-            tooltip: 'Refresh data',
-            iconSize: 18,
-            onPressed: _load,
-            icon: const Icon(Icons.refresh, color: AppColors.secondaryText),
-          ),
-          if (!isMobile) ...[
-            const SizedBox(width: 12),
-            Container(width: 1, height: 16, color: AppColors.primaryBorder),
-            const SizedBox(width: 16),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 180),
+              const SizedBox(width: 4),
+            ],
+            Flexible(
               child: Text(
-                session?.email ?? 'admin@schoolic.local',
+                _sectionTitle(_activeSection),
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontFamily: 'Switzer', fontSize: 13, color: AppColors.secondaryText),
+                style: const TextStyle(
+                  fontFamily: 'Switzer',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.primaryText,
+                ),
               ),
             ),
-            const SizedBox(width: 8),
+            if (!isMobile) ...[
+              const SizedBox(width: 20),
+              Container(width: 1, height: 16, color: AppColors.primaryBorder),
+              const SizedBox(width: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.primaryBorder),
+                  borderRadius: AppRadii.rMd,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.calendar_today_outlined,
+                      size: 12,
+                      color: AppColors.secondaryText,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      yearName,
+                      style: const TextStyle(
+                        fontFamily: 'Switzer',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.primaryText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const Spacer(),
+            if (!isMobile) ...[
+              IconButton(
+                tooltip: 'System activity',
+                iconSize: 18,
+                onPressed: _openNotificationsDialog,
+                icon: const Icon(
+                  Icons.notifications_none_outlined,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
+            IconButton(
+              tooltip: 'Refresh data',
+              iconSize: 18,
+              onPressed: _load,
+              icon: const Icon(Icons.refresh, color: AppColors.secondaryText),
+            ),
+            if (!isMobile) ...[
+              const SizedBox(width: 12),
+              Container(width: 1, height: 16, color: AppColors.primaryBorder),
+              const SizedBox(width: 16),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 180),
+                child: Text(
+                  session?.email ?? 'admin@schoolic.local',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'Switzer',
+                    fontSize: 13,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            IconButton(
+              tooltip: 'Sign out',
+              iconSize: 16,
+              onPressed: () => ref.read(authControllerProvider).signOut(),
+              icon: const Icon(Icons.logout, color: AppColors.secondaryText),
+            ),
           ],
-          IconButton(
-            tooltip: 'Sign out',
-            iconSize: 16,
-            onPressed: () => ref.read(authControllerProvider).signOut(),
-            icon: const Icon(Icons.logout, color: AppColors.secondaryText),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -607,7 +748,9 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   }
 
   Widget _buildCurrentView() {
-    final activeYear = _years.isNotEmpty ? '${_years.first['name'] ?? '2026-2027'}' : '2026-2027';
+    final activeYear = _years.isNotEmpty
+        ? '${_years.first['name'] ?? '2026-2027'}'
+        : '2026-2027';
 
     switch (_activeSection) {
       case AdminNavSection.overview:
@@ -663,10 +806,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           onExportCsv: _exportSummariesCsv,
         );
       case AdminNavSection.insights:
-        return AdminInsightsView(
-          classes: _classes,
-          sections: _sections,
-        );
+        return AdminInsightsView(classes: _classes, sections: _sections);
       case AdminNavSection.aiUsage:
         return const AdminAiUsageView();
       case AdminNavSection.students:
@@ -719,10 +859,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           onExportCsv: _exportSummariesCsv,
         );
       case AdminNavSection.settings:
-        return AdminSettingsView(
-          years: _years,
-          schoolName: _schoolName,
-        );
+        return AdminSettingsView(years: _years, schoolName: _schoolName);
     }
   }
 }

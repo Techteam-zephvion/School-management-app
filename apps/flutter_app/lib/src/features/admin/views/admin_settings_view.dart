@@ -15,7 +15,10 @@ class AdminSettingsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeYear = years.isNotEmpty ? '${years.first['name']}' : '2026-2027';
+    final activeYear = years.isNotEmpty
+        ? '${years.first['name']}'
+        : '2026-2027';
+    final isPhone = MediaQuery.sizeOf(context).width < 560;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -27,7 +30,7 @@ class AdminSettingsView extends StatelessWidget {
         const SizedBox(height: 20),
 
         Container(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(isPhone ? 18 : 24),
           decoration: BoxDecoration(
             color: AppColors.mainBackground,
             border: Border.all(color: AppColors.primaryBorder),
@@ -36,16 +39,43 @@ class AdminSettingsView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Institutional Configuration', style: AppTypography.subsectionHeading),
+              const Text(
+                'Institutional Configuration',
+                style: AppTypography.subsectionHeading,
+              ),
               const SizedBox(height: 16),
-              _settingRow('Institution Name', schoolName),
-              _settingRow('Active Academic Year', activeYear),
-              _settingRow('Application Version', 'Schoolic Phase 5.2 (UX Redesign)'),
-              _settingRow('Typography', 'Switzer (Bundled Fontshare Free License)'),
-              _settingRow('Design Identity', 'Strict Monochrome (#111111 / #FFFFFF) with Emerald (#10A37F) Accent'),
-              _settingRow('Database Layer', 'Neon Serverless PostgreSQL (Drizzle ORM)'),
-              _settingRow('Edge Gateway', 'Cloudflare Workers (Hono TypeScript Runtime)'),
-              _settingRow('Authentication', 'Neon Managed Auth (Better Auth JWT + Role Enforcement)'),
+              _settingRow('Institution Name', schoolName, isPhone: isPhone),
+              _settingRow('Active Academic Year', activeYear, isPhone: isPhone),
+              _settingRow(
+                'Application Version',
+                'Schoolic Phase 5.2 (UX Redesign)',
+                isPhone: isPhone,
+              ),
+              _settingRow(
+                'Typography',
+                'Switzer (Bundled Fontshare Free License)',
+                isPhone: isPhone,
+              ),
+              _settingRow(
+                'Design Identity',
+                'Strict Monochrome (#111111 / #FFFFFF) with Emerald (#10A37F) Accent',
+                isPhone: isPhone,
+              ),
+              _settingRow(
+                'Database Layer',
+                'Neon Serverless PostgreSQL (Drizzle ORM)',
+                isPhone: isPhone,
+              ),
+              _settingRow(
+                'Edge Gateway',
+                'Cloudflare Workers (Hono TypeScript Runtime)',
+                isPhone: isPhone,
+              ),
+              _settingRow(
+                'Authentication',
+                'Neon Managed Auth (Better Auth JWT + Role Enforcement)',
+                isPhone: isPhone,
+              ),
             ],
           ),
         ),
@@ -53,14 +83,38 @@ class AdminSettingsView extends StatelessWidget {
     );
   }
 
-  Widget _settingRow(String label, String value) {
+  Widget _settingRow(String label, String value, {required bool isPhone}) {
+    if (isPhone) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: AppTypography.bodySecondary),
+            const SizedBox(height: 4),
+            Text(value, style: AppTypography.bodyMedium, softWrap: true),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 9),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: AppTypography.bodySecondary),
-          Text(value, style: AppTypography.bodyMedium),
+          Expanded(child: Text(label, style: AppTypography.bodySecondary)),
+          const SizedBox(width: 24),
+          Expanded(
+            flex: 2,
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: AppTypography.bodyMedium,
+              softWrap: true,
+            ),
+          ),
         ],
       ),
     );

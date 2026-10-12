@@ -6,6 +6,7 @@ import '../../core/models.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../shared/components/feedback_banner.dart';
+import '../shared/components/schoolic_logo.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -77,16 +78,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         // Brand Header
                         Row(
                           children: [
-                            const Text(
-                              'schoolic.',
-                              style: TextStyle(
-                                fontFamily: 'Switzer',
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.6,
-                                color: AppColors.primaryText,
-                              ),
-                            ),
+                            const SchoolicLogo(size: 26),
                             const Spacer(),
                             Container(
                               padding: const EdgeInsets.symmetric(

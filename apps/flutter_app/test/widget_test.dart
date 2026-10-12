@@ -10,6 +10,7 @@ import 'package:schoolic/src/features/admin/views/admin_timetable_view.dart';
 import 'package:schoolic/src/features/shared/components/attendance_status_button.dart';
 import 'package:schoolic/src/features/shared/components/feedback_banner.dart';
 import 'package:schoolic/src/features/shared/components/page_header.dart';
+import 'package:schoolic/src/features/shared/components/schoolic_logo.dart';
 import 'package:schoolic/src/features/shared/components/stat_strip.dart';
 import 'package:schoolic/src/features/shared/components/status_badge.dart';
 import 'package:schoolic/src/features/teacher/utils/teaching_material_pdf.dart';
@@ -512,6 +513,98 @@ void main() {
       final renderBox = tester.renderObject<RenderBox>(find.byType(Container).first);
       expect(renderBox.size.width, greaterThanOrEqualTo(44.0));
       expect(renderBox.size.height, greaterThanOrEqualTo(28.0));
+    });
+  });
+
+  group('Safe Area & Mobile Viewport Insets', () {
+    testWidgets('teacher dashboard app bar respects top safe area inset on notched/status-bar mobile screens', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildSchoolicTheme(),
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(390, 844),
+              padding: EdgeInsets.only(top: 44.0, bottom: 34.0),
+            ),
+            child: Scaffold(
+              appBar: PreferredSize(
+                preferredSize: const Size.fromHeight(52),
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: AppColors.mainBackground,
+                    border: Border(bottom: BorderSide(color: AppColors.primaryBorder)),
+                  ),
+                  child: const SafeArea(
+                    bottom: false,
+                    child: SizedBox(
+                      height: 52,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          children: [
+                            SchoolicLogo(size: 18),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              body: const SizedBox(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final logoFinder = find.byType(SchoolicLogo).first;
+      expect(logoFinder, findsOneWidget);
+      expect(find.text('S.'), findsOneWidget);
+
+      final logoTopLeft = tester.getTopLeft(logoFinder);
+      // The logo must be rendered strictly below the 44.0px status bar
+      expect(logoTopLeft.dy, greaterThanOrEqualTo(44.0));
+    });
+  });
+
+  group('Schoolic Official Logo Branding', () {
+    testWidgets('SchoolicLogo renders official S. mark with Switzer bold typography and Schoolic accessibility label', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SchoolicLogo(size: 24),
+          ),
+        ),
+      );
+
+      final textFinder = find.text('S.');
+      expect(textFinder, findsOneWidget);
+
+      final textWidget = tester.widget<Text>(textFinder);
+      expect(textWidget.data, 'S.');
+      expect(textWidget.style?.fontFamily, 'Switzer');
+      expect(textWidget.style?.fontWeight, FontWeight.w700);
+      expect(textWidget.style?.fontSize, 24);
+      expect(textWidget.style?.color, AppColors.primaryText);
+
+      // Accessibility Semantics label must remain 'Schoolic'
+      expect(find.bySemanticsLabel('Schoolic'), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('SchoolicLogo supports custom size and color', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SchoolicLogo(size: 32, color: Colors.white),
+          ),
+        ),
+      );
+
+      final textWidget = tester.widget<Text>(find.text('S.'));
+      expect(textWidget.style?.fontSize, 32);
+      expect(textWidget.style?.color, Colors.white);
     });
   });
 }

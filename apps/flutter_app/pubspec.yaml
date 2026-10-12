@@ -66,6 +66,7 @@ flutter:
 
   assets:
     - assets/fonts/switzer/FFL.txt
+    - assets/branding/
 
   fonts:
     - family: Switzer

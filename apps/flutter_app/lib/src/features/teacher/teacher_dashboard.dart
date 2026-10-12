@@ -6,6 +6,7 @@ import '../../core/models.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../shared/components/feedback_banner.dart';
+import '../shared/components/schoolic_logo.dart';
 import 'views/teacher_attendance_view.dart';
 import 'views/teacher_classes_view.dart';
 import 'views/teacher_copilot_view.dart';
@@ -139,113 +140,114 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
             color: AppColors.mainBackground,
             border: Border(bottom: BorderSide(color: AppColors.primaryBorder)),
           ),
-          padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 24),
-          child: Row(
-            children: [
-              if (isMobile) ...[
-                Builder(
-                  builder: (ctx) => IconButton(
-                    icon: const Icon(
-                      Icons.menu,
-                      size: 20,
-                      color: AppColors.primaryText,
+          child: SafeArea(
+            bottom: false,
+            child: SizedBox(
+              height: 52,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 24),
+                child: Row(
+                  children: [
+                    if (isMobile) ...[
+                      Builder(
+                        builder: (ctx) => IconButton(
+                          icon: const Icon(
+                            Icons.menu,
+                            size: 20,
+                            color: AppColors.primaryText,
+                          ),
+                          tooltip: 'Open navigation',
+                          onPressed: () => Scaffold.of(ctx).openDrawer(),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    const SchoolicLogo(size: 20),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondaryBackground,
+                        borderRadius: AppRadii.rSm,
+                        border: Border.all(color: AppColors.primaryBorder),
+                      ),
+                      child: const Text(
+                        'TEACHER',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.secondaryText,
+                        ),
+                      ),
                     ),
-                    tooltip: 'Open navigation',
-                    onPressed: () => Scaffold.of(ctx).openDrawer(),
-                  ),
-                ),
-                const SizedBox(width: 4),
-              ],
-              const Text(
-                'schoolic.',
-                style: TextStyle(
-                  fontFamily: 'Switzer',
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.5,
-                  color: AppColors.primaryText,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.secondaryBackground,
-                  borderRadius: AppRadii.rSm,
-                  border: Border.all(color: AppColors.primaryBorder),
-                ),
-                child: const Text(
-                  'TEACHER',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.secondaryText,
-                  ),
-                ),
-              ),
-              if (!isMobile) ...[
-                const SizedBox(width: 24),
-                // Navigation tab buttons
-                _buildTabButton(0, 'My Day', Icons.dashboard_outlined),
-                const SizedBox(width: 4),
-                _buildTabButton(1, 'My Week', Icons.calendar_month_outlined),
-                const SizedBox(width: 4),
-                _buildTabButton(2, 'My Classes', Icons.layers_outlined),
-                const SizedBox(width: 4),
-                _buildTabButton(
-                  3,
-                  'Attendance Register',
-                  Icons.fact_check_outlined,
-                ),
-                const SizedBox(width: 4),
-                _buildTabButton(4, 'Copilot', Icons.auto_awesome_outlined),
-              ],
+                    if (!isMobile) ...[
+                      const SizedBox(width: 24),
+                      // Navigation tab buttons
+                      _buildTabButton(0, 'My Day', Icons.dashboard_outlined),
+                      const SizedBox(width: 4),
+                      _buildTabButton(1, 'My Week', Icons.calendar_month_outlined),
+                      const SizedBox(width: 4),
+                      _buildTabButton(2, 'My Classes', Icons.layers_outlined),
+                      const SizedBox(width: 4),
+                      _buildTabButton(
+                        3,
+                        'Attendance Register',
+                        Icons.fact_check_outlined,
+                      ),
+                      const SizedBox(width: 4),
+                      _buildTabButton(4, 'Copilot', Icons.auto_awesome_outlined),
+                    ],
 
-              const Spacer(),
+                    const Spacer(),
 
-              // Refresh button
-              IconButton(
-                tooltip: 'Refresh data',
-                iconSize: 18,
-                onPressed: _loadData,
-                icon: const Icon(Icons.refresh, color: AppColors.secondaryText),
-              ),
-
-              if (!isMobile) ...[
-                const SizedBox(width: 8),
-                Container(width: 1, height: 16, color: AppColors.primaryBorder),
-                const SizedBox(width: 14),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 180),
-                  child: Text(
-                    session?.displayName ?? session?.email ?? 'Faculty',
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: 'Switzer',
-                      fontSize: 13,
-                      color: AppColors.secondaryText,
+                    // Refresh button
+                    IconButton(
+                      tooltip: 'Refresh data',
+                      iconSize: 18,
+                      onPressed: _loadData,
+                      icon: const Icon(Icons.refresh, color: AppColors.secondaryText),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
 
-              IconButton(
-                tooltip: 'Sign out',
-                iconSize: 16,
-                onPressed: () => ref.read(authControllerProvider).signOut(),
-                icon: const Icon(Icons.logout, color: AppColors.secondaryText),
+                    if (!isMobile) ...[
+                      const SizedBox(width: 8),
+                      Container(width: 1, height: 16, color: AppColors.primaryBorder),
+                      const SizedBox(width: 14),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 180),
+                        child: Text(
+                          session?.displayName ?? session?.email ?? 'Faculty',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'Switzer',
+                            fontSize: 13,
+                            color: AppColors.secondaryText,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+
+                    IconButton(
+                      tooltip: 'Sign out',
+                      iconSize: 16,
+                      onPressed: () => ref.read(authControllerProvider).signOut(),
+                      icon: const Icon(Icons.logout, color: AppColors.secondaryText),
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
         ),
       ),
       body: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: isMobile ? 14 : 32,
-            vertical: isMobile ? 16 : 28,
+          padding: EdgeInsets.fromLTRB(
+            isMobile ? 14 : 32,
+            isMobile ? 16 : 28,
+            isMobile ? 14 : 32,
+            isMobile ? 32 : 28,
           ),
           child: Center(
             child: ConstrainedBox(
@@ -286,16 +288,7 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
               ),
               child: Row(
                 children: [
-                  const Text(
-                    'schoolic.',
-                    style: TextStyle(
-                      fontFamily: 'Switzer',
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.4,
-                      color: AppColors.primaryText,
-                    ),
-                  ),
+                  const SchoolicLogo(size: 20),
                   const Spacer(),
                   Container(
                     padding: const EdgeInsets.symmetric(

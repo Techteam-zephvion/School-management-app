@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class AppColors {
   const AppColors._();
@@ -175,6 +176,17 @@ ThemeData buildSchoolicTheme() {
       onSurface: AppColors.primaryText,
       outline: AppColors.primaryBorder,
       outlineVariant: AppColors.secondaryBorder,
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: AppColors.mainBackground,
+      foregroundColor: AppColors.primaryText,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      systemOverlayStyle: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
     ),
     dividerTheme: const DividerThemeData(
       color: AppColors.primaryBorder,
