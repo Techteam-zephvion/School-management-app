@@ -63,6 +63,10 @@ class AuthController extends ChangeNotifier {
       await _persist();
     } on ApiException catch (exception) {
       error = exception.message;
+      session = null;
+    } catch (_) {
+      error = 'An unexpected error occurred during sign in. Please try again.';
+      session = null;
     } finally {
       isLoading = false;
       notifyListeners();

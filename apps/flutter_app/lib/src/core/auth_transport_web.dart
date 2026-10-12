@@ -5,6 +5,10 @@ import 'dart:html';
 
 import 'package:http/http.dart' as http;
 
+void clearAuthCookies() {
+  // Browser manages cookie store automatically
+}
+
 Future<Map<String, Object?>> postAuthJson(
   Uri uri,
   Map<String, Object?> body, {
@@ -43,14 +47,51 @@ Future<void> postAuth(Uri uri, {http.Client? httpClient}) async {
 }
 
 Map<String, Object?> _decode(int statusCode, String body) {
-  final decoded = body.isEmpty ? <String, Object?>{} : (jsonDecode(body) as Map).cast<String, Object?>();
-  if (statusCode < 200 || statusCode >= 300) {
+  Map<String, Object?> decoded = const {};
+  if (body.isNotEmpty) {
+    try {
+      final parsed = jsonDecode(body);
+      if (parsed is Map) {
+        decoded = parsed.cast<String, Object?>();
+      }
+    } catch (_) {
+      // Non-JSON response
+    }
+  }
+
+  if (statusCode >= 200 && statusCode < 300) {
+    return decoded;
+  }
+
+  if (statusCode == 401) {
+    final message = decoded['message'] as String? ?? decoded['error'] as String?;
+    final code = decoded['code'] as String?;
+    if (code == 'INVALID_EMAIL_OR_PASSWORD' ||
+        (message != null && message.toLowerCase().contains('invalid email'))) {
+      throw AuthTransportException('Invalid email or password.', statusCode);
+    }
     throw AuthTransportException(
-      decoded['error'] as String? ?? decoded['message'] as String? ?? 'Authentication request failed',
+      message ?? 'Authentication failed. Please check your credentials.',
       statusCode,
     );
   }
-  return decoded;
+
+  if (statusCode == 403) {
+    final message = decoded['message'] as String? ?? decoded['error'] as String?;
+    throw AuthTransportException(message ?? 'Access denied.', statusCode);
+  }
+
+  if (statusCode >= 500) {
+    throw AuthTransportException(
+      'Authentication service is currently unavailable. Please try again later.',
+      statusCode,
+    );
+  }
+
+  final fallback = decoded['error'] as String? ??
+      decoded['message'] as String? ??
+      'Authentication request failed ($statusCode)';
+  throw AuthTransportException(fallback, statusCode);
 }
 
 class AuthTransportException implements Exception {
@@ -58,4 +99,7 @@ class AuthTransportException implements Exception {
 
   final String message;
   final int statusCode;
+
+  @override
+  String toString() => message;
 }

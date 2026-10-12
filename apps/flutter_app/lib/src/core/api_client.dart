@@ -17,33 +17,62 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
-  ApiClient({http.Client? httpClient}) : _httpClient = httpClient ?? http.Client();
+  ApiClient({
+    http.Client? httpClient,
+    this.neonAuthUrlOverride,
+    this.apiBaseUrlOverride,
+  }) : _httpClient = httpClient ?? http.Client();
 
   final http.Client _httpClient;
+  final String? neonAuthUrlOverride;
+  final String? apiBaseUrlOverride;
+
+  String get neonAuthUrl => neonAuthUrlOverride ?? AppConfig.neonAuthUrl;
+  String get apiBaseUrl => apiBaseUrlOverride ?? AppConfig.apiBaseUrl;
+
+  String get neonAuthBase {
+    final url = neonAuthUrl;
+    final trimmed = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+    if (trimmed.isEmpty || trimmed.endsWith('/auth')) return trimmed;
+    return '$trimmed/auth';
+  }
 
   Future<AuthSession> signInWithNeon({
     required String email,
     required String password,
   }) async {
-    if (AppConfig.neonAuthUrl.isEmpty) {
+    final normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail.isEmpty || password.isEmpty) {
+      throw ApiException('Email and password are required.', 400);
+    }
+
+    if (neonAuthUrl.isEmpty) {
       throw ApiException('NEON_AUTH_URL is not configured for this build.', 400);
     }
+
+    auth_transport.clearAuthCookies();
 
     final Map<String, Object?> tokenResponse;
     try {
       await auth_transport.postAuthJson(
-        Uri.parse('${AppConfig.neonAuthBase}/sign-in/email'),
-        {'email': email, 'password': password},
+        Uri.parse('$neonAuthBase/sign-in/email'),
+        {'email': normalizedEmail, 'password': password},
         httpClient: _httpClient,
       );
 
       tokenResponse = await auth_transport.getAuthJson(
-        Uri.parse('${AppConfig.neonAuthBase}/token'),
+        Uri.parse('$neonAuthBase/token'),
         httpClient: _httpClient,
       );
     } on auth_transport.AuthTransportException catch (exception) {
       throw ApiException(exception.message, exception.statusCode);
+    } on http.ClientException catch (exception) {
+      throw ApiException('Network connection error: ${exception.message}', 503);
+    } catch (exception) {
+      if (exception is ApiException) rethrow;
+      throw ApiException('Unable to connect to authentication service. Please check your network.', 503);
     }
+
     final token = tokenResponse['token'] as String?;
     if (token == null || token.isEmpty) {
       throw ApiException('Authentication token was not issued.', 401);
@@ -52,14 +81,18 @@ class ApiClient {
   }
 
   Future<void> signOutWithNeon() async {
-    if (AppConfig.neonAuthUrl.isEmpty) return;
+    if (neonAuthUrl.isEmpty) return;
     try {
       await auth_transport.postAuth(
-        Uri.parse('${AppConfig.neonAuthBase}/sign-out'),
+        Uri.parse('$neonAuthBase/sign-out'),
         httpClient: _httpClient,
       );
     } on auth_transport.AuthTransportException {
       // Local session cleanup should still proceed if the remote session is already gone.
+    } catch (_) {
+      // Ignore network errors during sign-out
+    } finally {
+      auth_transport.clearAuthCookies();
     }
   }
 
@@ -85,21 +118,37 @@ class ApiClient {
   }) async {
     final token = bearerToken ?? session?.bearerToken;
     final dev = devSession ?? (session?.devNeonUserId != null ? session : null);
-    final response = await _httpClient.get(
-      Uri.parse('${AppConfig.apiBaseUrl}$path'),
-      headers: _headers(bearerToken: token, devSession: dev),
-    );
-    _ensureSuccess(response);
-    return _decode(response);
+    try {
+      final response = await _httpClient.get(
+        Uri.parse('$apiBaseUrl$path'),
+        headers: _headers(bearerToken: token, devSession: dev),
+      );
+      _ensureSuccess(response);
+      return _decode(response);
+    } on ApiException {
+      rethrow;
+    } on http.ClientException catch (exception) {
+      throw ApiException('Network connection error: ${exception.message}', 503);
+    } catch (exception) {
+      throw ApiException('Failed to communicate with Schoolic API.', 500);
+    }
   }
 
   Future<List<Map<String, Object?>>> getList(String path, {required AuthSession session}) async {
-    final response = await _httpClient.get(
-      Uri.parse('${AppConfig.apiBaseUrl}$path'),
-      headers: _headers(bearerToken: session.bearerToken, devSession: session),
-    );
-    _ensureSuccess(response);
-    return (_decodeList(response)).cast<Map<String, Object?>>();
+    try {
+      final response = await _httpClient.get(
+        Uri.parse('$apiBaseUrl$path'),
+        headers: _headers(bearerToken: session.bearerToken, devSession: session),
+      );
+      _ensureSuccess(response);
+      return (_decodeList(response)).cast<Map<String, Object?>>();
+    } on ApiException {
+      rethrow;
+    } on http.ClientException catch (exception) {
+      throw ApiException('Network connection error: ${exception.message}', 503);
+    } catch (exception) {
+      throw ApiException('Failed to communicate with Schoolic API.', 500);
+    }
   }
 
   Future<Map<String, Object?>> postJson(
@@ -107,13 +156,21 @@ class ApiClient {
     Map<String, Object?> body, {
     required AuthSession session,
   }) async {
-    final response = await _httpClient.post(
-      Uri.parse('${AppConfig.apiBaseUrl}$path'),
-      headers: _headers(bearerToken: session.bearerToken, devSession: session),
-      body: jsonEncode(body),
-    );
-    _ensureSuccess(response);
-    return _decode(response);
+    try {
+      final response = await _httpClient.post(
+        Uri.parse('$apiBaseUrl$path'),
+        headers: _headers(bearerToken: session.bearerToken, devSession: session),
+        body: jsonEncode(body),
+      );
+      _ensureSuccess(response);
+      return _decode(response);
+    } on ApiException {
+      rethrow;
+    } on http.ClientException catch (exception) {
+      throw ApiException('Network connection error: ${exception.message}', 503);
+    } catch (exception) {
+      throw ApiException('Failed to communicate with Schoolic API.', 500);
+    }
   }
 
   Future<Map<String, Object?>> putJson(
@@ -121,13 +178,21 @@ class ApiClient {
     Map<String, Object?> body, {
     required AuthSession session,
   }) async {
-    final response = await _httpClient.put(
-      Uri.parse('${AppConfig.apiBaseUrl}$path'),
-      headers: _headers(bearerToken: session.bearerToken, devSession: session),
-      body: jsonEncode(body),
-    );
-    _ensureSuccess(response);
-    return _decode(response);
+    try {
+      final response = await _httpClient.put(
+        Uri.parse('$apiBaseUrl$path'),
+        headers: _headers(bearerToken: session.bearerToken, devSession: session),
+        body: jsonEncode(body),
+      );
+      _ensureSuccess(response);
+      return _decode(response);
+    } on ApiException {
+      rethrow;
+    } on http.ClientException catch (exception) {
+      throw ApiException('Network connection error: ${exception.message}', 503);
+    } catch (exception) {
+      throw ApiException('Failed to communicate with Schoolic API.', 500);
+    }
   }
 
   Future<Map<String, Object?>> patchJson(
@@ -135,22 +200,38 @@ class ApiClient {
     Map<String, Object?> body, {
     required AuthSession session,
   }) async {
-    final response = await _httpClient.patch(
-      Uri.parse('${AppConfig.apiBaseUrl}$path'),
-      headers: _headers(bearerToken: session.bearerToken, devSession: session),
-      body: jsonEncode(body),
-    );
-    _ensureSuccess(response);
-    return _decode(response);
+    try {
+      final response = await _httpClient.patch(
+        Uri.parse('$apiBaseUrl$path'),
+        headers: _headers(bearerToken: session.bearerToken, devSession: session),
+        body: jsonEncode(body),
+      );
+      _ensureSuccess(response);
+      return _decode(response);
+    } on ApiException {
+      rethrow;
+    } on http.ClientException catch (exception) {
+      throw ApiException('Network connection error: ${exception.message}', 503);
+    } catch (exception) {
+      throw ApiException('Failed to communicate with Schoolic API.', 500);
+    }
   }
 
   Future<Map<String, Object?>> deleteJson(String path, {required AuthSession session}) async {
-    final response = await _httpClient.delete(
-      Uri.parse('${AppConfig.apiBaseUrl}$path'),
-      headers: _headers(bearerToken: session.bearerToken, devSession: session),
-    );
-    _ensureSuccess(response);
-    return _decode(response);
+    try {
+      final response = await _httpClient.delete(
+        Uri.parse('$apiBaseUrl$path'),
+        headers: _headers(bearerToken: session.bearerToken, devSession: session),
+      );
+      _ensureSuccess(response);
+      return _decode(response);
+    } on ApiException {
+      rethrow;
+    } on http.ClientException catch (exception) {
+      throw ApiException('Network connection error: ${exception.message}', 503);
+    } catch (exception) {
+      throw ApiException('Failed to communicate with Schoolic API.', 500);
+    }
   }
 
   Map<String, String> _headers({String? bearerToken, AuthSession? devSession}) {
@@ -164,15 +245,40 @@ class ApiClient {
 
   void _ensureSuccess(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
-    final body = response.body.isEmpty ? <String, Object?>{} : _decode(response);
-    throw ApiException(body['error'] as String? ?? 'Request failed', response.statusCode);
+    String errorMessage = 'Request failed (${response.statusCode})';
+    if (response.body.isNotEmpty) {
+      try {
+        final body = _decode(response);
+        if (body['error'] is String) {
+          errorMessage = body['error'] as String;
+        } else if (body['message'] is String) {
+          errorMessage = body['message'] as String;
+        }
+      } catch (_) {
+        // Non-JSON response
+      }
+    }
+    if (response.statusCode >= 500) {
+      errorMessage = 'Schoolic service is currently unavailable. Please try again later.';
+    }
+    throw ApiException(errorMessage, response.statusCode);
   }
 
   Map<String, Object?> _decode(http.Response response) {
-    return (jsonDecode(response.body) as Map).cast<String, Object?>();
+    if (response.body.isEmpty) return const {};
+    try {
+      final parsed = jsonDecode(response.body);
+      if (parsed is Map) return parsed.cast<String, Object?>();
+    } catch (_) {}
+    return const {};
   }
 
   List<Object?> _decodeList(http.Response response) {
-    return (jsonDecode(response.body) as List).cast<Object?>();
+    if (response.body.isEmpty) return const [];
+    try {
+      final parsed = jsonDecode(response.body);
+      if (parsed is List) return parsed.cast<Object?>();
+    } catch (_) {}
+    return const [];
   }
 }
