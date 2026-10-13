@@ -10,6 +10,7 @@ import type { AppBindings } from '../types';
 import {
   aiAttendanceInsightsSchema,
   createAcademicYearSchema,
+  createAnnouncementSchema,
   createClassSchema,
   createSectionSchema,
   createStaffSchema,
@@ -213,6 +214,16 @@ adminRoutes.get('/ai/usage', zValidator('query', aiUsageQuerySchema), async (c) 
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
   return c.json(await repo.aiUsageSummary(c.get('authUser'), c.req.valid('query')));
 });
+
+adminRoutes
+  .get('/announcements', async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listAdminAnnouncements(c.get('authUser')));
+  })
+  .post('/announcements', zValidator('json', createAnnouncementSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createAdminAnnouncement(c.get('authUser'), c.req.valid('json')), 201);
+  });
 
 adminRoutes.post('/ai/attendance-insights', zValidator('json', aiAttendanceInsightsSchema), async (c) => {
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));

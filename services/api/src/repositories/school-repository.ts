@@ -3,6 +3,7 @@ import type { Db } from '../db/client';
 import {
   academicYears,
   aiUsageEvents,
+  announcements,
   appUsers,
   attendanceRecords,
   attendanceSessions,
@@ -22,6 +23,7 @@ import { ApiError } from '../http/errors';
 import type { AuthUser } from '../types';
 import type {
   createAcademicYearSchema,
+  createAnnouncementSchema,
   createClassSchema,
   createSchoolSchema,
   createSectionSchema,
@@ -46,6 +48,7 @@ type TimetableInput = z.infer<typeof createTimetableEntrySchema>;
 type TimetableUpdateInput = z.infer<typeof updateTimetableEntrySchema>;
 type TeacherMaterialInput = z.infer<typeof createTeacherMaterialSchema>;
 type TeacherMaterialUpdateInput = z.infer<typeof updateTeacherMaterialSchema>;
+type AnnouncementInput = z.infer<typeof createAnnouncementSchema>;
 
 export function createSchoolRepository(db: Db) {
   return {
@@ -117,6 +120,103 @@ export function createSchoolRepository(db: Db) {
         .limit(5000);
 
       return summarizeAiUsage(rows);
+    },
+
+    async listAdminAnnouncements(user: AuthUser) {
+      const rows = await db
+        .select({
+          announcement: announcements,
+          className: classes.name,
+          sectionName: sections.name,
+          authorName: appUsers.displayName,
+        })
+        .from(announcements)
+        .innerJoin(appUsers, eq(announcements.authorUserId, appUsers.id))
+        .leftJoin(classes, eq(announcements.classId, classes.id))
+        .leftJoin(sections, eq(announcements.sectionId, sections.id))
+        .where(eq(announcements.schoolId, user.schoolId))
+        .orderBy(desc(announcements.publishedAt))
+        .limit(200);
+
+      return rows.map(announcementWithLabels);
+    },
+
+    async createAdminAnnouncement(user: AuthUser, input: AnnouncementInput) {
+      await assertAnnouncementTarget(db, user, input);
+
+      const [created] = await db
+        .insert(announcements)
+        .values({
+          schoolId: user.schoolId,
+          authorUserId: user.appUserId,
+          authorStaffId: user.staffId ?? null,
+          audience: input.audience,
+          priority: input.priority,
+          classId: input.audience === 'class_section' ? input.classId! : null,
+          sectionId: input.audience === 'class_section' ? input.sectionId! : null,
+          title: input.title,
+          body: input.body,
+          expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+        })
+        .returning({ id: announcements.id });
+
+      if (!created) throw new ApiError(500, 'Unable to publish announcement');
+      return (await this.listAdminAnnouncements(user)).find((item) => item.id === created.id) ?? created;
+    },
+
+    async listTeacherAnnouncements(user: AuthUser) {
+      const assigned = await this.teacherAssignmentsFor(user);
+      const activeTargets = new Set(assigned.map((assignment) => `${assignment.classId}:${assignment.sectionId}`));
+
+      const rows = await db
+        .select({
+          announcement: announcements,
+          className: classes.name,
+          sectionName: sections.name,
+          authorName: appUsers.displayName,
+        })
+        .from(announcements)
+        .innerJoin(appUsers, eq(announcements.authorUserId, appUsers.id))
+        .leftJoin(classes, eq(announcements.classId, classes.id))
+        .leftJoin(sections, eq(announcements.sectionId, sections.id))
+        .where(eq(announcements.schoolId, user.schoolId))
+        .orderBy(desc(announcements.publishedAt))
+        .limit(200);
+
+      return rows
+        .map(announcementWithLabels)
+        .filter((item) => {
+          if (item.expiresAt && new Date(`${item.expiresAt}`).getTime() < Date.now()) return false;
+          if (item.audience === 'school') return true;
+          return activeTargets.has(`${item.classId}:${item.sectionId}`);
+        });
+    },
+
+    async createTeacherAnnouncement(user: AuthUser, input: AnnouncementInput) {
+      if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
+      if (input.audience !== 'class_section') {
+        throw new ApiError(403, 'Teachers can publish announcements only to assigned class sections');
+      }
+      await assertTeacherAnnouncementTarget(db, user, input);
+
+      const [created] = await db
+        .insert(announcements)
+        .values({
+          schoolId: user.schoolId,
+          authorUserId: user.appUserId,
+          authorStaffId: user.staffId,
+          audience: input.audience,
+          priority: input.priority,
+          classId: input.classId!,
+          sectionId: input.sectionId!,
+          title: input.title,
+          body: input.body,
+          expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+        })
+        .returning({ id: announcements.id });
+
+      if (!created) throw new ApiError(500, 'Unable to publish announcement');
+      return (await this.listTeacherAnnouncements(user)).find((item) => item.id === created.id) ?? created;
     },
 
     async overview(user: AuthUser) {
@@ -1083,6 +1183,55 @@ function materialWithLabels(row: {
     sectionName: row.sectionName,
     subjectName: row.subjectName,
   };
+}
+
+function announcementWithLabels(row: {
+  announcement: typeof announcements.$inferSelect;
+  className: string | null;
+  sectionName: string | null;
+  authorName: string | null;
+}) {
+  return {
+    ...row.announcement,
+    className: row.className,
+    sectionName: row.sectionName,
+    authorName: row.authorName,
+  };
+}
+
+async function assertAnnouncementTarget(db: Db, user: AuthUser, input: AnnouncementInput) {
+  if (input.audience === 'school') return;
+  const [target] = await db
+    .select({ id: sections.id })
+    .from(sections)
+    .where(
+      and(
+        eq(sections.schoolId, user.schoolId),
+        eq(sections.id, input.sectionId!),
+        eq(sections.classId, input.classId!),
+      ),
+    )
+    .limit(1);
+
+  if (!target) throw new ApiError(422, 'Selected class section is not available');
+}
+
+async function assertTeacherAnnouncementTarget(db: Db, user: AuthUser, input: AnnouncementInput) {
+  await assertAnnouncementTarget(db, user, input);
+  const [assigned] = await db
+    .select({ id: teacherAssignments.id })
+    .from(teacherAssignments)
+    .where(
+      and(
+        eq(teacherAssignments.schoolId, user.schoolId),
+        eq(teacherAssignments.staffId, user.staffId!),
+        eq(teacherAssignments.classId, input.classId!),
+        eq(teacherAssignments.sectionId, input.sectionId!),
+      ),
+    )
+    .limit(1);
+
+  if (!assigned) throw new ApiError(403, 'Teacher is not assigned to this class section');
 }
 
 function summarizeAiUsage(rows: Array<typeof aiUsageEvents.$inferSelect>) {

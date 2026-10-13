@@ -11,6 +11,7 @@ import '../shared/components/feedback_banner.dart';
 import '../shared/components/schoolic_logo.dart';
 import '../shared/components/shortcuts_dialog.dart';
 import '../shared/components/tour_dialog.dart';
+import '../shared/views/announcements_view.dart';
 import 'dialogs/add_staff_dialog.dart';
 import 'dialogs/add_student_dialog.dart';
 import 'dialogs/student_attendance_dialog.dart';
@@ -31,6 +32,7 @@ enum AdminNavSection {
   attendance,
   insights,
   aiUsage,
+  announcements,
   students,
   staff,
   classesAndSubjects,
@@ -301,10 +303,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           Expanded(
             child: Column(
               children: [
-                _buildTopBar(
-                  isMobile: isMobile,
-                  topInset: safePadding.top,
-                ),
+                _buildTopBar(isMobile: isMobile, topInset: safePadding.top),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: EdgeInsets.fromLTRB(
@@ -418,6 +417,12 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     AdminNavSection.aiUsage,
                     Icons.speed_outlined,
                     'AI Usage',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
+                    AdminNavSection.announcements,
+                    Icons.campaign_outlined,
+                    'Announcements',
                     isDrawer: isDrawer,
                   ),
                   _sidebarItem(
@@ -639,11 +644,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                 ? MainAxisAlignment.center
                 : MainAxisAlignment.start,
             children: [
-              Icon(
-                icon,
-                size: 18,
-                color: AppColors.secondaryText,
-              ),
+              Icon(icon, size: 18, color: AppColors.secondaryText),
               if (!collapsed) ...[
                 const SizedBox(width: 12),
                 Expanded(
@@ -819,6 +820,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         return 'Insights';
       case AdminNavSection.aiUsage:
         return 'AI Usage';
+      case AdminNavSection.announcements:
+        return 'Announcements';
       case AdminNavSection.students:
         return 'Students';
       case AdminNavSection.staff:
@@ -898,6 +901,13 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         return AdminInsightsView(classes: _classes, sections: _sections);
       case AdminNavSection.aiUsage:
         return const AdminAiUsageView();
+      case AdminNavSection.announcements:
+        return AnnouncementsView(
+          workspace: AnnouncementWorkspace.admin,
+          endpoint: '/api/v1/admin/announcements',
+          classes: _classes,
+          sections: _sections,
+        );
       case AdminNavSection.students:
         return AdminStudentsView(
           students: _students,

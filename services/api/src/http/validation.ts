@@ -210,3 +210,30 @@ export const createTeacherMaterialSchema = z.object({
 export const updateTeacherMaterialSchema = createTeacherMaterialSchema.partial().extend({
   content: teacherMaterialContentSchema.optional(),
 });
+
+export const createAnnouncementSchema = z
+  .object({
+    audience: z.enum(['school', 'class_section']),
+    priority: z.enum(['normal', 'important', 'urgent']).default('normal'),
+    classId: z.uuid().optional(),
+    sectionId: z.uuid().optional(),
+    title: z.string().trim().min(3).max(140),
+    body: z.string().trim().min(3).max(2000),
+    expiresAt: z.iso.datetime().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.audience === 'class_section' && (!value.classId || !value.sectionId)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Class and section are required for class-section announcements',
+        path: ['sectionId'],
+      });
+    }
+    if (value.audience === 'school' && (value.classId || value.sectionId)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'School-wide announcements cannot include a class or section target',
+        path: ['audience'],
+      });
+    }
+  });

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:schoolic/src/core/theme.dart';
 import 'package:schoolic/src/features/admin/views/admin_settings_view.dart';
 import 'package:schoolic/src/features/shared/components/page_header.dart';
+import 'package:schoolic/src/features/shared/views/announcements_view.dart';
 import 'package:schoolic/src/features/teacher/views/teacher_attendance_view.dart';
 import 'package:schoolic/src/features/teacher/views/teacher_classes_view.dart';
 import 'package:schoolic/src/features/teacher/views/teacher_copilot_view.dart';
@@ -170,6 +171,24 @@ void main() {
       find.text('Cloudflare Workers (Hono TypeScript Runtime)'),
       findsOneWidget,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Teacher announcements composer fits phone width', (
+    tester,
+  ) async {
+    await _pumpAtWidth(
+      tester,
+      390,
+      const AnnouncementsView(
+        workspace: AnnouncementWorkspace.teacher,
+        endpoint: '/api/v1/teacher/announcements',
+        assignments: [_assignment],
+      ),
+    );
+
+    expect(find.text('Announcements'), findsOneWidget);
+    expect(find.text('New announcement'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

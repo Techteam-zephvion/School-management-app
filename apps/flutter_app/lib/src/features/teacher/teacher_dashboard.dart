@@ -9,6 +9,7 @@ import '../shared/components/feedback_banner.dart';
 import '../shared/components/schoolic_logo.dart';
 import '../shared/components/shortcuts_dialog.dart';
 import '../shared/components/tour_dialog.dart';
+import '../shared/views/announcements_view.dart';
 import 'views/teacher_attendance_view.dart';
 import 'views/teacher_classes_view.dart';
 import 'views/teacher_copilot_view.dart';
@@ -174,7 +175,10 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                     const SchoolicLogo(size: 20),
                     const SizedBox(width: 12),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.secondaryBackground,
                         borderRadius: AppRadii.rSm,
@@ -194,7 +198,11 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                       // Navigation tab buttons
                       _buildTabButton(0, 'My Day', Icons.dashboard_outlined),
                       const SizedBox(width: 4),
-                      _buildTabButton(1, 'My Week', Icons.calendar_month_outlined),
+                      _buildTabButton(
+                        1,
+                        'My Week',
+                        Icons.calendar_month_outlined,
+                      ),
                       const SizedBox(width: 4),
                       _buildTabButton(2, 'My Classes', Icons.layers_outlined),
                       const SizedBox(width: 4),
@@ -204,7 +212,17 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                         Icons.fact_check_outlined,
                       ),
                       const SizedBox(width: 4),
-                      _buildTabButton(4, 'Copilot', Icons.auto_awesome_outlined),
+                      _buildTabButton(
+                        4,
+                        'Copilot',
+                        Icons.auto_awesome_outlined,
+                      ),
+                      const SizedBox(width: 4),
+                      _buildTabButton(
+                        5,
+                        'Announcements',
+                        Icons.campaign_outlined,
+                      ),
                     ],
 
                     const Spacer(),
@@ -225,12 +243,19 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                       tooltip: 'Refresh data',
                       iconSize: 18,
                       onPressed: _loadData,
-                      icon: const Icon(Icons.refresh, color: AppColors.secondaryText),
+                      icon: const Icon(
+                        Icons.refresh,
+                        color: AppColors.secondaryText,
+                      ),
                     ),
 
                     if (!isMobile) ...[
                       const SizedBox(width: 8),
-                      Container(width: 1, height: 16, color: AppColors.primaryBorder),
+                      Container(
+                        width: 1,
+                        height: 16,
+                        color: AppColors.primaryBorder,
+                      ),
                       const SizedBox(width: 14),
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 180),
@@ -250,8 +275,12 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                     IconButton(
                       tooltip: 'Sign out',
                       iconSize: 16,
-                      onPressed: () => ref.read(authControllerProvider).signOut(),
-                      icon: const Icon(Icons.logout, color: AppColors.secondaryText),
+                      onPressed: () =>
+                          ref.read(authControllerProvider).signOut(),
+                      icon: const Icon(
+                        Icons.logout,
+                        color: AppColors.secondaryText,
+                      ),
                     ),
                   ],
                 ),
@@ -350,6 +379,7 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                     'Teacher Copilot',
                     Icons.auto_awesome_outlined,
                   ),
+                  _drawerTabItem(5, 'Announcements', Icons.campaign_outlined),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Divider(height: 1, color: AppColors.primaryBorder),
@@ -490,11 +520,7 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 18,
-              color: AppColors.secondaryText,
-            ),
+            Icon(icon, size: 18, color: AppColors.secondaryText),
             const SizedBox(width: 12),
             Text(
               label,
@@ -598,6 +624,12 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
         );
       case 4:
         return TeacherCopilotView(assignments: _assignments);
+      case 5:
+        return AnnouncementsView(
+          workspace: AnnouncementWorkspace.teacher,
+          endpoint: '/api/v1/teacher/announcements',
+          assignments: _assignments,
+        );
       default:
         return const SizedBox.shrink();
     }

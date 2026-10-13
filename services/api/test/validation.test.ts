@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   aiAttendanceInsightsSchema,
+  createAnnouncementSchema,
   createTeacherMaterialSchema,
   createTimetableEntrySchema,
   saveAttendanceSchema,
@@ -143,5 +144,40 @@ describe('AI feature validation', () => {
 
     expect(parsed.language).toBe('English');
     expect(parsed.content.sections[0]?.heading).toBe('Start');
+  });
+});
+
+describe('announcement validation', () => {
+  it('accepts school-wide announcements without a class target', () => {
+    const parsed = createAnnouncementSchema.parse({
+      audience: 'school',
+      title: 'Holiday notice',
+      body: 'The school will remain closed tomorrow.',
+    });
+
+    expect(parsed.priority).toBe('normal');
+    expect(parsed.audience).toBe('school');
+  });
+
+  it('requires class and section for class-section announcements', () => {
+    const parsed = createAnnouncementSchema.safeParse({
+      audience: 'class_section',
+      title: 'Bring notebooks',
+      body: 'Please bring your mathematics notebook tomorrow.',
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects class targets on school-wide announcements', () => {
+    const parsed = createAnnouncementSchema.safeParse({
+      audience: 'school',
+      classId: uuid,
+      sectionId: uuid,
+      title: 'Invalid target',
+      body: 'This should not mix whole-school and class-section targets.',
+    });
+
+    expect(parsed.success).toBe(false);
   });
 });

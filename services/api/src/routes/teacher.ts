@@ -7,6 +7,7 @@ import { requireRole } from '../http/auth';
 import { ApiError } from '../http/errors';
 import { createSchoolRepository } from '../repositories/school-repository';
 import {
+  createAnnouncementSchema,
   createTeacherMaterialSchema,
   idSchema,
   saveAttendanceSchema,
@@ -59,6 +60,16 @@ teacherRoutes.get('/attendance/summary', async (c) => {
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
   return c.json(await repo.attendanceSummary(c.get('authUser')));
 });
+
+teacherRoutes
+  .get('/announcements', async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listTeacherAnnouncements(c.get('authUser')));
+  })
+  .post('/announcements', zValidator('json', createAnnouncementSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createTeacherAnnouncement(c.get('authUser'), c.req.valid('json')), 201);
+  });
 
 teacherRoutes.get('/materials', async (c) => {
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));

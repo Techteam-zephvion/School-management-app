@@ -1,5 +1,42 @@
 # Last Update (October 12, 2026)
 
+## Phase 8.1: Announcements & Communication MVP
+
+### Summary
+- Began the Phase 8 roadmap with a connected communication slice rather than a standalone page.
+- Added persisted announcements for school-wide notices and class-section updates.
+- Administrators can publish whole-school or class-section announcements.
+- Teachers can view whole-school announcements plus announcements for their assigned sections, and can publish only to their assigned class sections.
+- Added responsive announcement boards to both administrator and teacher workspaces.
+
+### Backend
+- Added `announcements` table with audience, priority, class/section target, author, publish time, optional expiry, and tenant-scoped indexes.
+- Added validation for announcement audience/target combinations.
+- Added API routes:
+  - `GET /api/v1/admin/announcements`
+  - `POST /api/v1/admin/announcements`
+  - `GET /api/v1/teacher/announcements`
+  - `POST /api/v1/teacher/announcements`
+- Added server-side teacher assignment authorization for class-section announcements.
+
+### Frontend
+- Added a shared responsive `AnnouncementsView`.
+- Added **Announcements** navigation in the administrator workspace.
+- Added **Announcements** navigation in the teacher workspace.
+- Added mobile layout coverage for the teacher announcement composer.
+
+### Verification
+- `pnpm api:typecheck`: PASS.
+- `pnpm api:test`: PASS, 35/35 tests across 4 files.
+- `cd apps/flutter_app && flutter analyze --no-fatal-infos`: PASS with one pre-existing non-fatal info in `shortcuts_dialog.dart`.
+- `pnpm flutter:test`: PASS, 38/38 tests.
+
+### Deployment
+- Not deployed yet.
+- Production resources were not touched.
+
+---
+
 ## Schoolic Branding — Official `S.` Logo, Favicon & Application Icons
 
 ### Summary

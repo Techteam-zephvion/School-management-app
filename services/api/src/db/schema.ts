@@ -22,6 +22,8 @@ export const attendanceStatusEnum = pgEnum('attendance_status', [
   'excused',
 ]);
 export const teachingMaterialTypeEnum = pgEnum('teaching_material_type', ['lesson_plan', 'worksheet', 'quiz']);
+export const announcementAudienceEnum = pgEnum('announcement_audience', ['school', 'class_section']);
+export const announcementPriorityEnum = pgEnum('announcement_priority', ['normal', 'important', 'urgent']);
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -287,5 +289,28 @@ export const aiUsageEvents = pgTable(
     index('ai_usage_events_school_created_idx').on(table.schoolId, table.createdAt),
     index('ai_usage_events_user_created_idx').on(table.schoolId, table.appUserId, table.createdAt),
     index('ai_usage_events_feature_idx').on(table.schoolId, table.feature, table.generationType),
+  ],
+);
+
+export const announcements = pgTable(
+  'announcements',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    authorUserId: uuid('author_user_id').notNull().references(() => appUsers.id, { onDelete: 'cascade' }),
+    authorStaffId: uuid('author_staff_id').references(() => staff.id, { onDelete: 'set null' }),
+    audience: announcementAudienceEnum('audience').notNull(),
+    priority: announcementPriorityEnum('priority').default('normal').notNull(),
+    classId: uuid('class_id').references(() => classes.id, { onDelete: 'set null' }),
+    sectionId: uuid('section_id').references(() => sections.id, { onDelete: 'set null' }),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    publishedAt: timestamp('published_at', { withTimezone: true }).defaultNow().notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index('announcements_school_published_idx').on(table.schoolId, table.publishedAt),
+    index('announcements_section_published_idx').on(table.schoolId, table.classId, table.sectionId, table.publishedAt),
   ],
 );
