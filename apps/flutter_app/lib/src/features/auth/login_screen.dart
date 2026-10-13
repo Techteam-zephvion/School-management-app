@@ -323,42 +323,41 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                               ),
                               const SizedBox(height: 10),
-                              Row(
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
                                 children: [
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: auth.isLoading
-                                          ? null
-                                          : () => ref
-                                                .read(authControllerProvider)
-                                                .devSignIn(AppRole.admin),
-                                      icon: const Icon(
-                                        Icons.admin_panel_settings_outlined,
-                                        size: 14,
-                                      ),
-                                      label: const Text(
-                                        'Dev Admin',
-                                        style: TextStyle(fontSize: 12),
-                                      ),
-                                    ),
+                                  _DevAccessButton(
+                                    label: 'Dev Admin',
+                                    icon: Icons.admin_panel_settings_outlined,
+                                    enabled: !auth.isLoading,
+                                    onPressed: () => ref
+                                        .read(authControllerProvider)
+                                        .devSignIn(AppRole.admin),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: auth.isLoading
-                                          ? null
-                                          : () => ref
-                                                .read(authControllerProvider)
-                                                .devSignIn(AppRole.teacher),
-                                      icon: const Icon(
-                                        Icons.school_outlined,
-                                        size: 14,
-                                      ),
-                                      label: const Text(
-                                        'Dev Teacher',
-                                        style: TextStyle(fontSize: 12),
-                                      ),
-                                    ),
+                                  _DevAccessButton(
+                                    label: 'Dev Teacher',
+                                    icon: Icons.school_outlined,
+                                    enabled: !auth.isLoading,
+                                    onPressed: () => ref
+                                        .read(authControllerProvider)
+                                        .devSignIn(AppRole.teacher),
+                                  ),
+                                  _DevAccessButton(
+                                    label: 'Dev Parent',
+                                    icon: Icons.family_restroom_outlined,
+                                    enabled: !auth.isLoading,
+                                    onPressed: () => ref
+                                        .read(authControllerProvider)
+                                        .devSignIn(AppRole.parent),
+                                  ),
+                                  _DevAccessButton(
+                                    label: 'Dev Student',
+                                    icon: Icons.person_outline,
+                                    enabled: !auth.isLoading,
+                                    onPressed: () => ref
+                                        .read(authControllerProvider)
+                                        .devSignIn(AppRole.student),
                                   ),
                                 ],
                               ),
@@ -373,6 +372,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DevAccessButton extends StatelessWidget {
+  const _DevAccessButton({
+    required this.label,
+    required this.icon,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 142,
+      child: OutlinedButton.icon(
+        onPressed: enabled ? onPressed : null,
+        icon: Icon(icon, size: 14),
+        label: Text(label, style: const TextStyle(fontSize: 12)),
       ),
     );
   }

@@ -80,11 +80,24 @@ class AuthController extends ChangeNotifier {
       return;
     }
 
+    final devEmail = switch (role) {
+      AppRole.admin => 'admin@schoolic.local',
+      AppRole.teacher => 'teacher@schoolic.local',
+      AppRole.student => 'student@schoolic.local',
+      AppRole.parent => 'parent@schoolic.local',
+    };
+    final devNeonUserId = switch (role) {
+      AppRole.admin => 'dev-admin',
+      AppRole.teacher => 'dev-teacher',
+      AppRole.student => 'dev-student',
+      AppRole.parent => 'dev-parent',
+    };
+
     final devSession = AuthSession(
-      email: role == AppRole.admin ? 'admin@schoolic.local' : 'teacher@schoolic.local',
+      email: devEmail,
       roles: [role],
       schoolId: 'dev-school',
-      devNeonUserId: role == AppRole.admin ? 'dev-admin' : 'dev-teacher',
+      devNeonUserId: devNeonUserId,
     );
 
     isLoading = true;

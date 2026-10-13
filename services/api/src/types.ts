@@ -16,7 +16,7 @@ export type Env = {
   AI_REQUEST_WINDOW_MINUTES?: string;
 };
 
-export type Role = 'admin' | 'teacher';
+export type Role = 'admin' | 'teacher' | 'student' | 'parent';
 
 export type AuthUser = {
   appUserId: string;

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   aiAttendanceInsightsSchema,
   createAnnouncementSchema,
+  createStudentGuardianLinkSchema,
+  createStudentSchema,
   createTeacherMaterialSchema,
+  createUserSchema,
   createTimetableEntrySchema,
   saveAttendanceSchema,
   teacherCopilotSchema,
@@ -179,5 +182,41 @@ describe('announcement validation', () => {
     });
 
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe('portal account validation', () => {
+  it('accepts student account links while creating a student', () => {
+    const parsed = createStudentSchema.parse({
+      admissionNumber: 'S-100',
+      fullName: 'Student User',
+      userId: uuid,
+      academicYearId: uuid,
+      classId: uuid,
+      sectionId: uuid,
+    });
+
+    expect(parsed.userId).toBe(uuid);
+  });
+
+  it('accepts parent guardian links', () => {
+    const parsed = createStudentGuardianLinkSchema.parse({
+      studentId: uuid,
+      appUserId: uuid,
+      relationship: 'mother',
+    });
+
+    expect(parsed.relationship).toBe('mother');
+  });
+
+  it('allows provisioning student and parent roles', () => {
+    const parsed = createUserSchema.parse({
+      neonUserId: 'neon-parent-1',
+      email: 'parent@schoolic.local',
+      displayName: 'Parent User',
+      roles: ['parent', 'student'],
+    });
+
+    expect(parsed.roles).toEqual(['parent', 'student']);
   });
 });

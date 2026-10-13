@@ -1,16 +1,17 @@
 # Schoolic Product Roadmap
 
-Last updated: October 11, 2026
+Last updated: October 12, 2026
 
 ## Current Status
 
-Phase 5.4 production promotion is complete.
+Phase 8.2 implementation is underway on top of the completed production-ready core.
 
 - Fully implemented and tested: production Neon Auth, trusted production frontend domain, production Worker auth configuration, production Flutter auth configuration, real admin and teacher auth identities mapped to `app_users`, role-based smoke tests, invalid-session rejection, and blocked production development-bypass headers.
 - Implemented and deployed: default-domain production frontend and API.
 - Deployed to production: Phase 5.2 Product UX Redesign.
 - Deployed to production: Phase 5.3 Timetable & Daily Schedule.
-- Planned later: homework, academic results, announcements/calendar, and fee management.
+- Completed after the original production promotion: AI MVP/productization, native build pipeline, mobile UX adaptation, announcements MVP, and the initial student/parent portal MVP.
+- Planned next: homework/assignments, exams and results, fees and finance, admissions, and deeper student/parent workflows.
 
 ## Phase 5.2: Product UX Redesign
 
@@ -60,9 +61,10 @@ Status: Complete and deployed to production with synthetic portfolio timetable d
 ## Later Feature Priorities
 
 1. Homework and assignments: teacher-created assignments for assigned classes with due dates and status.
-2. Examinations and results: exams, subject marks, validation, class summaries, and student academic history.
-3. Announcements and school calendar: announcements, academic dates, events, and simple read states where identity supports them.
+2. Student and parent portal expansion: homework visibility, academic progress, read receipts, and profile/account management.
+3. Examinations and results: exams, subject marks, validation, class summaries, and student academic history.
 4. Fee management: fee structures, student fee assignments, payment records, outstanding balances, and synthetic portfolio transactions.
+5. Admissions and school operations: application tracking, enrollment workflow, document collection, and operational reports.
 
 ## Guardrails
 

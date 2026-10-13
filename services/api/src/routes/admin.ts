@@ -15,6 +15,7 @@ import {
   createSectionSchema,
   createStaffSchema,
   createStudentSchema,
+  createStudentGuardianLinkSchema,
   createSubjectSchema,
   createTeacherAssignmentSchema,
   createTimetableEntrySchema,
@@ -138,6 +139,11 @@ adminRoutes
     const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
     return c.json(await repo.createStudent(c.get('authUser'), c.req.valid('json')), 201);
   });
+
+adminRoutes.post('/students/guardian-links', zValidator('json', createStudentGuardianLinkSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createStudentGuardianLink(c.get('authUser'), c.req.valid('json')), 201);
+});
 
 adminRoutes
   .get('/teacher-assignments', async (c) => {

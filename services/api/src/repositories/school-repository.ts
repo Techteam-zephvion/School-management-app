@@ -12,6 +12,7 @@ import {
   sections,
   staff,
   studentEnrollments,
+  studentGuardians,
   students,
   subjects,
   teacherMaterials,
@@ -29,6 +30,7 @@ import type {
   createSectionSchema,
   createStaffSchema,
   createStudentSchema,
+  createStudentGuardianLinkSchema,
   createSubjectSchema,
   createTeacherAssignmentSchema,
   createTeacherMaterialSchema,
@@ -219,6 +221,95 @@ export function createSchoolRepository(db: Db) {
       return (await this.listTeacherAnnouncements(user)).find((item) => item.id === created.id) ?? created;
     },
 
+    async portalProfile(user: AuthUser) {
+      const [school] = await db.select().from(schools).where(eq(schools.id, user.schoolId)).limit(1);
+      const [activeAcademicYear] = await db
+        .select()
+        .from(academicYears)
+        .where(and(eq(academicYears.schoolId, user.schoolId), eq(academicYears.isActive, true)))
+        .limit(1);
+
+      return {
+        school,
+        activeAcademicYear: activeAcademicYear ?? null,
+        students: await portalStudentsFor(db, user),
+      };
+    },
+
+    async portalAnnouncements(user: AuthUser, studentId?: string) {
+      const portalStudents = await resolvePortalStudents(db, user, studentId);
+      const targets = new Set(portalStudents.map((student) => `${student.classId}:${student.sectionId}`));
+
+      const rows = await db
+        .select({
+          announcement: announcements,
+          className: classes.name,
+          sectionName: sections.name,
+          authorName: appUsers.displayName,
+        })
+        .from(announcements)
+        .innerJoin(appUsers, eq(announcements.authorUserId, appUsers.id))
+        .leftJoin(classes, eq(announcements.classId, classes.id))
+        .leftJoin(sections, eq(announcements.sectionId, sections.id))
+        .where(eq(announcements.schoolId, user.schoolId))
+        .orderBy(desc(announcements.publishedAt))
+        .limit(200);
+
+      return rows
+        .map(announcementWithLabels)
+        .filter((item) => {
+          if (item.expiresAt && new Date(`${item.expiresAt}`).getTime() < Date.now()) return false;
+          if (item.audience === 'school') return true;
+          return targets.has(`${item.classId}:${item.sectionId}`);
+        });
+    },
+
+    async portalAttendance(user: AuthUser, studentId?: string) {
+      const portalStudent = await resolvePortalStudent(db, user, studentId);
+      return this.studentAttendanceSummary(user, portalStudent.id);
+    },
+
+    async portalTimetable(user: AuthUser, studentId?: string) {
+      const portalStudent = await resolvePortalStudent(db, user, studentId);
+      const rows = await db
+        .select({
+          entry: timetableEntries,
+          className: classes.name,
+          sectionName: sections.name,
+          subjectName: subjects.name,
+          staffName: staff.fullName,
+          academicYearName: academicYears.name,
+        })
+        .from(timetableEntries)
+        .innerJoin(classes, eq(timetableEntries.classId, classes.id))
+        .innerJoin(sections, eq(timetableEntries.sectionId, sections.id))
+        .innerJoin(subjects, eq(timetableEntries.subjectId, subjects.id))
+        .innerJoin(staff, eq(timetableEntries.staffId, staff.id))
+        .innerJoin(academicYears, eq(timetableEntries.academicYearId, academicYears.id))
+        .where(
+          and(
+            eq(timetableEntries.schoolId, user.schoolId),
+            eq(timetableEntries.academicYearId, portalStudent.academicYearId),
+            eq(timetableEntries.classId, portalStudent.classId),
+            eq(timetableEntries.sectionId, portalStudent.sectionId),
+          ),
+        )
+        .orderBy(timetableEntries.dayOfWeek, timetableEntries.startTime)
+        .limit(100);
+
+      return {
+        student: portalStudent,
+        entries: rows.map((r) => ({
+          ...r.entry,
+          className: r.className,
+          sectionName: r.sectionName,
+          subjectName: r.subjectName,
+          staffName: r.staffName,
+          academicYearName: r.academicYearName,
+        })),
+      };
+    },
+
     async overview(user: AuthUser) {
       const [school] = await db.select().from(schools).where(eq(schools.id, user.schoolId)).limit(1);
       const [year] = await db
@@ -330,6 +421,7 @@ export function createSchoolRepository(db: Db) {
           id: students.id,
           admissionNumber: students.admissionNumber,
           fullName: students.fullName,
+          userId: students.userId,
           guardianName: students.guardianName,
           guardianPhone: students.guardianPhone,
           classId: studentEnrollments.classId,
@@ -360,6 +452,7 @@ export function createSchoolRepository(db: Db) {
         .insert(students)
         .values({
           schoolId: user.schoolId,
+          userId: input.userId ?? null,
           admissionNumber: input.admissionNumber,
           fullName: input.fullName,
           guardianName: input.guardianName,
@@ -377,6 +470,22 @@ export function createSchoolRepository(db: Db) {
         rollNumber: input.rollNumber,
       });
 
+      return created;
+    },
+
+    async createStudentGuardianLink(user: AuthUser, input: z.infer<typeof createStudentGuardianLinkSchema>) {
+      await assertStudentAndUserBelongToSchool(db, user, input.studentId, input.appUserId);
+      const [created] = await db
+        .insert(studentGuardians)
+        .values({
+          schoolId: user.schoolId,
+          studentId: input.studentId,
+          appUserId: input.appUserId,
+          relationship: input.relationship,
+        })
+        .returning();
+
+      if (!created) throw new ApiError(500, 'Unable to link guardian account');
       return created;
     },
 
@@ -955,6 +1064,111 @@ export function createSchoolRepository(db: Db) {
   };
 }
 
+type PortalStudent = {
+  id: string;
+  fullName: string;
+  admissionNumber: string;
+  relationship: string;
+  academicYearId: string;
+  academicYearName: string;
+  classId: string;
+  className: string;
+  sectionId: string;
+  sectionName: string;
+  rollNumber: string | null;
+};
+
+async function portalStudentsFor(db: Db, user: AuthUser): Promise<PortalStudent[]> {
+  const directRows = await db
+    .select({
+      id: students.id,
+      fullName: students.fullName,
+      admissionNumber: students.admissionNumber,
+      academicYearId: studentEnrollments.academicYearId,
+      academicYearName: academicYears.name,
+      classId: studentEnrollments.classId,
+      className: classes.name,
+      sectionId: studentEnrollments.sectionId,
+      sectionName: sections.name,
+      rollNumber: studentEnrollments.rollNumber,
+    })
+    .from(students)
+    .innerJoin(studentEnrollments, eq(studentEnrollments.studentId, students.id))
+    .innerJoin(academicYears, eq(studentEnrollments.academicYearId, academicYears.id))
+    .innerJoin(classes, eq(studentEnrollments.classId, classes.id))
+    .innerJoin(sections, eq(studentEnrollments.sectionId, sections.id))
+    .where(
+      and(
+        eq(students.schoolId, user.schoolId),
+        eq(students.userId, user.appUserId),
+        eq(students.isActive, true),
+        eq(studentEnrollments.schoolId, user.schoolId),
+        eq(academicYears.schoolId, user.schoolId),
+        eq(academicYears.isActive, true),
+        eq(classes.schoolId, user.schoolId),
+        eq(sections.schoolId, user.schoolId),
+      ),
+    )
+    .limit(20);
+
+  const guardianRows = await db
+    .select({
+      id: students.id,
+      fullName: students.fullName,
+      admissionNumber: students.admissionNumber,
+      relationship: studentGuardians.relationship,
+      academicYearId: studentEnrollments.academicYearId,
+      academicYearName: academicYears.name,
+      classId: studentEnrollments.classId,
+      className: classes.name,
+      sectionId: studentEnrollments.sectionId,
+      sectionName: sections.name,
+      rollNumber: studentEnrollments.rollNumber,
+    })
+    .from(studentGuardians)
+    .innerJoin(students, eq(studentGuardians.studentId, students.id))
+    .innerJoin(studentEnrollments, eq(studentEnrollments.studentId, students.id))
+    .innerJoin(academicYears, eq(studentEnrollments.academicYearId, academicYears.id))
+    .innerJoin(classes, eq(studentEnrollments.classId, classes.id))
+    .innerJoin(sections, eq(studentEnrollments.sectionId, sections.id))
+    .where(
+      and(
+        eq(studentGuardians.schoolId, user.schoolId),
+        eq(studentGuardians.appUserId, user.appUserId),
+        eq(students.schoolId, user.schoolId),
+        eq(students.isActive, true),
+        eq(studentEnrollments.schoolId, user.schoolId),
+        eq(academicYears.schoolId, user.schoolId),
+        eq(academicYears.isActive, true),
+        eq(classes.schoolId, user.schoolId),
+        eq(sections.schoolId, user.schoolId),
+      ),
+    )
+    .limit(50);
+
+  const deduped = new Map<string, PortalStudent>();
+  for (const row of directRows) {
+    deduped.set(row.id, { ...row, relationship: 'self' });
+  }
+  for (const row of guardianRows) {
+    if (!deduped.has(row.id)) deduped.set(row.id, row);
+  }
+  return [...deduped.values()];
+}
+
+async function resolvePortalStudents(db: Db, user: AuthUser, studentId?: string): Promise<PortalStudent[]> {
+  const students = await portalStudentsFor(db, user);
+  if (students.length === 0) throw new ApiError(404, 'No linked student profile is available for this account');
+  if (!studentId) return students;
+  const selected = students.find((student) => student.id === studentId);
+  if (!selected) throw new ApiError(403, 'This student profile is not linked to your account');
+  return [selected];
+}
+
+async function resolvePortalStudent(db: Db, user: AuthUser, studentId?: string): Promise<PortalStudent> {
+  return (await resolvePortalStudents(db, user, studentId))[0]!;
+}
+
 type AttendanceInsightRow = {
   sessionId: string;
   attendanceDate: string;
@@ -1214,6 +1428,22 @@ async function assertAnnouncementTarget(db: Db, user: AuthUser, input: Announcem
     .limit(1);
 
   if (!target) throw new ApiError(422, 'Selected class section is not available');
+}
+
+async function assertStudentAndUserBelongToSchool(db: Db, user: AuthUser, studentId: string, appUserId: string) {
+  const [student] = await db
+    .select({ id: students.id })
+    .from(students)
+    .where(and(eq(students.schoolId, user.schoolId), eq(students.id, studentId), eq(students.isActive, true)))
+    .limit(1);
+  if (!student) throw new ApiError(422, 'Selected student is not available');
+
+  const [appUser] = await db
+    .select({ id: appUsers.id })
+    .from(appUsers)
+    .where(and(eq(appUsers.schoolId, user.schoolId), eq(appUsers.id, appUserId), eq(appUsers.isActive, true)))
+    .limit(1);
+  if (!appUser) throw new ApiError(422, 'Selected user account is not available');
 }
 
 async function assertTeacherAnnouncementTarget(db: Db, user: AuthUser, input: AnnouncementInput) {

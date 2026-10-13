@@ -5,6 +5,7 @@ import { authenticate } from './http/auth';
 import { fail } from './http/errors';
 import { adminRoutes } from './routes/admin';
 import { bootstrapRoutes } from './routes/bootstrap';
+import { portalRoutes } from './routes/portal';
 import { teacherRoutes } from './routes/teacher';
 import type { AppBindings } from './types';
 
@@ -51,6 +52,7 @@ export function createApp() {
   app.get('/api/v1/me', (c) => c.json(c.get('authUser')));
   app.route('/api/v1/admin', adminRoutes);
   app.route('/api/v1/teacher', teacherRoutes);
+  app.route('/api/v1/portal', portalRoutes);
 
   return app;
 }

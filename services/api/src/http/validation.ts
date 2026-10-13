@@ -34,12 +34,19 @@ export const createSubjectSchema = z.object({
 export const createStudentSchema = z.object({
   admissionNumber: z.string().min(1).max(64),
   fullName: z.string().min(2),
+  userId: z.uuid().optional(),
   guardianName: z.string().optional(),
   guardianPhone: z.string().optional(),
   academicYearId: z.uuid(),
   classId: z.uuid(),
   sectionId: z.uuid(),
   rollNumber: z.string().optional(),
+});
+
+export const createStudentGuardianLinkSchema = z.object({
+  studentId: z.uuid(),
+  appUserId: z.uuid(),
+  relationship: z.string().trim().min(2).max(80).default('guardian'),
 });
 
 export const createStaffSchema = z.object({
@@ -55,7 +62,7 @@ export const createUserSchema = z.object({
   neonUserId: z.string().min(1),
   email: z.email(),
   displayName: z.string().min(2),
-  roles: z.array(z.enum(['admin', 'teacher'])).min(1),
+  roles: z.array(z.enum(['admin', 'teacher', 'student', 'parent'])).min(1),
 });
 
 export const createTeacherAssignmentSchema = z.object({
@@ -76,6 +83,10 @@ export const timetableQuerySchema = z.object({
   staffId: z.uuid().optional(),
   subjectId: z.uuid().optional(),
   dayOfWeek: z.coerce.number().int().min(1).max(7).optional(),
+});
+
+export const portalStudentQuerySchema = z.object({
+  studentId: z.uuid().optional(),
 });
 
 const timetableEntryBaseSchema = z.object({

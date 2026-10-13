@@ -13,7 +13,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
-export const roleEnum = pgEnum('role', ['admin', 'teacher']);
+export const roleEnum = pgEnum('role', ['admin', 'teacher', 'student', 'parent']);
 export const attendanceKindEnum = pgEnum('attendance_kind', ['daily', 'period']);
 export const attendanceStatusEnum = pgEnum('attendance_status', [
   'present',
@@ -125,6 +125,7 @@ export const students = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').references(() => appUsers.id, { onDelete: 'set null' }),
     admissionNumber: text('admission_number').notNull(),
     fullName: text('full_name').notNull(),
     guardianName: text('guardian_name'),
@@ -132,7 +133,27 @@ export const students = pgTable(
     isActive: boolean('is_active').default(true).notNull(),
     ...timestamps,
   },
-  (table) => [unique().on(table.schoolId, table.admissionNumber)],
+  (table) => [
+    unique().on(table.schoolId, table.admissionNumber),
+    index('students_user_idx').on(table.schoolId, table.userId),
+  ],
+);
+
+export const studentGuardians = pgTable(
+  'student_guardians',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+    appUserId: uuid('app_user_id').notNull().references(() => appUsers.id, { onDelete: 'cascade' }),
+    relationship: text('relationship').default('guardian').notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.studentId, table.appUserId),
+    index('student_guardians_user_idx').on(table.schoolId, table.appUserId),
+    index('student_guardians_student_idx').on(table.schoolId, table.studentId),
+  ],
 );
 
 export const studentEnrollments = pgTable(

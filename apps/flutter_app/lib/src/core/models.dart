@@ -1,4 +1,4 @@
-enum AppRole { admin, teacher }
+enum AppRole { admin, teacher, student, parent }
 
 enum AttendanceKind { daily, period }
 
@@ -23,6 +23,7 @@ class AuthSession {
 
   bool get isAdmin => roles.contains(AppRole.admin);
   bool get isTeacher => roles.contains(AppRole.teacher);
+  bool get isPortalUser => roles.contains(AppRole.student) || roles.contains(AppRole.parent);
 
   Map<String, Object?> toJson() => {
         'email': email,

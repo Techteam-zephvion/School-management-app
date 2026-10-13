@@ -23,7 +23,7 @@ void main() {
     const session = AuthSession(
       email: 'admin@schoolic.local',
       displayName: 'System Admin',
-      roles: [AppRole.admin],
+      roles: [AppRole.admin, AppRole.parent],
       schoolId: 'school-1',
       devNeonUserId: 'dev-admin',
     );
@@ -33,6 +33,7 @@ void main() {
     expect(restored.email, 'admin@schoolic.local');
     expect(restored.displayName, 'System Admin');
     expect(restored.isAdmin, isTrue);
+    expect(restored.isPortalUser, isTrue);
     expect(restored.devNeonUserId, 'dev-admin');
   });
 

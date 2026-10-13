@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:schoolic/src/core/theme.dart';
 import 'package:schoolic/src/features/admin/views/admin_settings_view.dart';
+import 'package:schoolic/src/features/portal/portal_dashboard.dart';
 import 'package:schoolic/src/features/shared/components/page_header.dart';
 import 'package:schoolic/src/features/shared/views/announcements_view.dart';
 import 'package:schoolic/src/features/teacher/views/teacher_attendance_view.dart';
@@ -189,6 +190,20 @@ void main() {
 
     expect(find.text('Announcements'), findsOneWidget);
     expect(find.text('New announcement'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Student portal shell fits phone width without a session', (
+    tester,
+  ) async {
+    await _pumpAtWidth(
+      tester,
+      390,
+      const SizedBox(height: 700, child: PortalDashboard()),
+    );
+
+    expect(find.text('Student Portal'), findsOneWidget);
+    expect(find.text('Please sign in to continue.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

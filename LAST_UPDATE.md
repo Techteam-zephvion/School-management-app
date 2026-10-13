@@ -1,5 +1,45 @@
 # Last Update (October 12, 2026)
 
+## Phase 8.2: Student & Parent Portal MVP
+
+### Summary
+- Added a read-only student and parent portal for linked accounts.
+- Student and parent roles now route to a dedicated portal instead of teacher/admin workspaces.
+- The portal shows linked student context, attendance summary, weekly timetable, and relevant announcements.
+- Parent accounts can be linked to one or more students; student accounts can be linked directly to a student record.
+
+### Backend
+- Extended `role` support to `student` and `parent`.
+- Added `students.user_id` for direct student account links.
+- Added `student_guardians` table for parent/guardian-to-student links.
+- Added portal API routes:
+  - `GET /api/v1/portal/profile`
+  - `GET /api/v1/portal/announcements`
+  - `GET /api/v1/portal/attendance`
+  - `GET /api/v1/portal/timetable`
+- Added admin provisioning support:
+  - student creation can include `userId`;
+  - `POST /api/v1/admin/students/guardian-links` links parent/guardian accounts to student records.
+- Portal endpoints enforce student/parent roles and only return data for linked students in the current school.
+
+### Frontend
+- Added `PortalDashboard` for the student and parent experience.
+- Added routing for `student` and `parent` roles.
+- Added local-development sign-in buttons for parent and student roles.
+- Added responsive mobile coverage for the portal shell.
+
+### Verification
+- `pnpm api:typecheck`: PASS.
+- `pnpm api:test`: PASS, 38/38 tests across 4 files.
+- `cd apps/flutter_app && flutter analyze --no-fatal-infos`: PASS with one pre-existing non-fatal info in `shortcuts_dialog.dart`.
+- `pnpm flutter:test`: PASS, 39/39 tests.
+
+### Deployment
+- Not deployed yet.
+- Production resources were not touched.
+
+---
+
 ## Phase 8.1: Announcements & Communication MVP
 
 ### Summary
