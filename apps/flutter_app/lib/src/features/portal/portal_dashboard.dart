@@ -24,12 +24,16 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
   Map<String, Object?>? _profile;
   Map<String, Object?>? _attendance;
   Map<String, Object?>? _timetable;
+  Map<String, Object?>? _homework;
   List<Map<String, Object?>> _announcements = const [];
 
   List<Map<String, Object?>> get _students {
     final rows = _profile?['students'];
     if (rows is! List) return const [];
-    return rows.whereType<Map>().map((row) => row.cast<String, Object?>()).toList();
+    return rows
+        .whereType<Map>()
+        .map((row) => row.cast<String, Object?>())
+        .toList();
   }
 
   @override
@@ -55,17 +59,36 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
 
     try {
       final api = ref.read(apiClientProvider);
-      final profile = await api.getJson('/api/v1/portal/profile', session: session);
+      final profile = await api.getJson(
+        '/api/v1/portal/profile',
+        session: session,
+      );
       final students = ((profile['students'] as List?) ?? const [])
           .whereType<Map>()
           .map((row) => row.cast<String, Object?>())
           .toList();
-      final selectedId = studentId ?? _selectedStudentId ?? (students.isEmpty ? null : students.first['id'] as String?);
+      final selectedId =
+          studentId ??
+          _selectedStudentId ??
+          (students.isEmpty ? null : students.first['id'] as String?);
       final query = selectedId == null ? '' : '?studentId=$selectedId';
 
-      final attendance = await api.getJson('/api/v1/portal/attendance$query', session: session);
-      final timetable = await api.getJson('/api/v1/portal/timetable$query', session: session);
-      final announcements = await api.getList('/api/v1/portal/announcements$query', session: session);
+      final attendance = await api.getJson(
+        '/api/v1/portal/attendance$query',
+        session: session,
+      );
+      final timetable = await api.getJson(
+        '/api/v1/portal/timetable$query',
+        session: session,
+      );
+      final homework = await api.getJson(
+        '/api/v1/portal/homework$query',
+        session: session,
+      );
+      final announcements = await api.getList(
+        '/api/v1/portal/announcements$query',
+        session: session,
+      );
 
       if (!mounted) return;
       setState(() {
@@ -73,6 +96,7 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
         _selectedStudentId = selectedId;
         _attendance = attendance;
         _timetable = timetable;
+        _homework = homework;
         _announcements = announcements;
         _loading = false;
       });
@@ -80,7 +104,9 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = exception is ApiException ? exception.message : 'Unable to load portal data.';
+        _error = exception is ApiException
+            ? exception.message
+            : 'Unable to load portal data.';
       });
     }
   }
@@ -109,12 +135,19 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
             child: RefreshIndicator(
               onRefresh: () => _load(),
               child: ListView(
-                padding: EdgeInsets.fromLTRB(isCompact ? 16 : 28, 24, isCompact ? 16 : 28, 32),
+                padding: EdgeInsets.fromLTRB(
+                  isCompact ? 16 : 28,
+                  24,
+                  isCompact ? 16 : 28,
+                  32,
+                ),
                 children: [
                   PageHeader(
                     title: 'Student Portal',
                     description: 'Attendance, timetable, and school updates in one place.',
-                    primaryAction: _students.length > 1 ? _studentSelector() : null,
+                    primaryAction: _students.length > 1
+                        ? _studentSelector()
+                        : null,
                   ),
                   const SizedBox(height: 20),
                   if (_error != null)
@@ -146,7 +179,13 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
                         if (stack) {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [timetable, const SizedBox(height: 18), announcements],
+                            children: [
+                              timetable,
+                              const SizedBox(height: 18),
+                              _homeworkPanel(),
+                              const SizedBox(height: 18),
+                              announcements,
+                            ],
                           );
                         }
                         return Row(
@@ -154,7 +193,16 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
                           children: [
                             Expanded(flex: 3, child: timetable),
                             const SizedBox(width: 18),
-                            Expanded(flex: 2, child: announcements),
+                            Expanded(
+                              flex: 2,
+                              child: Column(
+                                children: [
+                                  _homeworkPanel(),
+                                  const SizedBox(height: 18),
+                                  announcements,
+                                ],
+                              ),
+                            ),
                           ],
                         );
                       },
@@ -187,8 +235,12 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
 
   Widget _studentSummary() {
     final student = _selectedStudent;
-    final profileYear = (_profile?['activeAcademicYear'] as Map?)?.cast<String, Object?>();
-    final yearName = student?['academicYearName'] as String? ?? profileYear?['name'] as String? ?? 'Active year';
+    final profileYear = (_profile?['activeAcademicYear'] as Map?)
+        ?.cast<String, Object?>();
+    final yearName =
+        student?['academicYearName'] as String? ??
+        profileYear?['name'] as String? ??
+        'Active year';
     return _Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,11 +252,15 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
           const SizedBox(height: 6),
           Text(
             '${student?['className'] ?? 'Class'} ${student?['sectionName'] ?? ''} • $yearName',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.secondaryText),
+            style: Theme.of(context).textTheme.bodyMedium
+                ?.copyWith(color: AppColors.secondaryText),
           ),
           if ((student?['rollNumber'] as String?)?.isNotEmpty ?? false) ...[
             const SizedBox(height: 10),
-            StatusBadge(label: 'Roll ${student!['rollNumber']}', tone: BadgeTone.neutral),
+            StatusBadge(
+              label: 'Roll ${student!['rollNumber']}',
+              tone: BadgeTone.neutral,
+            ),
           ],
         ],
       ),
@@ -216,10 +272,26 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
     final rate = stats?['attendanceRate'];
     return StatStrip(
       items: [
-        StatItemData(label: 'Attendance Rate', value: rate == null ? '-' : '$rate%', helper: 'Present and late counted'),
-        StatItemData(label: 'Present', value: '${stats?['present'] ?? 0}', helper: 'Recorded sessions'),
-        StatItemData(label: 'Absent', value: '${stats?['absent'] ?? 0}', helper: 'Requires attention'),
-        StatItemData(label: 'Late', value: '${stats?['late'] ?? 0}', helper: 'Arrived after roll call'),
+        StatItemData(
+          label: 'Attendance Rate',
+          value: rate == null ? '-' : '$rate%',
+          helper: 'Present and late counted',
+        ),
+        StatItemData(
+          label: 'Present',
+          value: '${stats?['present'] ?? 0}',
+          helper: 'Recorded sessions',
+        ),
+        StatItemData(
+          label: 'Absent',
+          value: '${stats?['absent'] ?? 0}',
+          helper: 'Requires attention',
+        ),
+        StatItemData(
+          label: 'Late',
+          value: '${stats?['late'] ?? 0}',
+          helper: 'Arrived after roll call',
+        ),
       ],
     );
   }
@@ -232,12 +304,17 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
     return _Panel(
       title: 'Weekly Timetable',
       child: entries.isEmpty
-          ? const EmptyStateView(title: 'No timetable published', description: 'Scheduled lessons will appear here.')
+          ? const EmptyStateView(
+              title: 'No timetable published',
+              description: 'Scheduled lessons will appear here.',
+            )
           : Column(
               children: entries.map((entry) {
                 return _ListRow(
-                  title: '${_dayName(entry['dayOfWeek'])} • ${entry['startTime']} - ${entry['endTime']}',
-                  subtitle: '${entry['subjectName'] ?? 'Subject'} with ${entry['staffName'] ?? 'Teacher'}',
+                  title:
+                      '${_dayName(entry['dayOfWeek'])} • ${entry['startTime']} - ${entry['endTime']}',
+                  subtitle:
+                      '${entry['subjectName'] ?? 'Subject'} with ${entry['staffName'] ?? 'Teacher'}',
                 );
               }).toList(),
             ),
@@ -248,7 +325,10 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
     return _Panel(
       title: 'Announcements',
       child: _announcements.isEmpty
-          ? const EmptyStateView(title: 'No announcements', description: 'School notices for your class will appear here.')
+          ? const EmptyStateView(
+              title: 'No announcements',
+              description: 'School notices for your class will appear here.',
+            )
           : Column(
               children: _announcements.map((announcement) {
                 final audience = announcement['audience'] == 'school'
@@ -257,6 +337,33 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
                 return _ListRow(
                   title: announcement['title'] as String? ?? 'Announcement',
                   subtitle: '${announcement['body'] ?? ''}\n$audience',
+                );
+              }).toList(),
+            ),
+    );
+  }
+
+  Widget _homeworkPanel() {
+    final assignments = ((_homework?['assignments'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((row) => row.cast<String, Object?>())
+        .toList();
+    return _Panel(
+      title: 'Homework',
+      child: assignments.isEmpty
+          ? const EmptyStateView(
+              title: 'No homework assigned',
+              description: 'Published class assignments will appear here.',
+            )
+          : Column(
+              children: assignments.map((assignment) {
+                final subject = assignment['subjectName'] == null
+                    ? ''
+                    : ' • ${assignment['subjectName']}';
+                return _ListRow(
+                  title: '${assignment['title'] ?? 'Homework'}',
+                  subtitle:
+                      'Due ${assignment['dueDate'] ?? '-'}$subject\n${assignment['instructions'] ?? ''}',
                 );
               }).toList(),
             ),
@@ -291,14 +398,22 @@ class _PortalTopBar extends StatelessWidget {
         children: [
           const Text(
             'Schoolic.',
-            style: TextStyle(fontFamily: 'Switzer', fontSize: 18, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              fontFamily: 'Switzer',
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(width: 16),
           const Expanded(
             child: Text(
               'Student & Parent Portal',
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontFamily: 'Switzer', fontSize: 14, color: AppColors.secondaryText),
+              style: TextStyle(
+                fontFamily: 'Switzer',
+                fontSize: 14,
+                color: AppColors.secondaryText,
+              ),
             ),
           ),
           IconButton(
@@ -367,7 +482,8 @@ class _ListRow extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             subtitle,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.secondaryText, height: 1.35),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: AppColors.secondaryText, height: 1.35),
           ),
         ],
       ),

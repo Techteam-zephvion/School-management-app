@@ -248,3 +248,18 @@ export const createAnnouncementSchema = z
       });
     }
   });
+
+export const createHomeworkAssignmentSchema = z.object({
+  academicYearId: z.uuid(),
+  classId: z.uuid(),
+  sectionId: z.uuid(),
+  subjectId: z.uuid().nullable().optional(),
+  title: z.string().trim().min(3).max(160),
+  instructions: z.string().trim().min(3).max(3000),
+  dueDate: z.iso.date(),
+  estimatedMinutes: z.number().int().min(5).max(240).nullable().optional(),
+  status: z.enum(['draft', 'published', 'archived']).default('published'),
+  sourceMaterialId: z.uuid().nullable().optional(),
+});
+
+export const updateHomeworkAssignmentSchema = createHomeworkAssignmentSchema.partial();

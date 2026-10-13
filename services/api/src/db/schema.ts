@@ -24,6 +24,7 @@ export const attendanceStatusEnum = pgEnum('attendance_status', [
 export const teachingMaterialTypeEnum = pgEnum('teaching_material_type', ['lesson_plan', 'worksheet', 'quiz']);
 export const announcementAudienceEnum = pgEnum('announcement_audience', ['school', 'class_section']);
 export const announcementPriorityEnum = pgEnum('announcement_priority', ['normal', 'important', 'urgent']);
+export const homeworkStatusEnum = pgEnum('homework_status', ['draft', 'published', 'archived']);
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -333,5 +334,29 @@ export const announcements = pgTable(
   (table) => [
     index('announcements_school_published_idx').on(table.schoolId, table.publishedAt),
     index('announcements_section_published_idx').on(table.schoolId, table.classId, table.sectionId, table.publishedAt),
+  ],
+);
+
+export const homeworkAssignments = pgTable(
+  'homework_assignments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    ownerStaffId: uuid('owner_staff_id').notNull().references(() => staff.id, { onDelete: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull().references(() => academicYears.id),
+    classId: uuid('class_id').notNull().references(() => classes.id),
+    sectionId: uuid('section_id').notNull().references(() => sections.id),
+    subjectId: uuid('subject_id').references(() => subjects.id),
+    title: text('title').notNull(),
+    instructions: text('instructions').notNull(),
+    dueDate: date('due_date').notNull(),
+    estimatedMinutes: integer('estimated_minutes'),
+    status: homeworkStatusEnum('status').default('published').notNull(),
+    sourceMaterialId: uuid('source_material_id').references(() => teacherMaterials.id, { onDelete: 'set null' }),
+    ...timestamps,
+  },
+  (table) => [
+    index('homework_assignments_teacher_idx').on(table.schoolId, table.ownerStaffId, table.dueDate),
+    index('homework_assignments_section_idx').on(table.schoolId, table.academicYearId, table.sectionId, table.dueDate),
   ],
 );

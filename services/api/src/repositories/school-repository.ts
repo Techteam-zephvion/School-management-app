@@ -8,6 +8,7 @@ import {
   attendanceRecords,
   attendanceSessions,
   classes,
+  homeworkAssignments,
   schools,
   sections,
   staff,
@@ -25,6 +26,7 @@ import type { AuthUser } from '../types';
 import type {
   createAcademicYearSchema,
   createAnnouncementSchema,
+  createHomeworkAssignmentSchema,
   createClassSchema,
   createSchoolSchema,
   createSectionSchema,
@@ -39,6 +41,7 @@ import type {
   saveAttendanceSchema,
   timetableQuerySchema,
   updateTeacherMaterialSchema,
+  updateHomeworkAssignmentSchema,
   updateTimetableEntrySchema,
 } from '../http/validation';
 import type { z } from 'zod';
@@ -51,6 +54,8 @@ type TimetableUpdateInput = z.infer<typeof updateTimetableEntrySchema>;
 type TeacherMaterialInput = z.infer<typeof createTeacherMaterialSchema>;
 type TeacherMaterialUpdateInput = z.infer<typeof updateTeacherMaterialSchema>;
 type AnnouncementInput = z.infer<typeof createAnnouncementSchema>;
+type HomeworkAssignmentInput = z.infer<typeof createHomeworkAssignmentSchema>;
+type HomeworkAssignmentUpdateInput = z.infer<typeof updateHomeworkAssignmentSchema>;
 
 export function createSchoolRepository(db: Db) {
   return {
@@ -307,6 +312,39 @@ export function createSchoolRepository(db: Db) {
           staffName: r.staffName,
           academicYearName: r.academicYearName,
         })),
+      };
+    },
+
+    async portalHomework(user: AuthUser, studentId?: string) {
+      const portalStudent = await resolvePortalStudent(db, user, studentId);
+      const rows = await db
+        .select({
+          assignment: homeworkAssignments,
+          className: classes.name,
+          sectionName: sections.name,
+          subjectName: subjects.name,
+          teacherName: staff.fullName,
+        })
+        .from(homeworkAssignments)
+        .innerJoin(classes, eq(homeworkAssignments.classId, classes.id))
+        .innerJoin(sections, eq(homeworkAssignments.sectionId, sections.id))
+        .leftJoin(subjects, eq(homeworkAssignments.subjectId, subjects.id))
+        .innerJoin(staff, eq(homeworkAssignments.ownerStaffId, staff.id))
+        .where(
+          and(
+            eq(homeworkAssignments.schoolId, user.schoolId),
+            eq(homeworkAssignments.academicYearId, portalStudent.academicYearId),
+            eq(homeworkAssignments.classId, portalStudent.classId),
+            eq(homeworkAssignments.sectionId, portalStudent.sectionId),
+            eq(homeworkAssignments.status, 'published'),
+          ),
+        )
+        .orderBy(desc(homeworkAssignments.dueDate), desc(homeworkAssignments.createdAt))
+        .limit(100);
+
+      return {
+        student: portalStudent,
+        assignments: rows.map(homeworkWithLabels),
       };
     },
 
@@ -674,6 +712,116 @@ export function createSchoolRepository(db: Db) {
         .limit(100);
 
       return rows.map(materialWithLabels);
+    },
+
+    async listTeacherHomework(user: AuthUser) {
+      if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
+      const rows = await db
+        .select({
+          assignment: homeworkAssignments,
+          className: classes.name,
+          sectionName: sections.name,
+          subjectName: subjects.name,
+          teacherName: staff.fullName,
+        })
+        .from(homeworkAssignments)
+        .innerJoin(classes, eq(homeworkAssignments.classId, classes.id))
+        .innerJoin(sections, eq(homeworkAssignments.sectionId, sections.id))
+        .leftJoin(subjects, eq(homeworkAssignments.subjectId, subjects.id))
+        .innerJoin(staff, eq(homeworkAssignments.ownerStaffId, staff.id))
+        .where(and(eq(homeworkAssignments.schoolId, user.schoolId), eq(homeworkAssignments.ownerStaffId, user.staffId)))
+        .orderBy(desc(homeworkAssignments.dueDate), desc(homeworkAssignments.createdAt))
+        .limit(200);
+
+      return rows.map(homeworkWithLabels);
+    },
+
+    async createTeacherHomework(user: AuthUser, input: HomeworkAssignmentInput) {
+      if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
+      await assertTeacherMaterialContext(db, user, input);
+
+      const [created] = await db
+        .insert(homeworkAssignments)
+        .values({
+          schoolId: user.schoolId,
+          ownerStaffId: user.staffId,
+          academicYearId: input.academicYearId,
+          classId: input.classId,
+          sectionId: input.sectionId,
+          subjectId: input.subjectId ?? null,
+          title: input.title,
+          instructions: input.instructions,
+          dueDate: input.dueDate,
+          estimatedMinutes: input.estimatedMinutes ?? null,
+          status: input.status,
+          sourceMaterialId: input.sourceMaterialId ?? null,
+        })
+        .returning({ id: homeworkAssignments.id });
+
+      if (!created) throw new ApiError(500, 'Unable to create homework assignment');
+      return (await this.listTeacherHomework(user)).find((item) => item.id === created.id) ?? created;
+    },
+
+    async updateTeacherHomework(user: AuthUser, id: string, input: HomeworkAssignmentUpdateInput) {
+      if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
+      const [existing] = await db
+        .select()
+        .from(homeworkAssignments)
+        .where(
+          and(
+            eq(homeworkAssignments.schoolId, user.schoolId),
+            eq(homeworkAssignments.ownerStaffId, user.staffId),
+            eq(homeworkAssignments.id, id),
+          ),
+        )
+        .limit(1);
+      if (!existing) throw new ApiError(404, 'Homework assignment not found');
+
+      const next = {
+        academicYearId: input.academicYearId ?? existing.academicYearId,
+        classId: input.classId ?? existing.classId,
+        sectionId: input.sectionId ?? existing.sectionId,
+        subjectId: input.subjectId === undefined ? existing.subjectId : input.subjectId,
+      };
+      await assertTeacherMaterialContext(db, user, next);
+
+      const [updated] = await db
+        .update(homeworkAssignments)
+        .set({
+          ...input,
+          subjectId: input.subjectId === undefined ? undefined : input.subjectId ?? null,
+          estimatedMinutes: input.estimatedMinutes === undefined ? undefined : input.estimatedMinutes ?? null,
+          sourceMaterialId: input.sourceMaterialId === undefined ? undefined : input.sourceMaterialId ?? null,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(homeworkAssignments.schoolId, user.schoolId),
+            eq(homeworkAssignments.ownerStaffId, user.staffId),
+            eq(homeworkAssignments.id, id),
+          ),
+        )
+        .returning({ id: homeworkAssignments.id });
+
+      if (!updated) throw new ApiError(500, 'Unable to update homework assignment');
+      return (await this.listTeacherHomework(user)).find((item) => item.id === updated.id) ?? updated;
+    },
+
+    async deleteTeacherHomework(user: AuthUser, id: string) {
+      if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
+      const [deleted] = await db
+        .delete(homeworkAssignments)
+        .where(
+          and(
+            eq(homeworkAssignments.schoolId, user.schoolId),
+            eq(homeworkAssignments.ownerStaffId, user.staffId),
+            eq(homeworkAssignments.id, id),
+          ),
+        )
+        .returning({ id: homeworkAssignments.id });
+
+      if (!deleted) throw new ApiError(404, 'Homework assignment not found');
+      return deleted;
     },
 
     async getTeacherMaterial(user: AuthUser, id: string) {
@@ -1399,6 +1547,22 @@ function materialWithLabels(row: {
   };
 }
 
+function homeworkWithLabels(row: {
+  assignment: typeof homeworkAssignments.$inferSelect;
+  className: string;
+  sectionName: string;
+  subjectName: string | null;
+  teacherName: string;
+}) {
+  return {
+    ...row.assignment,
+    className: row.className,
+    sectionName: row.sectionName,
+    subjectName: row.subjectName,
+    teacherName: row.teacherName,
+  };
+}
+
 function announcementWithLabels(row: {
   announcement: typeof announcements.$inferSelect;
   className: string | null;
@@ -1555,7 +1719,7 @@ async function assertTeacherMaterialContext(
     academicYearId?: string | undefined;
     classId?: string | undefined;
     sectionId?: string | undefined;
-    subjectId?: string | undefined;
+    subjectId?: string | null | undefined;
   },
 ) {
   if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');

@@ -8,6 +8,7 @@ import { ApiError } from '../http/errors';
 import { createSchoolRepository } from '../repositories/school-repository';
 import {
   createAnnouncementSchema,
+  createHomeworkAssignmentSchema,
   createTeacherMaterialSchema,
   idSchema,
   saveAttendanceSchema,
@@ -15,6 +16,7 @@ import {
   teacherMaterialContentSchema,
   timetableQuerySchema,
   updateTeacherMaterialSchema,
+  updateHomeworkAssignmentSchema,
 } from '../http/validation';
 import type { AppBindings } from '../types';
 
@@ -70,6 +72,26 @@ teacherRoutes
     const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
     return c.json(await repo.createTeacherAnnouncement(c.get('authUser'), c.req.valid('json')), 201);
   });
+
+teacherRoutes
+  .get('/homework', async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listTeacherHomework(c.get('authUser')));
+  })
+  .post('/homework', zValidator('json', createHomeworkAssignmentSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createTeacherHomework(c.get('authUser'), c.req.valid('json')), 201);
+  });
+
+teacherRoutes.patch('/homework/:id', zValidator('param', idSchema), zValidator('json', updateHomeworkAssignmentSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.updateTeacherHomework(c.get('authUser'), c.req.valid('param').id, c.req.valid('json')));
+});
+
+teacherRoutes.delete('/homework/:id', zValidator('param', idSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.deleteTeacherHomework(c.get('authUser'), c.req.valid('param').id));
+});
 
 teacherRoutes.get('/materials', async (c) => {
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));

@@ -43,6 +43,13 @@
       "when": 1791875868366,
       "tag": "0005_condemned_gideon",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791876218882,
+      "tag": "0006_happy_wallop",
+      "breakpoints": true
     }
   ]
 }

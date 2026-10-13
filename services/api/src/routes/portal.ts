@@ -32,3 +32,8 @@ portalRoutes.get('/timetable', zValidator('query', portalStudentQuerySchema), as
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
   return c.json(await repo.portalTimetable(c.get('authUser'), c.req.valid('query').studentId));
 });
+
+portalRoutes.get('/homework', zValidator('query', portalStudentQuerySchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.portalHomework(c.get('authUser'), c.req.valid('query').studentId));
+});

@@ -10,6 +10,7 @@ import 'package:schoolic/src/features/shared/views/announcements_view.dart';
 import 'package:schoolic/src/features/teacher/views/teacher_attendance_view.dart';
 import 'package:schoolic/src/features/teacher/views/teacher_classes_view.dart';
 import 'package:schoolic/src/features/teacher/views/teacher_copilot_view.dart';
+import 'package:schoolic/src/features/teacher/views/teacher_homework_view.dart';
 import 'package:schoolic/src/features/teacher/views/teacher_timetable_view.dart';
 
 const _assignment = <String, Object?>{
@@ -190,6 +191,18 @@ void main() {
 
     expect(find.text('Announcements'), findsOneWidget);
     expect(find.text('New announcement'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Teacher homework composer fits phone width', (tester) async {
+    await _pumpAtWidth(
+      tester,
+      390,
+      const TeacherHomeworkView(assignments: [_assignment]),
+    );
+
+    expect(find.text('Homework'), findsOneWidget);
+    expect(find.text('Assign homework'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

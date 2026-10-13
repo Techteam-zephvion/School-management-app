@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   aiAttendanceInsightsSchema,
   createAnnouncementSchema,
+  createHomeworkAssignmentSchema,
   createStudentGuardianLinkSchema,
   createStudentSchema,
   createTeacherMaterialSchema,
@@ -36,6 +37,36 @@ describe('attendance validation', () => {
       kind: 'period',
       attendanceDate: '2026-10-10',
       records: [{ studentId: uuid, status: 'present' }],
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe('homework validation', () => {
+  it('accepts bounded teacher homework payloads', () => {
+    const parsed = createHomeworkAssignmentSchema.parse({
+      academicYearId: uuid,
+      classId: uuid,
+      sectionId: uuid,
+      subjectId: uuid,
+      title: 'Read chapter 4',
+      instructions: 'Complete the reading notes and answer questions 1-5.',
+      dueDate: '2026-10-16',
+      estimatedMinutes: 30,
+    });
+
+    expect(parsed.status).toBe('published');
+  });
+
+  it('rejects homework without useful instructions', () => {
+    const parsed = createHomeworkAssignmentSchema.safeParse({
+      academicYearId: uuid,
+      classId: uuid,
+      sectionId: uuid,
+      title: 'HW',
+      instructions: '',
+      dueDate: '2026-10-16',
     });
 
     expect(parsed.success).toBe(false);

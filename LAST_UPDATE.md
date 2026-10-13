@@ -1,5 +1,43 @@
 # Last Update (October 12, 2026)
 
+## Phase 8.0: Homework & Assignments MVP
+
+### Summary
+- Added persisted homework assignments as the first academic workflow in the Phase 8 roadmap.
+- Teachers can create, edit, publish, draft, archive, and delete homework for their assigned class sections.
+- Students and parents can see published homework in the portal for the selected linked student.
+- Homework is connected to existing class, section, subject, academic year, teacher assignment, and portal authorization rules.
+
+### Backend
+- Added `homework_status` enum and `homework_assignments` table.
+- Added validation for homework title, instructions, due date, estimated time, status, and class context.
+- Added teacher API routes:
+  - `GET /api/v1/teacher/homework`
+  - `POST /api/v1/teacher/homework`
+  - `PATCH /api/v1/teacher/homework/:id`
+  - `DELETE /api/v1/teacher/homework/:id`
+- Added portal API route:
+  - `GET /api/v1/portal/homework`
+- Teacher homework writes are restricted to assigned class sections. Portal reads are restricted to linked students and published homework only.
+
+### Frontend
+- Added **Homework** navigation in the teacher workspace.
+- Added a responsive teacher homework composer and assignment list.
+- Added homework visibility in the student and parent portal.
+- Added mobile layout coverage for the teacher homework composer.
+
+### Verification
+- `pnpm api:typecheck`: PASS.
+- `pnpm api:test`: PASS, 40/40 tests across 4 files.
+- `cd apps/flutter_app && flutter analyze --no-fatal-infos`: PASS with one pre-existing non-fatal info in `shortcuts_dialog.dart`.
+- `pnpm flutter:test`: PASS, 40/40 tests.
+
+### Deployment
+- Not deployed yet.
+- Production resources were not touched.
+
+---
+
 ## Phase 8.2: Student & Parent Portal MVP
 
 ### Summary

@@ -4,14 +4,14 @@ Last updated: October 12, 2026
 
 ## Current Status
 
-Phase 8.2 implementation is underway on top of the completed production-ready core.
+Phase 8.0 through 8.2 MVP slices are implemented on top of the completed production-ready core.
 
 - Fully implemented and tested: production Neon Auth, trusted production frontend domain, production Worker auth configuration, production Flutter auth configuration, real admin and teacher auth identities mapped to `app_users`, role-based smoke tests, invalid-session rejection, and blocked production development-bypass headers.
 - Implemented and deployed: default-domain production frontend and API.
 - Deployed to production: Phase 5.2 Product UX Redesign.
 - Deployed to production: Phase 5.3 Timetable & Daily Schedule.
-- Completed after the original production promotion: AI MVP/productization, native build pipeline, mobile UX adaptation, announcements MVP, and the initial student/parent portal MVP.
-- Planned next: homework/assignments, exams and results, fees and finance, admissions, and deeper student/parent workflows.
+- Completed after the original production promotion: AI MVP/productization, native build pipeline, mobile UX adaptation, homework/assignments MVP, announcements MVP, and the initial student/parent portal MVP.
+- Planned next: exams and results, fees and finance, admissions, and deeper student/parent workflows.
 
 ## Phase 5.2: Product UX Redesign
 
@@ -60,11 +60,10 @@ Status: Complete and deployed to production with synthetic portfolio timetable d
 
 ## Later Feature Priorities
 
-1. Homework and assignments: teacher-created assignments for assigned classes with due dates and status.
-2. Student and parent portal expansion: homework visibility, academic progress, read receipts, and profile/account management.
-3. Examinations and results: exams, subject marks, validation, class summaries, and student academic history.
-4. Fee management: fee structures, student fee assignments, payment records, outstanding balances, and synthetic portfolio transactions.
-5. Admissions and school operations: application tracking, enrollment workflow, document collection, and operational reports.
+1. Student and parent portal expansion: homework read receipts, submissions, academic progress, and profile/account management.
+2. Examinations and results: exams, subject marks, validation, class summaries, and student academic history.
+3. Fee management: fee structures, student fee assignments, payment records, outstanding balances, and synthetic portfolio transactions.
+4. Admissions and school operations: application tracking, enrollment workflow, document collection, and operational reports.
 
 ## Guardrails
 
