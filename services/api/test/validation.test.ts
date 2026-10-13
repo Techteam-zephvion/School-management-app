@@ -3,6 +3,8 @@ import {
   aiAttendanceInsightsSchema,
   createAnnouncementSchema,
   createHomeworkAssignmentSchema,
+  createExamSchema,
+  saveExamMarksSchema,
   createStudentGuardianLinkSchema,
   createStudentSchema,
   createTeacherMaterialSchema,
@@ -67,6 +69,37 @@ describe('homework validation', () => {
       title: 'HW',
       instructions: '',
       dueDate: '2026-10-16',
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe('exam validation', () => {
+  it('accepts exam setup and mark entry payloads', () => {
+    const exam = createExamSchema.parse({
+      academicYearId: uuid,
+      classId: uuid,
+      sectionId: uuid,
+      subjectId: uuid,
+      name: 'Term 1 Mathematics',
+      examDate: '2026-10-20',
+      maxMarks: 100,
+      status: 'published',
+    });
+    const marks = saveExamMarksSchema.parse({
+      examId: uuid,
+      records: [{ studentId: uuid, marksObtained: 82, remarks: 'Good work' }],
+    });
+
+    expect(exam.status).toBe('published');
+    expect(marks.records[0]?.marksObtained).toBe(82);
+  });
+
+  it('rejects impossible mark values', () => {
+    const parsed = saveExamMarksSchema.safeParse({
+      examId: uuid,
+      records: [{ studentId: uuid, marksObtained: -1 }],
     });
 
     expect(parsed.success).toBe(false);

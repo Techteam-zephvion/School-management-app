@@ -12,6 +12,7 @@ import {
   createTeacherMaterialSchema,
   idSchema,
   saveAttendanceSchema,
+  saveExamMarksSchema,
   teacherCopilotSchema,
   teacherMaterialContentSchema,
   timetableQuerySchema,
@@ -35,6 +36,21 @@ teacherRoutes.get('/assignments', async (c) => {
 teacherRoutes.get('/timetable', zValidator('query', timetableQuerySchema), async (c) => {
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
   return c.json(await repo.teacherTimetable(c.get('authUser'), c.req.valid('query')));
+});
+
+teacherRoutes.get('/exams', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.listTeacherExams(c.get('authUser')));
+});
+
+teacherRoutes.get('/exams/:id/roster', zValidator('param', idSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.examRosterForTeacher(c.get('authUser'), c.req.valid('param').id));
+});
+
+teacherRoutes.post('/exam-marks', zValidator('json', saveExamMarksSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.saveTeacherExamMarks(c.get('authUser'), c.req.valid('json')), 201);
 });
 
 teacherRoutes.get(

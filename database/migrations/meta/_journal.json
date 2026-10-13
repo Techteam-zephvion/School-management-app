@@ -50,6 +50,13 @@
       "when": 1791876218882,
       "tag": "0006_happy_wallop",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791883083486,
+      "tag": "0007_romantic_scorpion",
+      "breakpoints": true
     }
   ]
 }

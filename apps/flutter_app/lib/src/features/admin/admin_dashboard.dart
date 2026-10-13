@@ -19,6 +19,7 @@ import 'views/admin_assignments_view.dart';
 import 'views/admin_attendance_view.dart';
 import 'views/admin_ai_usage_view.dart';
 import 'views/admin_classes_view.dart';
+import 'views/admin_exams_view.dart';
 import 'views/admin_insights_view.dart';
 import 'views/admin_overview_view.dart';
 import 'views/admin_reports_view.dart';
@@ -38,6 +39,7 @@ enum AdminNavSection {
   classesAndSubjects,
   teacherAssignments,
   timetable,
+  exams,
   reports,
   settings,
 }
@@ -61,6 +63,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   List<Map<String, Object?>> _students = [];
   List<Map<String, Object?>> _assignments = [];
   List<Map<String, Object?>> _timetable = [];
+  List<Map<String, Object?>> _exams = [];
   List<Map<String, Object?>> _summaries = [];
   String _schoolName = 'Schoolic Academy';
   bool _loading = true;
@@ -111,6 +114,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         api.getList('/api/v1/admin/students', session: session),
         api.getList('/api/v1/admin/teacher-assignments', session: session),
         api.getList('/api/v1/admin/timetable', session: session),
+        api.getList('/api/v1/admin/exams', session: session),
         api
             .getJson('/api/v1/admin/overview', session: session)
             .then((res) {
@@ -131,6 +135,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         _students = results[5];
         _assignments = results[6];
         _timetable = results[7];
+        _exams = results[8];
       });
       await _loadSummaries();
     } on ApiException catch (exception) {
@@ -453,6 +458,12 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     AdminNavSection.timetable,
                     Icons.calendar_month_outlined,
                     'Timetable',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
+                    AdminNavSection.exams,
+                    Icons.assignment_outlined,
+                    'Exams',
                     isDrawer: isDrawer,
                   ),
                   _sidebarItem(
@@ -832,6 +843,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         return 'Teacher Assignments';
       case AdminNavSection.timetable:
         return 'Timetable';
+      case AdminNavSection.exams:
+        return 'Exams & Marks';
       case AdminNavSection.reports:
         return 'Reports & Export';
       case AdminNavSection.settings:
@@ -948,6 +961,15 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           staff: _staff,
           assignments: _assignments,
           entries: _timetable,
+          reload: _load,
+        );
+      case AdminNavSection.exams:
+        return AdminExamsView(
+          exams: _exams,
+          years: _years,
+          classes: _classes,
+          sections: _sections,
+          subjects: _subjects,
           reload: _load,
         );
       case AdminNavSection.reports:

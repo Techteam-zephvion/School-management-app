@@ -25,6 +25,7 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
   Map<String, Object?>? _attendance;
   Map<String, Object?>? _timetable;
   Map<String, Object?>? _homework;
+  Map<String, Object?>? _reportCard;
   List<Map<String, Object?>> _announcements = const [];
 
   List<Map<String, Object?>> get _students {
@@ -85,6 +86,10 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
         '/api/v1/portal/homework$query',
         session: session,
       );
+      final reportCard = await api.getJson(
+        '/api/v1/portal/report-card$query',
+        session: session,
+      );
       final announcements = await api.getList(
         '/api/v1/portal/announcements$query',
         session: session,
@@ -97,6 +102,7 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
         _attendance = attendance;
         _timetable = timetable;
         _homework = homework;
+        _reportCard = reportCard;
         _announcements = announcements;
         _loading = false;
       });
@@ -184,6 +190,8 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
                               const SizedBox(height: 18),
                               _homeworkPanel(),
                               const SizedBox(height: 18),
+                              _reportCardPanel(),
+                              const SizedBox(height: 18),
                               announcements,
                             ],
                           );
@@ -198,6 +206,8 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
                               child: Column(
                                 children: [
                                   _homeworkPanel(),
+                                  const SizedBox(height: 18),
+                                  _reportCardPanel(),
                                   const SizedBox(height: 18),
                                   announcements,
                                 ],
@@ -366,6 +376,41 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
                       'Due ${assignment['dueDate'] ?? '-'}$subject\n${assignment['instructions'] ?? ''}',
                 );
               }).toList(),
+            ),
+    );
+  }
+
+  Widget _reportCardPanel() {
+    final summary = (_reportCard?['summary'] as Map?)?.cast<String, Object?>();
+    final results = ((_reportCard?['results'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((row) => row.cast<String, Object?>())
+        .toList();
+    return _Panel(
+      title: 'Report Card',
+      child: results.isEmpty
+          ? const EmptyStateView(
+              title: 'No published marks',
+              description:
+                  'Exam results published by the school will appear here.',
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${summary?['percentage'] ?? '-'}% overall • ${summary?['totalObtained'] ?? 0}/${summary?['totalMax'] ?? 0}',
+                  style: AppTypography.body,
+                ),
+                const SizedBox(height: 10),
+                ...results.map((result) {
+                  return _ListRow(
+                    title:
+                        '${result['name'] ?? 'Exam'} • ${result['marksObtained']}/${result['maxMarks']}',
+                    subtitle:
+                        '${result['subjectName'] ?? 'General'} • ${result['examDate'] ?? '-'}\n${result['remarks'] ?? ''}',
+                  );
+                }),
+              ],
             ),
     );
   }

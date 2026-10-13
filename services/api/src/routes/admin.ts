@@ -11,6 +11,7 @@ import {
   aiAttendanceInsightsSchema,
   createAcademicYearSchema,
   createAnnouncementSchema,
+  createExamSchema,
   createClassSchema,
   createSectionSchema,
   createStaffSchema,
@@ -23,6 +24,7 @@ import {
   idSchema,
   timetableQuerySchema,
   updateTimetableEntrySchema,
+  updateExamSchema,
 } from '../http/validation';
 
 export const adminRoutes = new Hono<AppBindings>();
@@ -230,6 +232,26 @@ adminRoutes
     const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
     return c.json(await repo.createAdminAnnouncement(c.get('authUser'), c.req.valid('json')), 201);
   });
+
+adminRoutes
+  .get('/exams', async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listAdminExams(c.get('authUser')));
+  })
+  .post('/exams', zValidator('json', createExamSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createAdminExam(c.get('authUser'), c.req.valid('json')), 201);
+  });
+
+adminRoutes.patch('/exams/:id', zValidator('param', idSchema), zValidator('json', updateExamSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.updateAdminExam(c.get('authUser'), c.req.valid('param').id, c.req.valid('json')));
+});
+
+adminRoutes.delete('/exams/:id', zValidator('param', idSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.deleteAdminExam(c.get('authUser'), c.req.valid('param').id));
+});
 
 adminRoutes.post('/ai/attendance-insights', zValidator('json', aiAttendanceInsightsSchema), async (c) => {
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));

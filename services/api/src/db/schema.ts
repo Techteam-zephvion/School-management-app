@@ -25,6 +25,7 @@ export const teachingMaterialTypeEnum = pgEnum('teaching_material_type', ['lesso
 export const announcementAudienceEnum = pgEnum('announcement_audience', ['school', 'class_section']);
 export const announcementPriorityEnum = pgEnum('announcement_priority', ['normal', 'important', 'urgent']);
 export const homeworkStatusEnum = pgEnum('homework_status', ['draft', 'published', 'archived']);
+export const examStatusEnum = pgEnum('exam_status', ['draft', 'published', 'archived']);
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -358,5 +359,44 @@ export const homeworkAssignments = pgTable(
   (table) => [
     index('homework_assignments_teacher_idx').on(table.schoolId, table.ownerStaffId, table.dueDate),
     index('homework_assignments_section_idx').on(table.schoolId, table.academicYearId, table.sectionId, table.dueDate),
+  ],
+);
+
+export const exams = pgTable(
+  'exams',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull().references(() => academicYears.id),
+    classId: uuid('class_id').notNull().references(() => classes.id),
+    sectionId: uuid('section_id').notNull().references(() => sections.id),
+    subjectId: uuid('subject_id').references(() => subjects.id),
+    name: text('name').notNull(),
+    examDate: date('exam_date').notNull(),
+    maxMarks: integer('max_marks').notNull(),
+    status: examStatusEnum('status').default('draft').notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index('exams_section_idx').on(table.schoolId, table.academicYearId, table.sectionId, table.examDate),
+    index('exams_subject_idx').on(table.schoolId, table.subjectId, table.examDate),
+  ],
+);
+
+export const examMarks = pgTable(
+  'exam_marks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    examId: uuid('exam_id').notNull().references(() => exams.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+    recordedByStaffId: uuid('recorded_by_staff_id').notNull().references(() => staff.id),
+    marksObtained: integer('marks_obtained').notNull(),
+    remarks: text('remarks'),
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.examId, table.studentId),
+    index('exam_marks_student_idx').on(table.schoolId, table.studentId),
   ],
 );

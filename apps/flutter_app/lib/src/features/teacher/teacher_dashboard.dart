@@ -14,6 +14,7 @@ import 'views/teacher_attendance_view.dart';
 import 'views/teacher_classes_view.dart';
 import 'views/teacher_copilot_view.dart';
 import 'views/teacher_homework_view.dart';
+import 'views/teacher_marks_view.dart';
 import 'views/teacher_my_day_view.dart';
 import 'views/teacher_timetable_view.dart';
 
@@ -221,8 +222,10 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                       const SizedBox(width: 4),
                       _buildTabButton(5, 'Homework', Icons.assignment_outlined),
                       const SizedBox(width: 4),
+                      _buildTabButton(6, 'Marks', Icons.fact_check_outlined),
+                      const SizedBox(width: 4),
                       _buildTabButton(
-                        6,
+                        7,
                         'Announcements',
                         Icons.campaign_outlined,
                       ),
@@ -383,7 +386,8 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                     Icons.auto_awesome_outlined,
                   ),
                   _drawerTabItem(5, 'Homework', Icons.assignment_outlined),
-                  _drawerTabItem(6, 'Announcements', Icons.campaign_outlined),
+                  _drawerTabItem(6, 'Marks', Icons.fact_check_outlined),
+                  _drawerTabItem(7, 'Announcements', Icons.campaign_outlined),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Divider(height: 1, color: AppColors.primaryBorder),
@@ -631,6 +635,8 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
       case 5:
         return TeacherHomeworkView(assignments: _assignments);
       case 6:
+        return const TeacherMarksView();
+      case 7:
         return AnnouncementsView(
           workspace: AnnouncementWorkspace.teacher,
           endpoint: '/api/v1/teacher/announcements',

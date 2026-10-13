@@ -263,3 +263,27 @@ export const createHomeworkAssignmentSchema = z.object({
 });
 
 export const updateHomeworkAssignmentSchema = createHomeworkAssignmentSchema.partial();
+
+export const createExamSchema = z.object({
+  academicYearId: z.uuid(),
+  classId: z.uuid(),
+  sectionId: z.uuid(),
+  subjectId: z.uuid().nullable().optional(),
+  name: z.string().trim().min(2).max(160),
+  examDate: z.iso.date(),
+  maxMarks: z.number().int().min(1).max(1000),
+  status: z.enum(['draft', 'published', 'archived']).default('draft'),
+});
+
+export const updateExamSchema = createExamSchema.partial();
+
+export const saveExamMarksSchema = z.object({
+  examId: z.uuid(),
+  records: z.array(
+    z.object({
+      studentId: z.uuid(),
+      marksObtained: z.number().int().min(0).max(1000),
+      remarks: z.string().trim().max(500).optional(),
+    }),
+  ).min(1).max(200),
+});

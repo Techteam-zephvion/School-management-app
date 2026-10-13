@@ -1,5 +1,45 @@
 # Last Update (October 12, 2026)
 
+## Phase 8.3: Exams, Marks & Report Cards MVP
+
+### Summary
+- Added the first examination workflow for Schoolic.
+- Administrators can create and manage exams for class sections.
+- Teachers can view assigned exams and enter marks for students in their authorized class sections.
+- Students and parents can view published exam results and overall report-card summary in the portal.
+
+### Backend
+- Added `exam_status`, `exams`, and `exam_marks`.
+- Added admin exam routes:
+  - `GET /api/v1/admin/exams`
+  - `POST /api/v1/admin/exams`
+  - `PATCH /api/v1/admin/exams/:id`
+  - `DELETE /api/v1/admin/exams/:id`
+- Added teacher mark-entry routes:
+  - `GET /api/v1/teacher/exams`
+  - `GET /api/v1/teacher/exams/:id/roster`
+  - `POST /api/v1/teacher/exam-marks`
+- Added portal report route:
+  - `GET /api/v1/portal/report-card`
+- Teacher mark entry is restricted to assigned sections. Portal report cards are restricted to linked students and published exams.
+
+### Frontend
+- Added **Exams** area in the administrator workspace.
+- Added **Marks** area in the teacher workspace.
+- Added **Report Card** panel to the student and parent portal.
+
+### Verification
+- `pnpm api:typecheck`: PASS.
+- `pnpm api:test`: PASS, 42/42 tests across 4 files.
+- `cd apps/flutter_app && flutter analyze --no-fatal-infos`: PASS with one pre-existing non-fatal info in `shortcuts_dialog.dart`.
+- `pnpm flutter:test`: PASS, 40/40 tests.
+
+### Deployment
+- Not deployed yet.
+- Production resources were not touched.
+
+---
+
 ## Phase 8.0: Homework & Assignments MVP
 
 ### Summary

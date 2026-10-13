@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, ne } from 'drizzle-orm';
+import { and, desc, eq, gte, lte, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import {
   academicYears,
@@ -8,6 +8,8 @@ import {
   attendanceRecords,
   attendanceSessions,
   classes,
+  examMarks,
+  exams,
   homeworkAssignments,
   schools,
   sections,
@@ -27,6 +29,7 @@ import type {
   createAcademicYearSchema,
   createAnnouncementSchema,
   createHomeworkAssignmentSchema,
+  createExamSchema,
   createClassSchema,
   createSchoolSchema,
   createSectionSchema,
@@ -42,6 +45,8 @@ import type {
   timetableQuerySchema,
   updateTeacherMaterialSchema,
   updateHomeworkAssignmentSchema,
+  updateExamSchema,
+  saveExamMarksSchema,
   updateTimetableEntrySchema,
 } from '../http/validation';
 import type { z } from 'zod';
@@ -56,6 +61,8 @@ type TeacherMaterialUpdateInput = z.infer<typeof updateTeacherMaterialSchema>;
 type AnnouncementInput = z.infer<typeof createAnnouncementSchema>;
 type HomeworkAssignmentInput = z.infer<typeof createHomeworkAssignmentSchema>;
 type HomeworkAssignmentUpdateInput = z.infer<typeof updateHomeworkAssignmentSchema>;
+type ExamInput = z.infer<typeof createExamSchema>;
+type ExamUpdateInput = z.infer<typeof updateExamSchema>;
 
 export function createSchoolRepository(db: Db) {
   return {
@@ -345,6 +352,46 @@ export function createSchoolRepository(db: Db) {
       return {
         student: portalStudent,
         assignments: rows.map(homeworkWithLabels),
+      };
+    },
+
+    async portalReportCard(user: AuthUser, studentId?: string) {
+      const portalStudent = await resolvePortalStudent(db, user, studentId);
+      const rows = await db
+        .select({
+          exam: exams,
+          mark: examMarks,
+          subjectName: subjects.name,
+          teacherName: staff.fullName,
+        })
+        .from(examMarks)
+        .innerJoin(exams, eq(examMarks.examId, exams.id))
+        .leftJoin(subjects, eq(exams.subjectId, subjects.id))
+        .innerJoin(staff, eq(examMarks.recordedByStaffId, staff.id))
+        .where(
+          and(
+            eq(examMarks.schoolId, user.schoolId),
+            eq(examMarks.studentId, portalStudent.id),
+            eq(exams.schoolId, user.schoolId),
+            eq(exams.academicYearId, portalStudent.academicYearId),
+            eq(exams.status, 'published'),
+          ),
+        )
+        .orderBy(desc(exams.examDate), desc(examMarks.updatedAt))
+        .limit(200);
+
+      const results = rows.map((row) => examResultWithLabels(row));
+      const totalObtained = results.reduce((sum, result) => sum + result.marksObtained, 0);
+      const totalMax = results.reduce((sum, result) => sum + result.maxMarks, 0);
+      return {
+        student: portalStudent,
+        summary: {
+          exams: results.length,
+          totalObtained,
+          totalMax,
+          percentage: totalMax === 0 ? null : Math.round((totalObtained / totalMax) * 1000) / 10,
+        },
+        results,
       };
     },
 
@@ -734,6 +781,180 @@ export function createSchoolRepository(db: Db) {
         .limit(200);
 
       return rows.map(homeworkWithLabels);
+    },
+
+    async listAdminExams(user: AuthUser) {
+      const rows = await db
+        .select({
+          exam: exams,
+          className: classes.name,
+          sectionName: sections.name,
+          subjectName: subjects.name,
+        })
+        .from(exams)
+        .innerJoin(classes, eq(exams.classId, classes.id))
+        .innerJoin(sections, eq(exams.sectionId, sections.id))
+        .leftJoin(subjects, eq(exams.subjectId, subjects.id))
+        .where(eq(exams.schoolId, user.schoolId))
+        .orderBy(desc(exams.examDate), desc(exams.createdAt))
+        .limit(300);
+
+      return rows.map(examWithLabels);
+    },
+
+    async createAdminExam(user: AuthUser, input: ExamInput) {
+      await assertExamContext(db, user, input);
+      const [created] = await db
+        .insert(exams)
+        .values({ ...input, schoolId: user.schoolId, subjectId: input.subjectId ?? null })
+        .returning({ id: exams.id });
+      if (!created) throw new ApiError(500, 'Unable to create exam');
+      return (await this.listAdminExams(user)).find((item) => item.id === created.id) ?? created;
+    },
+
+    async updateAdminExam(user: AuthUser, id: string, input: ExamUpdateInput) {
+      const [existing] = await db
+        .select()
+        .from(exams)
+        .where(and(eq(exams.schoolId, user.schoolId), eq(exams.id, id)))
+        .limit(1);
+      if (!existing) throw new ApiError(404, 'Exam not found');
+      await assertExamContext(db, user, {
+        academicYearId: input.academicYearId ?? existing.academicYearId,
+        classId: input.classId ?? existing.classId,
+        sectionId: input.sectionId ?? existing.sectionId,
+        subjectId: input.subjectId === undefined ? existing.subjectId : input.subjectId,
+      });
+      const [updated] = await db
+        .update(exams)
+        .set({
+          ...input,
+          subjectId: input.subjectId === undefined ? undefined : input.subjectId ?? null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(exams.schoolId, user.schoolId), eq(exams.id, id)))
+        .returning({ id: exams.id });
+      if (!updated) throw new ApiError(500, 'Unable to update exam');
+      return (await this.listAdminExams(user)).find((item) => item.id === updated.id) ?? updated;
+    },
+
+    async deleteAdminExam(user: AuthUser, id: string) {
+      const [deleted] = await db
+        .delete(exams)
+        .where(and(eq(exams.schoolId, user.schoolId), eq(exams.id, id)))
+        .returning({ id: exams.id });
+      if (!deleted) throw new ApiError(404, 'Exam not found');
+      return deleted;
+    },
+
+    async listTeacherExams(user: AuthUser) {
+      if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
+      const assignments = await this.teacherAssignmentsFor(user);
+      const allowed = new Set(assignments.map((assignment) => examContextKey(assignment)));
+      const rows = await db
+        .select({
+          exam: exams,
+          className: classes.name,
+          sectionName: sections.name,
+          subjectName: subjects.name,
+        })
+        .from(exams)
+        .innerJoin(classes, eq(exams.classId, classes.id))
+        .innerJoin(sections, eq(exams.sectionId, sections.id))
+        .leftJoin(subjects, eq(exams.subjectId, subjects.id))
+        .where(eq(exams.schoolId, user.schoolId))
+        .orderBy(desc(exams.examDate), desc(exams.createdAt))
+        .limit(300);
+
+      return rows.map(examWithLabels).filter((exam) => allowed.has(examContextKey(exam)));
+    },
+
+    async examRosterForTeacher(user: AuthUser, examId: string) {
+      const exam = await assertTeacherCanManageExam(db, user, examId);
+      const rows = await db
+        .select({
+          studentId: students.id,
+          admissionNumber: students.admissionNumber,
+          fullName: students.fullName,
+          rollNumber: studentEnrollments.rollNumber,
+          mark: examMarks,
+        })
+        .from(studentEnrollments)
+        .innerJoin(students, eq(studentEnrollments.studentId, students.id))
+        .leftJoin(examMarks, and(eq(examMarks.examId, examId), eq(examMarks.studentId, students.id)))
+        .where(
+          and(
+            eq(studentEnrollments.schoolId, user.schoolId),
+            eq(studentEnrollments.academicYearId, exam.academicYearId),
+            eq(studentEnrollments.classId, exam.classId),
+            eq(studentEnrollments.sectionId, exam.sectionId),
+            eq(students.isActive, true),
+          ),
+        )
+        .orderBy(studentEnrollments.rollNumber, students.fullName)
+        .limit(300);
+      return {
+        exam,
+        students: rows.map((row) => ({
+          studentId: row.studentId,
+          admissionNumber: row.admissionNumber,
+          fullName: row.fullName,
+          rollNumber: row.rollNumber,
+          marksObtained: row.mark?.marksObtained ?? null,
+          remarks: row.mark?.remarks ?? null,
+        })),
+      };
+    },
+
+    async saveTeacherExamMarks(user: AuthUser, input: z.infer<typeof saveExamMarksSchema>) {
+      const exam = await assertTeacherCanManageExam(db, user, input.examId);
+      if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
+      const validStudentIds = new Set(
+        (
+          await db
+            .select({ id: students.id })
+            .from(studentEnrollments)
+            .innerJoin(students, eq(studentEnrollments.studentId, students.id))
+            .where(
+              and(
+                eq(studentEnrollments.schoolId, user.schoolId),
+                eq(studentEnrollments.academicYearId, exam.academicYearId),
+                eq(studentEnrollments.classId, exam.classId),
+                eq(studentEnrollments.sectionId, exam.sectionId),
+                eq(students.isActive, true),
+              ),
+            )
+            .limit(300)
+        ).map((row) => row.id),
+      );
+      for (const record of input.records) {
+        if (!validStudentIds.has(record.studentId)) throw new ApiError(403, 'One or more students do not belong to this exam section');
+        if (record.marksObtained > exam.maxMarks) throw new ApiError(422, 'Marks cannot exceed exam maximum marks');
+      }
+
+      await db
+        .insert(examMarks)
+        .values(
+          input.records.map((record) => ({
+            schoolId: user.schoolId,
+            examId: input.examId,
+            studentId: record.studentId,
+            recordedByStaffId: user.staffId!,
+            marksObtained: record.marksObtained,
+            remarks: record.remarks ?? null,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [examMarks.examId, examMarks.studentId],
+          set: {
+            recordedByStaffId: user.staffId,
+            marksObtained: sqlExcluded('marks_obtained'),
+            remarks: sqlExcluded('remarks'),
+            updatedAt: new Date(),
+          },
+        });
+
+      return this.examRosterForTeacher(user, input.examId);
     },
 
     async createTeacherHomework(user: AuthUser, input: HomeworkAssignmentInput) {
@@ -1563,6 +1784,41 @@ function homeworkWithLabels(row: {
   };
 }
 
+function examWithLabels(row: {
+  exam: typeof exams.$inferSelect;
+  className: string;
+  sectionName: string;
+  subjectName: string | null;
+}) {
+  return {
+    ...row.exam,
+    className: row.className,
+    sectionName: row.sectionName,
+    subjectName: row.subjectName,
+  };
+}
+
+function examResultWithLabels(row: {
+  exam: typeof exams.$inferSelect;
+  mark: typeof examMarks.$inferSelect;
+  subjectName: string | null;
+  teacherName: string;
+}) {
+  return {
+    id: row.mark.id,
+    examId: row.exam.id,
+    name: row.exam.name,
+    examDate: row.exam.examDate,
+    subjectId: row.exam.subjectId,
+    subjectName: row.subjectName,
+    marksObtained: row.mark.marksObtained,
+    maxMarks: row.exam.maxMarks,
+    percentage: Math.round((row.mark.marksObtained / row.exam.maxMarks) * 1000) / 10,
+    remarks: row.mark.remarks,
+    teacherName: row.teacherName,
+  };
+}
+
 function announcementWithLabels(row: {
   announcement: typeof announcements.$inferSelect;
   className: string | null;
@@ -1608,6 +1864,86 @@ async function assertStudentAndUserBelongToSchool(db: Db, user: AuthUser, studen
     .where(and(eq(appUsers.schoolId, user.schoolId), eq(appUsers.id, appUserId), eq(appUsers.isActive, true)))
     .limit(1);
   if (!appUser) throw new ApiError(422, 'Selected user account is not available');
+}
+
+async function assertExamContext(
+  db: Db,
+  user: AuthUser,
+  input: {
+    academicYearId?: string | undefined;
+    classId?: string | undefined;
+    sectionId?: string | undefined;
+    subjectId?: string | null | undefined;
+  },
+) {
+  if (input.academicYearId) {
+    const [year] = await db
+      .select({ id: academicYears.id })
+      .from(academicYears)
+      .where(and(eq(academicYears.schoolId, user.schoolId), eq(academicYears.id, input.academicYearId)))
+      .limit(1);
+    if (!year) throw new ApiError(422, 'Selected academic year is not available');
+  }
+  if (input.classId) {
+    const [klass] = await db
+      .select({ id: classes.id })
+      .from(classes)
+      .where(and(eq(classes.schoolId, user.schoolId), eq(classes.id, input.classId)))
+      .limit(1);
+    if (!klass) throw new ApiError(422, 'Selected class is not available');
+  }
+  if (input.sectionId) {
+    const [section] = await db
+      .select({ id: sections.id })
+      .from(sections)
+      .where(and(eq(sections.schoolId, user.schoolId), eq(sections.id, input.sectionId)))
+      .limit(1);
+    if (!section) throw new ApiError(422, 'Selected section is not available');
+  }
+  if (input.subjectId) {
+    const [subject] = await db
+      .select({ id: subjects.id })
+      .from(subjects)
+      .where(and(eq(subjects.schoolId, user.schoolId), eq(subjects.id, input.subjectId)))
+      .limit(1);
+    if (!subject) throw new ApiError(422, 'Selected subject is not available');
+  }
+}
+
+async function assertTeacherCanManageExam(db: Db, user: AuthUser, examId: string) {
+  if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
+  const [exam] = await db
+    .select()
+    .from(exams)
+    .where(and(eq(exams.schoolId, user.schoolId), eq(exams.id, examId)))
+    .limit(1);
+  if (!exam) throw new ApiError(404, 'Exam not found');
+
+  const predicates = [
+    eq(teacherAssignments.schoolId, user.schoolId),
+    eq(teacherAssignments.staffId, user.staffId),
+    eq(teacherAssignments.academicYearId, exam.academicYearId),
+    eq(teacherAssignments.classId, exam.classId),
+    eq(teacherAssignments.sectionId, exam.sectionId),
+  ];
+  if (exam.subjectId) predicates.push(eq(teacherAssignments.subjectId, exam.subjectId));
+
+  const [assignment] = await db.select({ id: teacherAssignments.id }).from(teacherAssignments).where(and(...predicates)).limit(1);
+  if (!assignment) throw new ApiError(403, 'Teacher is not assigned to this exam section');
+  return exam;
+}
+
+function examContextKey(input: {
+  academicYearId: string;
+  classId: string;
+  sectionId: string;
+  subjectId?: string | null;
+}) {
+  return `${input.academicYearId}:${input.classId}:${input.sectionId}:${input.subjectId ?? ''}`;
+}
+
+function sqlExcluded(column: string) {
+  return sql.raw(`excluded.${column}`);
 }
 
 async function assertTeacherAnnouncementTarget(db: Db, user: AuthUser, input: AnnouncementInput) {
