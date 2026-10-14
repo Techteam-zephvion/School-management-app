@@ -108,7 +108,7 @@ class _AddStaffDialogState extends ConsumerState<AddStaffDialog> {
               keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(
                 labelText: 'Email Address (optional)',
-                hintText: 'e.g. robert.vance@schoolic.edu',
+                hintText: 'e.g. faculty.name@institution.edu',
               ),
             ),
             const SizedBox(height: 12),

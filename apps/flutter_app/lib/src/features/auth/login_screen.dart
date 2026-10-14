@@ -203,7 +203,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               onSubmitted: (_) => _submit(),
                               decoration: const InputDecoration(
                                 labelText: 'Institutional Email',
-                                hintText: 'user@schoolic.edu',
+                                hintText: 'name@institution.edu',
                               ),
                             ),
                             const SizedBox(height: 12),

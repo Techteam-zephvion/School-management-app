@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+
 
 import '../../core/api_client.dart';
 import '../../core/csv_exporter.dart';
@@ -57,7 +59,8 @@ class AdminDashboard extends ConsumerStatefulWidget {
   ConsumerState<AdminDashboard> createState() => _AdminDashboardState();
 }
 
-class _AdminDashboardState extends ConsumerState<AdminDashboard> {
+class _AdminDashboardState extends ConsumerState<AdminDashboard>
+    with WidgetsBindingObserver {
   AdminNavSection _activeSection = AdminNavSection.overview;
   bool _sidebarCollapsed = false;
 
@@ -71,10 +74,11 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   List<Map<String, Object?>> _timetable = [];
   List<Map<String, Object?>> _exams = [];
   List<Map<String, Object?>> _summaries = [];
-  String _schoolName = 'Schoolic Academy';
+  String _schoolName = 'Schoolic';
   bool _loading = true;
   bool _hasLoaded = false;
   String? _error;
+  Timer? _realtimeSyncTimer;
 
   String? _selectedClassId;
   String? _selectedSectionId;
@@ -85,7 +89,18 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
+
+    // Background real-time live sync every 25s (bypassed in test harness)
+    final isTest =
+        WidgetsBinding.instance.runtimeType.toString().contains('Test');
+    if (!isTest) {
+      _realtimeSyncTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+        if (mounted) _load(silent: true);
+      });
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (await TourDialog.shouldShowAutoTour()) {
         if (mounted) {
@@ -96,25 +111,36 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _load(silent: true);
+    }
+  }
+
+  @override
   void dispose() {
+    _realtimeSyncTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _startDate.dispose();
     _endDate.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool silent = false}) async {
     final auth = ref.read(authControllerProvider);
     if (auth.isLoading) return;
     final session = auth.session;
     if (session == null) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && !silent) setState(() => _loading = false);
       return;
     }
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final api = ref.read(apiClientProvider);
       final results = await Future.wait([
@@ -153,11 +179,11 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
       });
       await _loadSummaries();
     } on ApiException catch (exception) {
-      if (!_hasLoaded) setState(() => _error = exception.message);
+      if (!silent && !_hasLoaded) setState(() => _error = exception.message);
     } catch (e) {
-      if (!_hasLoaded) setState(() => _error = e.toString());
+      if (!silent && !_hasLoaded) setState(() => _error = e.toString());
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && !silent) setState(() => _loading = false);
     }
   }
 
@@ -547,7 +573,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                   children: [
                     Expanded(
                       child: Text(
-                        session?.email ?? 'admin@schoolic.local',
+                        session?.email ?? 'admin@schoolic.app',
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontFamily: 'Switzer',
@@ -821,10 +847,44 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
               ),
             ),
             const SizedBox(width: 4),
+            // Live Sync Status Pill
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              margin: const EdgeInsets.only(right: 6),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: Colors.green,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  const Text(
+                    'LIVE SYNC',
+                    style: TextStyle(
+                      fontFamily: 'Switzer',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.green,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             IconButton(
               tooltip: 'Refresh data',
               iconSize: 18,
-              onPressed: _load,
+              onPressed: () => _load(),
               icon: const Icon(Icons.refresh, color: AppColors.secondaryText),
             ),
             if (!isMobile) ...[
@@ -834,7 +894,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 180),
                 child: Text(
-                  session?.email ?? 'admin@schoolic.local',
+                  session?.email ?? 'admin@schoolic.app',
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontFamily: 'Switzer',

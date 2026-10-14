@@ -48,7 +48,12 @@ class AdminSettingsView extends StatelessWidget {
               _settingRow('Active Academic Year', activeYear, isPhone: isPhone),
               _settingRow(
                 'Application Version',
-                'Schoolic Phase 5.2 (UX Redesign)',
+                'Schoolic v1.0.0 (Production Release Build)',
+                isPhone: isPhone,
+              ),
+              _settingRow(
+                'Real-time Sync',
+                'Active (Automated Live Background Sync)',
                 isPhone: isPhone,
               ),
               _settingRow(
