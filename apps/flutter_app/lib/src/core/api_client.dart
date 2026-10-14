@@ -329,22 +329,23 @@ class ApiClient {
 
   void _ensureSuccess(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
-    String errorMessage = 'Request failed (${response.statusCode})';
+    String? serverMessage;
     if (response.body.isNotEmpty) {
       try {
         final body = _decode(response);
-        if (body['error'] is String) {
-          errorMessage = body['error'] as String;
-        } else if (body['message'] is String) {
-          errorMessage = body['message'] as String;
+        if (body['error'] is String && (body['error'] as String).trim().isNotEmpty) {
+          serverMessage = (body['error'] as String).trim();
+        } else if (body['message'] is String && (body['message'] as String).trim().isNotEmpty) {
+          serverMessage = (body['message'] as String).trim();
         }
       } catch (_) {
         // Non-JSON response
       }
     }
-    if (response.statusCode >= 500) {
-      errorMessage = 'Schoolic service is currently unavailable. Please try again later.';
-    }
+    final errorMessage = serverMessage ??
+        (response.statusCode >= 500
+            ? 'Schoolic service is currently unavailable. Please try again later.'
+            : 'Request failed (${response.statusCode})');
     throw ApiException(errorMessage, response.statusCode);
   }
 
