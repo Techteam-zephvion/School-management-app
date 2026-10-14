@@ -205,10 +205,13 @@ importers:
         version: 1.2.0
       drizzle-orm:
         specifier: ^0.45.4
-        version: 0.45.4(@cloudflare/workers-types@5.20261009.1)(@neondatabase/serverless@1.2.0)
+        version: 0.45.4(@cloudflare/workers-types@5.20261009.1)(@neondatabase/serverless@1.2.0)(postgres@3.4.9)
       hono:
         specifier: ^4.13.13
         version: 4.13.13
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
       zod:
         specifier: ^4.1.13
         version: 4.6.5
@@ -1766,6 +1769,10 @@ packages:
     resolution: {integrity: sha512-49cGhUbXj8Qenv0iTMxA1cFBzxXoctpC9Ujd77t1WcbJIr6nF/eI7g/8MgxrYldFRuAXvja7xQRwavoW7kgrxQ==}
     engines: {node: ^10 || ^12 || >=14}
 
+  postgres@3.4.9:
+    resolution: {integrity: sha512-GD3qdB0x1z9xgFI6cdRD6xu2Sp2WCOEoe3mtnyB5Ee0XrrL5Pe+e4CCnJrRMnL1zYtRDZmQQVbvOttLnKDLnaw==}
+    engines: {node: '>=12'}
+
   resolve-pkg-maps@1.0.0:
     resolution: {integrity: sha512-seS2Tj26TBVOC2NIc2rOe2y2ZO7efxITtLZcGSOnHHNOQ7CkiUBfw0Iw2ck6xkIhPwLhKNLS8BO+hEpngQlqzw==}
 
@@ -2800,10 +2807,11 @@ snapshots:
       esbuild: 0.25.12
       tsx: 4.23.15
 
-  drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261009.1)(@neondatabase/serverless@1.2.0):
+  drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261009.1)(@neondatabase/serverless@1.2.0)(postgres@3.4.9):
     optionalDependencies:
       '@cloudflare/workers-types': 5.20261009.1
       '@neondatabase/serverless': 1.2.0
+      postgres: 3.4.9
 
   error-stack-parser-es@1.0.5: {}
 
@@ -3055,6 +3063,8 @@ snapshots:
       nanoid: 3.3.20
       picocolors: 1.1.1
       source-map-js: 1.2.2
+
+  postgres@3.4.9: {}
 
   resolve-pkg-maps@1.0.0: {}
 

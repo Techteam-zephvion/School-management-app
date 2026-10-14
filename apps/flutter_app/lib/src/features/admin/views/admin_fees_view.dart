@@ -11,6 +11,7 @@ import '../../shared/components/feedback_banner.dart';
 import '../../shared/components/page_header.dart';
 import '../../shared/components/stat_strip.dart';
 import '../../shared/components/status_badge.dart';
+import '../../student/utils/fee_receipt_pdf.dart';
 
 class AdminFeesView extends ConsumerStatefulWidget {
   const AdminFeesView({
@@ -1138,6 +1139,27 @@ class _ReceiptModal extends StatelessWidget {
         ),
       ),
       actions: [
+        OutlinedButton.icon(
+          icon: const Icon(Icons.print, size: 16),
+          label: const Text('Print Receipt'),
+          onPressed: () {
+            printOrShareFeeReceipt(
+              FeeReceiptData(
+                schoolName: 'Schoolic Academy',
+                receiptNumber: receiptNum,
+                studentName: student,
+                admissionNumber: adm,
+                className: 'Institutional',
+                sectionName: '',
+                feeName: fee,
+                amountPaid: amount,
+                paymentMethod: method,
+                paidAt: paidAt,
+                transactionReference: ref,
+              ),
+            );
+          },
+        ),
         FilledButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Close Receipt'),

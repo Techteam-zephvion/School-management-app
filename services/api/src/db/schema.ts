@@ -43,6 +43,7 @@ export const admissionStatusEnum = pgEnum('admission_status', [
   'enrolled',
   'rejected',
 ]);
+export const paymentOrderStatusEnum = pgEnum('payment_order_status', ['ACTIVE', 'PAID', 'EXPIRED', 'FAILED']);
 export const documentStatusEnum = pgEnum('document_status', [
   'pending',
   'submitted',
@@ -558,5 +559,46 @@ export const admissionDocuments = pgTable(
     index('admission_docs_app_idx').on(table.schoolId, table.applicationId),
   ],
 );
+
+export const paymentOrders = pgTable(
+  'payment_orders',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+    allocationId: uuid('allocation_id').notNull().references(() => studentFeeAllocations.id, { onDelete: 'cascade' }),
+    gateway: text('gateway').default('cashfree').notNull(),
+    gatewayOrderId: text('gateway_order_id').notNull(),
+    paymentSessionId: text('payment_session_id').notNull(),
+    amount: integer('amount').notNull(),
+    currency: text('currency').default('INR').notNull(),
+    status: paymentOrderStatusEnum('status').default('ACTIVE').notNull(),
+    cfPaymentId: text('cf_payment_id'),
+    paymentMethod: text('payment_method'),
+    failureReason: text('failure_reason'),
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.gatewayOrderId),
+    index('payment_orders_student_idx').on(table.schoolId, table.studentId),
+    index('payment_orders_allocation_idx').on(table.allocationId),
+  ],
+);
+
+export const paymentWebhookEvents = pgTable(
+  'payment_webhook_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    gateway: text('gateway').default('cashfree').notNull(),
+    eventId: text('event_id').notNull(),
+    eventType: text('event_type').notNull(),
+    payload: jsonb('payload').notNull(),
+    processedAt: timestamp('processed_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique().on(table.eventId),
+  ],
+);
+
 
 

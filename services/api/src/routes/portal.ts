@@ -2,14 +2,14 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import { createDb } from '../db/client';
 import { requireRole } from '../http/auth';
-import { portalStudentQuerySchema, submitHomeworkSchema } from '../http/validation';
+import { portalStudentQuerySchema, submitHomeworkSchema, createPaymentOrderSchema, verifyPaymentOrderSchema } from '../http/validation';
 import { createSchoolRepository } from '../repositories/school-repository';
 import type { AppBindings } from '../types';
 
 export const portalRoutes = new Hono<AppBindings>();
 
 portalRoutes.use('*', async (c, next) => {
-  requireRole(c.get('authUser'), ['student', 'parent']);
+  requireRole(c.get('authUser'), ['student', 'parent', 'admin']);
   await next();
 });
 
@@ -52,6 +52,18 @@ portalRoutes.get('/report-card', zValidator('query', portalStudentQuerySchema), 
 portalRoutes.get('/fees', zValidator('query', portalStudentQuerySchema), async (c) => {
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
   return c.json(await repo.portalFeeSummary(c.get('authUser'), c.req.valid('query').studentId));
+});
+
+portalRoutes.post('/fees/orders', zValidator('json', createPaymentOrderSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const res = await repo.createPaymentOrder(c.get('authUser'), c.req.valid('json'), c.env);
+  return c.json(res, 201);
+});
+
+portalRoutes.post('/fees/verify', zValidator('json', verifyPaymentOrderSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const res = await repo.verifyPaymentOrder(c.get('authUser'), c.req.valid('json').orderId, c.env);
+  return c.json(res);
 });
 
 portalRoutes.get('/id-card', zValidator('query', portalStudentQuerySchema), async (c) => {

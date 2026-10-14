@@ -28,10 +28,13 @@ import {
   timetableEntries,
   teacherAssignments,
   userRoles,
+  paymentOrders,
+  paymentWebhookEvents,
 } from '../db/schema';
 
 import { ApiError } from '../http/errors';
-import type { AuthUser } from '../types';
+import { CashfreeClient } from '../payments/cashfree';
+import type { AuthUser, Env } from '../types';
 import type {
   createAcademicYearSchema,
   createAnnouncementSchema,
@@ -1485,6 +1488,339 @@ export function createSchoolRepository(db: Db) {
         payments,
       };
     },
+
+    async createPaymentOrder(
+      user: AuthUser,
+      input: { allocationId: string; amount: number; returnUrl?: string | undefined },
+      env: Env,
+    ) {
+      const [alloc] = await db
+        .select({
+          id: studentFeeAllocations.id,
+          schoolId: studentFeeAllocations.schoolId,
+          studentId: studentFeeAllocations.studentId,
+          totalAmount: studentFeeAllocations.amount,
+          status: studentFeeAllocations.status,
+          studentName: students.fullName,
+          feeName: feeStructures.name,
+          admissionNumber: students.admissionNumber,
+        })
+        .from(studentFeeAllocations)
+        .innerJoin(students, eq(students.id, studentFeeAllocations.studentId))
+        .innerJoin(feeStructures, eq(feeStructures.id, studentFeeAllocations.feeStructureId))
+        .where(
+          and(
+            eq(studentFeeAllocations.id, input.allocationId),
+            eq(studentFeeAllocations.schoolId, user.schoolId),
+          ),
+        )
+        .limit(1);
+
+      if (!alloc) throw new ApiError(404, 'Fee allocation not found');
+
+      if (!user.roles.includes('admin')) {
+        const allowed = await portalStudentsFor(db, user);
+        if (!allowed.some((s) => s.id === alloc.studentId)) {
+          throw new ApiError(403, 'Unauthorized access to student fee allocation');
+        }
+      }
+
+      const existingPayments = await db
+        .select({
+          amountPaid: feePayments.amountPaid,
+        })
+        .from(feePayments)
+        .where(
+          and(
+            eq(feePayments.allocationId, alloc.id),
+            eq(feePayments.schoolId, user.schoolId),
+          ),
+        );
+
+      const totalPaid = existingPayments.reduce((sum, p) => sum + p.amountPaid, 0);
+      const balanceDue = Math.max(0, alloc.totalAmount - totalPaid);
+
+      if (balanceDue <= 0) {
+        throw new ApiError(400, 'Fee allocation is already fully settled');
+      }
+
+      if (input.amount > balanceDue) {
+        throw new ApiError(400, `Amount exceeds outstanding balance of ₹${balanceDue}`);
+      }
+
+      if (input.amount <= 0) {
+        throw new ApiError(400, 'Payment amount must be greater than zero');
+      }
+
+      const orderId = `SCH_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`.toUpperCase();
+
+      const cashfree = new CashfreeClient(env);
+      const cfOrder = await cashfree.createOrder({
+        orderId,
+        orderAmount: input.amount,
+        customerId: alloc.studentId,
+        customerName: alloc.studentName,
+        customerEmail: user.email,
+        customerPhone: '9999999999',
+        orderNote: `${alloc.feeName} for ${alloc.studentName} (${alloc.admissionNumber || ''})`,
+        returnUrl: input.returnUrl,
+      });
+
+      const [orderRecord] = await db
+        .insert(paymentOrders)
+        .values({
+          schoolId: user.schoolId,
+          studentId: alloc.studentId,
+          allocationId: alloc.id,
+          gateway: 'cashfree',
+          gatewayOrderId: orderId,
+          paymentSessionId: cfOrder.paymentSessionId,
+          amount: input.amount,
+          currency: 'INR',
+          status: 'ACTIVE',
+        })
+        .returning();
+
+      if (!orderRecord) {
+        throw new ApiError(500, 'Failed to persist payment order record');
+      }
+
+      return {
+        orderId: orderRecord.gatewayOrderId,
+        paymentSessionId: orderRecord.paymentSessionId,
+        amount: orderRecord.amount,
+        currency: orderRecord.currency,
+        studentName: alloc.studentName,
+        feeName: alloc.feeName,
+        isSimulated: cfOrder.isSimulated,
+      };
+    },
+
+    async verifyPaymentOrder(user: AuthUser, orderId: string, env: Env) {
+      const [order] = await db
+        .select()
+        .from(paymentOrders)
+        .where(
+          and(
+            eq(paymentOrders.gatewayOrderId, orderId),
+            eq(paymentOrders.schoolId, user.schoolId),
+          ),
+        )
+        .limit(1);
+
+      if (!order) throw new ApiError(404, 'Payment order not found');
+
+      if (order.status === 'PAID') {
+        const [existingPayment] = await db
+          .select()
+          .from(feePayments)
+          .where(
+            and(
+              eq(feePayments.allocationId, order.allocationId),
+              eq(feePayments.transactionReference, order.gatewayOrderId),
+            ),
+          )
+          .limit(1);
+
+        return {
+          success: true,
+          status: 'PAID',
+          receiptNumber: existingPayment?.receiptNumber ?? 'REC-PAID',
+          amountPaid: order.amount,
+        };
+      }
+
+      const cashfree = new CashfreeClient(env);
+      let payments = await cashfree.getPayments(orderId);
+      let successPayment = payments.find((p) => p.paymentStatus === 'SUCCESS');
+
+      // In Sandbox mode, if client verifies and no payment transaction has settled yet on Cashfree sandbox,
+      // simulate settlement via Cashfree's test UPI channel
+      if (!successPayment && (env.CASHFREE_ENV === 'sandbox' || env.CASHFREE_APP_ID?.startsWith('TEST'))) {
+        await cashfree.payOrderSession(order.paymentSessionId);
+        payments = await cashfree.getPayments(orderId);
+        successPayment = payments.find((p) => p.paymentStatus === 'SUCCESS');
+      }
+
+      if (!successPayment) {
+        return {
+          success: false,
+          status: order.status,
+          message: 'Payment has not been completed or was not approved by bank.',
+        };
+      }
+
+      const year = new Date().getFullYear();
+      const countRes = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(feePayments)
+        .where(eq(feePayments.schoolId, user.schoolId));
+      const nextSeq = (countRes[0]?.count ?? 0) + 1;
+      const receiptNumber = `REC-${year}-${String(nextSeq).padStart(5, '0')}`;
+
+      await db
+        .update(paymentOrders)
+        .set({
+          status: 'PAID',
+          cfPaymentId: successPayment.cfPaymentId,
+          paymentMethod: successPayment.paymentMethod,
+          updatedAt: new Date(),
+        })
+        .where(eq(paymentOrders.id, order.id));
+
+      let method: 'cash' | 'upi' | 'card' | 'bank_transfer' | 'cheque' = 'upi';
+      const mStr = (successPayment.paymentMethod || '').toLowerCase();
+      if (mStr.includes('card')) method = 'card';
+      else if (mStr.includes('netbanking') || mStr.includes('bank')) method = 'bank_transfer';
+      else method = 'upi';
+
+      const [payment] = await db
+        .insert(feePayments)
+        .values({
+          schoolId: user.schoolId,
+          allocationId: order.allocationId,
+          studentId: order.studentId,
+          receiptNumber,
+          amountPaid: order.amount,
+          paymentMethod: method,
+          transactionReference: order.gatewayOrderId,
+          paidAt: new Date(successPayment.paymentTime || Date.now()),
+          notes: `Online payment via Cashfree (${successPayment.cfPaymentId})`,
+        })
+        .returning();
+
+      if (!payment) {
+        throw new ApiError(500, 'Failed to persist fee payment record');
+      }
+
+      const [alloc] = await db
+        .select()
+        .from(studentFeeAllocations)
+        .where(eq(studentFeeAllocations.id, order.allocationId))
+        .limit(1);
+
+      if (alloc) {
+        const allPayments = await db
+          .select({ amount: feePayments.amountPaid })
+          .from(feePayments)
+          .where(eq(feePayments.allocationId, alloc.id));
+        const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
+        const newStatus = totalPaid >= alloc.amount ? 'paid' : (totalPaid > 0 ? 'partial' : 'pending');
+
+        await db
+          .update(studentFeeAllocations)
+          .set({ status: newStatus, updatedAt: new Date() })
+          .where(eq(studentFeeAllocations.id, alloc.id));
+      }
+
+      return {
+        success: true,
+        status: 'PAID',
+        receiptNumber: payment.receiptNumber,
+        amountPaid: payment.amountPaid,
+        paidAt: payment.paidAt,
+        paymentMethod: payment.paymentMethod,
+      };
+    },
+
+    async handleCashfreeWebhook(payload: Record<string, unknown>, env: Env) {
+      const data = payload.data as Record<string, unknown> | undefined;
+      const order = data?.order as Record<string, unknown> | undefined;
+      const payment = data?.payment as Record<string, unknown> | undefined;
+
+      const orderId = (order?.order_id as string) || (payload.order_id as string);
+      const cfPaymentId = (payment?.cf_payment_id ? String(payment.cf_payment_id) : undefined) ||
+        (payload.cf_payment_id ? String(payload.cf_payment_id) : undefined);
+      const paymentStatus = (payment?.payment_status as string) || (payload.txStatus as string);
+
+      if (!orderId) {
+        return { handled: false, reason: 'No order_id in webhook payload' };
+      }
+
+      const eventId = cfPaymentId ? `${orderId}_${cfPaymentId}` : `${orderId}_${Date.now()}`;
+
+      // Idempotency check
+      const [existingEvent] = await db
+        .select({ id: paymentWebhookEvents.id })
+        .from(paymentWebhookEvents)
+        .where(eq(paymentWebhookEvents.eventId, eventId))
+        .limit(1);
+
+      if (existingEvent) {
+        return { handled: true, deduplicated: true };
+      }
+
+      // Record webhook event
+      await db.insert(paymentWebhookEvents).values({
+        gateway: 'cashfree',
+        eventId,
+        eventType: (payload.type as string) || 'PAYMENT_WEBHOOK',
+        payload,
+      });
+
+      if (paymentStatus === 'SUCCESS') {
+        const [ord] = await db
+          .select()
+          .from(paymentOrders)
+          .where(eq(paymentOrders.gatewayOrderId, orderId))
+          .limit(1);
+
+        if (ord && ord.status !== 'PAID') {
+          const year = new Date().getFullYear();
+          const countRes = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(feePayments)
+            .where(eq(feePayments.schoolId, ord.schoolId));
+          const nextSeq = (countRes[0]?.count ?? 0) + 1;
+          const receiptNumber = `REC-${year}-${String(nextSeq).padStart(5, '0')}`;
+
+          await db
+            .update(paymentOrders)
+            .set({
+              status: 'PAID',
+              cfPaymentId: cfPaymentId || 'WEBHOOK',
+              paymentMethod: 'upi',
+              updatedAt: new Date(),
+            })
+            .where(eq(paymentOrders.id, ord.id));
+
+          await db.insert(feePayments).values({
+            schoolId: ord.schoolId,
+            allocationId: ord.allocationId,
+            studentId: ord.studentId,
+            receiptNumber,
+            amountPaid: ord.amount,
+            paymentMethod: 'upi',
+            transactionReference: ord.gatewayOrderId,
+            paidAt: new Date(),
+            notes: `Online payment reconciled via Cashfree Webhook (${cfPaymentId || ''})`,
+          });
+
+          const [alloc] = await db
+            .select()
+            .from(studentFeeAllocations)
+            .where(eq(studentFeeAllocations.id, ord.allocationId))
+            .limit(1);
+
+          if (alloc) {
+            const allPayments = await db
+              .select({ amount: feePayments.amountPaid })
+              .from(feePayments)
+              .where(eq(feePayments.allocationId, alloc.id));
+            const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
+            const newStatus = totalPaid >= alloc.amount ? 'paid' : (totalPaid > 0 ? 'partial' : 'pending');
+
+            await db
+              .update(studentFeeAllocations)
+              .set({ status: newStatus, updatedAt: new Date() })
+              .where(eq(studentFeeAllocations.id, alloc.id));
+          }
+        }
+      }
+
+      return { handled: true };
+    },
+
 
     async admissionSummary(user: AuthUser, academicYearId?: string) {
       const yearConditions = [eq(academicYears.schoolId, user.schoolId)];

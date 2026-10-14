@@ -7,6 +7,7 @@ import { adminRoutes } from './routes/admin';
 import { bootstrapRoutes } from './routes/bootstrap';
 import { portalRoutes } from './routes/portal';
 import { teacherRoutes } from './routes/teacher';
+import { webhookRoutes } from './routes/webhooks';
 import type { AppBindings } from './types';
 
 export function createApp() {
@@ -36,7 +37,7 @@ export function createApp() {
         }
         return '';
       },
-      allowHeaders: ['content-type', 'authorization', 'x-dev-neon-user-id', 'x-dev-email', 'x-bootstrap-token'],
+      allowHeaders: ['content-type', 'authorization', 'x-dev-neon-user-id', 'x-dev-email', 'x-bootstrap-token', 'x-webhook-signature', 'x-webhook-timestamp'],
       allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       credentials: true,
       maxAge: 86400,
@@ -48,8 +49,14 @@ export function createApp() {
   app.get('/health', (c) => c.json({ ok: true, service: 'schoolic-api' }));
 
   app.route('/api/v1/bootstrap', bootstrapRoutes);
+  app.route('/api/v1/webhooks', webhookRoutes);
 
-  app.use('/api/v1/*', authenticate);
+  app.use('/api/v1/*', async (c, next) => {
+    if (c.req.path.startsWith('/api/v1/webhooks')) {
+      return next();
+    }
+    return authenticate(c, next);
+  });
   app.get('/api/v1/me', (c) => c.json(c.get('authUser')));
   app.route('/api/v1/admin', adminRoutes);
   app.route('/api/v1/teacher', teacherRoutes);

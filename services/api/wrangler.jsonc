@@ -7,7 +7,10 @@
   "vars": {
     "APP_ENV": "development",
     "CORS_ORIGIN": "http://localhost:8080,http://127.0.0.1:8080",
-    "NEON_AUTH_URL": "http://localhost:8787"
+    "NEON_AUTH_URL": "http://localhost:8787",
+    "CASHFREE_APP_ID": "TEST112097243d3d637f11e796a7739842790211",
+    "CASHFREE_ENV": "sandbox",
+    "CASHFREE_API_VERSION": "2023-08-01"
   },
   "env": {
     "staging": {
@@ -24,7 +27,10 @@
         "AI_MAX_OUTPUT_TOKENS": "1200",
         "AI_TIMEOUT_MS": "30000",
         "AI_REQUESTS_PER_USER": "20",
-        "AI_REQUEST_WINDOW_MINUTES": "60"
+        "AI_REQUEST_WINDOW_MINUTES": "60",
+        "CASHFREE_APP_ID": "TEST112097243d3d637f11e796a7739842790211",
+        "CASHFREE_ENV": "sandbox",
+        "CASHFREE_API_VERSION": "2023-08-01"
       }
     },
     "production": {
@@ -41,7 +47,10 @@
         "AI_MAX_OUTPUT_TOKENS": "1200",
         "AI_TIMEOUT_MS": "30000",
         "AI_REQUESTS_PER_USER": "20",
-        "AI_REQUEST_WINDOW_MINUTES": "60"
+        "AI_REQUEST_WINDOW_MINUTES": "60",
+        "CASHFREE_APP_ID": "TEST112097243d3d637f11e796a7739842790211",
+        "CASHFREE_ENV": "sandbox",
+        "CASHFREE_API_VERSION": "2023-08-01"
       }
     }
   }

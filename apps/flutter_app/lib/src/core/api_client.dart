@@ -248,6 +248,34 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, Object?>> createFeePaymentOrder({
+    required AuthSession session,
+    required String allocationId,
+    required int amount,
+    String? returnUrl,
+  }) async {
+    return postJson(
+      '/api/v1/portal/fees/orders',
+      {
+        'allocationId': allocationId,
+        'amount': amount,
+        'returnUrl': ?returnUrl,
+      },
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> verifyFeePaymentOrder({
+    required AuthSession session,
+    required String orderId,
+  }) async {
+    return postJson(
+      '/api/v1/portal/fees/verify',
+      {'orderId': orderId},
+      session: session,
+    );
+  }
+
   Future<Map<String, Object?>> putJson(
     String path,
     Map<String, Object?> body, {

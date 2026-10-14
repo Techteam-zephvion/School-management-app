@@ -394,4 +394,15 @@ export const addAdmissionDocumentSchema = z.object({
 
 export const updateAdmissionDocumentSchema = addAdmissionDocumentSchema.partial();
 
+export const createPaymentOrderSchema = z.object({
+  allocationId: z.uuid(),
+  amount: z.number().int().positive(),
+  returnUrl: z.string().url().optional(),
+});
+
+export const verifyPaymentOrderSchema = z.object({
+  orderId: z.string().trim().min(1).max(100),
+});
+
+
 

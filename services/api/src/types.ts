@@ -14,6 +14,10 @@ export type Env = {
   AI_TIMEOUT_MS?: string;
   AI_REQUESTS_PER_USER?: string;
   AI_REQUEST_WINDOW_MINUTES?: string;
+  CASHFREE_APP_ID?: string;
+  CASHFREE_SECRET_KEY?: string;
+  CASHFREE_ENV?: 'sandbox' | 'production';
+  CASHFREE_API_VERSION?: string;
 };
 
 export type Role = 'admin' | 'teacher' | 'student' | 'parent';

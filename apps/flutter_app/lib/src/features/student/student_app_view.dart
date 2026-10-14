@@ -9,7 +9,10 @@ import '../shared/components/empty_state_view.dart';
 import '../shared/components/feedback_banner.dart';
 import '../shared/components/status_badge.dart';
 import 'components/digital_id_card.dart';
+import 'components/fee_payment_sheet.dart';
+import 'components/fee_receipt_modal.dart';
 import 'components/homework_submission_sheet.dart';
+import 'utils/fee_receipt_pdf.dart';
 
 class StudentAppView extends ConsumerStatefulWidget {
   const StudentAppView({super.key});
@@ -38,7 +41,6 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
   String _homeworkFilter = 'all'; // all, pending, submitted
 
   Timer? _realtimeSyncTimer;
-  DateTime _lastSyncTime = DateTime.now();
 
   List<Map<String, Object?>> get _students {
     final rows = _profile?['students'];
@@ -161,7 +163,6 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
         _idCard = responses[5] as Map<String, Object?>;
         _announcements = responses[6] as List<Map<String, Object?>>;
         _loading = false;
-        _lastSyncTime = DateTime.now();
       });
     } catch (e) {
       if (!mounted) return;
@@ -1728,50 +1729,322 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
             ],
           ),
         ),
-        const SizedBox(height: 14),
-
-        // Receipt Card Example
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.mainBackground,
-            borderRadius: AppRadii.rMd,
-            border: Border.all(color: AppColors.primaryBorder),
+        // Fee Allocations List
+        if (((_fees?['allocations'] as List?) ?? const []).isNotEmpty) ...[
+          const SizedBox(height: 22),
+          const Text(
+            'Assigned Fee Schedules',
+            style: TextStyle(
+              fontFamily: 'Switzer',
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          child: Row(
-            children: [
-              const Icon(Icons.receipt_long, size: 22, color: Colors.green),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Term 1 Composite Tuition Receipt',
-                      style: TextStyle(
-                        fontFamily: 'Switzer',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+          const SizedBox(height: 4),
+          const Text(
+            'Academic terms, tuition fees, and flexible installment payment options.',
+            style: AppTypography.bodySecondary,
+          ),
+          const SizedBox(height: 12),
+          ...((_fees?['allocations'] as List?) ?? const [])
+              .whereType<Map>()
+              .map((rawAlloc) {
+            final alloc = rawAlloc.cast<String, Object?>();
+            final allocId = (alloc['id'] as String?) ?? '';
+            final feeTitle = (alloc['feeStructureName'] as String?) ??
+                (alloc['feeName'] as String?) ??
+                'Tuition Fee';
+            final amount = (alloc['amount'] as int?) ?? 0;
+            final paid = (alloc['paidAmount'] as int?) ?? 0;
+            final due = (alloc['balanceAmount'] as int?) ?? (amount - paid);
+            final dueDate = (alloc['dueDate'] as String?) ?? 'Term End';
+            final status = (alloc['status'] as String?) ??
+                (due <= 0 ? 'paid' : (paid > 0 ? 'partial' : 'pending'));
+
+            final isPaid = status == 'paid' || due <= 0;
+            final BadgeTone tone = isPaid
+                ? BadgeTone.success
+                : (status == 'overdue'
+                    ? BadgeTone.error
+                    : (paid > 0 ? BadgeTone.warning : BadgeTone.neutral));
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.mainBackground,
+                borderRadius: AppRadii.rMd,
+                border: Border.all(color: AppColors.primaryBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          feeTitle,
+                          style: const TextStyle(
+                            fontFamily: 'Switzer',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      StatusBadge(
+                        label: status.toUpperCase(),
+                        tone: tone,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Due Date: $dueDate',
+                    style: AppTypography.metadata,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Total', style: AppTypography.metadata),
+                          Text(
+                            '₹$amount',
+                            style: const TextStyle(
+                              fontFamily: 'Switzer',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Paid', style: AppTypography.metadata),
+                          Text(
+                            '₹$paid',
+                            style: const TextStyle(
+                              fontFamily: 'Switzer',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('Balance Due', style: AppTypography.metadata),
+                          Text(
+                            '₹$due',
+                            style: TextStyle(
+                              fontFamily: 'Switzer',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: due > 0 ? Colors.redAccent : Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  if (!isPaid && due > 0) ...[
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 38,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.accent,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: AppRadii.rSm),
+                        ),
+                        icon: const Icon(Icons.payment, size: 16),
+                        label: Text(
+                          'Pay ₹$due Online',
+                          style: const TextStyle(
+                            fontFamily: 'Switzer',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        onPressed: () {
+                          FeePaymentSheet.show(
+                            context,
+                            allocationId: allocId,
+                            feeName: feeTitle,
+                            totalAmount: amount,
+                            paidAmount: paid,
+                            balanceDue: due,
+                            studentName: fullName,
+                            admissionNumber: admissionNumber,
+                            onPaymentSuccess: () => _load(silent: true),
+                          );
+                        },
                       ),
                     ),
-                    Text(
-                      'Receipt: REC-2026-0089 • UPI Payment',
-                      style: AppTypography.metadata,
-                    ),
                   ],
-                ),
+                ],
               ),
-              const Text(
-                '₹15,000',
-                style: TextStyle(
-                  fontFamily: 'Switzer',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
+            );
+          }),
+        ],
+
+        // Paid Receipts & Payment History
+        const SizedBox(height: 22),
+        const Text(
+          'Payment Receipts & History',
+          style: TextStyle(
+            fontFamily: 'Switzer',
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
           ),
         ),
+        const SizedBox(height: 4),
+        const Text(
+          'Verified payment records, Cashfree references, and printable invoices.',
+          style: AppTypography.bodySecondary,
+        ),
+        const SizedBox(height: 12),
+
+        if (((_fees?['payments'] as List?) ?? const []).isEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.secondaryBackground,
+              borderRadius: AppRadii.rMd,
+              border: Border.all(color: AppColors.primaryBorder),
+            ),
+            child: Center(
+              child: Column(
+                children: [
+                  const Icon(Icons.receipt_long_outlined, size: 30, color: AppColors.mutedText),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'No Payment Receipts Found',
+                    style: TextStyle(
+                      fontFamily: 'Switzer',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Online fee payments or office receipts will be archived here.',
+                    style: AppTypography.metadata,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ] else ...[
+          ...((_fees?['payments'] as List?) ?? const [])
+              .whereType<Map>()
+              .map((rawPmt) {
+            final pmt = rawPmt.cast<String, Object?>();
+            final receiptNo = (pmt['receiptNumber'] as String?) ?? 'REC-PAID';
+            final pmtAmount = (pmt['amountPaid'] as int?) ?? 0;
+            final method = (pmt['paymentMethod'] as String?) ?? 'Online';
+            final feeTitle = (pmt['feeStructureName'] as String?) ??
+                (pmt['feeName'] as String?) ??
+                'Institutional Fee';
+            final dateRaw = (pmt['paidAt'] as String?) ?? '';
+            final dateFormatted = dateRaw.length >= 10 ? dateRaw.substring(0, 10) : dateRaw;
+            final ref = pmt['transactionReference'] as String?;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.mainBackground,
+                borderRadius: AppRadii.rMd,
+                border: Border.all(color: AppColors.primaryBorder),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withValues(alpha: 0.1),
+                      borderRadius: AppRadii.rSm,
+                    ),
+                    child: const Icon(Icons.receipt_long, size: 20, color: Colors.green),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          feeTitle,
+                          style: const TextStyle(
+                            fontFamily: 'Switzer',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$receiptNo • ${method.toUpperCase()} • $dateFormatted',
+                          style: AppTypography.metadata,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '₹$pmtAmount',
+                        style: const TextStyle(
+                          fontFamily: 'Switzer',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      InkWell(
+                        onTap: () {
+                          FeeReceiptModal.show(
+                            context,
+                            receiptData: FeeReceiptData(
+                              schoolName: schoolName,
+                              receiptNumber: receiptNo,
+                              studentName: fullName,
+                              admissionNumber: admissionNumber,
+                              className: className,
+                              sectionName: sectionName,
+                              feeName: feeTitle,
+                              amountPaid: pmtAmount,
+                              paymentMethod: method,
+                              paidAt: dateFormatted,
+                              transactionReference: ref,
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'View & Print',
+                          style: TextStyle(
+                            fontFamily: 'Switzer',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.accent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
       ],
     );
   }
