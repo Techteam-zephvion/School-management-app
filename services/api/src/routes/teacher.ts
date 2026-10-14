@@ -18,6 +18,7 @@ import {
   timetableQuerySchema,
   updateTeacherMaterialSchema,
   updateHomeworkAssignmentSchema,
+  gradeHomeworkSubmissionSchema,
 } from '../http/validation';
 import type { AppBindings } from '../types';
 
@@ -107,6 +108,17 @@ teacherRoutes.patch('/homework/:id', zValidator('param', idSchema), zValidator('
 teacherRoutes.delete('/homework/:id', zValidator('param', idSchema), async (c) => {
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
   return c.json(await repo.deleteTeacherHomework(c.get('authUser'), c.req.valid('param').id));
+});
+
+teacherRoutes.get('/homework/:id/submissions', zValidator('param', idSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.listTeacherHomeworkSubmissions(c.get('authUser'), c.req.valid('param').id));
+});
+
+teacherRoutes.post('/homework/submissions/:submissionId/grade', zValidator('json', gradeHomeworkSubmissionSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const submissionId = c.req.param('submissionId');
+  return c.json(await repo.gradeHomeworkSubmission(c.get('authUser'), submissionId, c.req.valid('json')));
 });
 
 teacherRoutes.get('/materials', async (c) => {

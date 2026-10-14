@@ -10,6 +10,7 @@ import {
   time,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -25,6 +26,11 @@ export const teachingMaterialTypeEnum = pgEnum('teaching_material_type', ['lesso
 export const announcementAudienceEnum = pgEnum('announcement_audience', ['school', 'class_section']);
 export const announcementPriorityEnum = pgEnum('announcement_priority', ['normal', 'important', 'urgent']);
 export const homeworkStatusEnum = pgEnum('homework_status', ['draft', 'published', 'archived']);
+export const homeworkSubmissionStatusEnum = pgEnum('homework_submission_status', [
+  'submitted',
+  'reviewed',
+  'resubmitted',
+]);
 export const examStatusEnum = pgEnum('exam_status', ['draft', 'published', 'archived']);
 export const feeFrequencyEnum = pgEnum('fee_frequency', ['one_time', 'term', 'monthly', 'annual']);
 export const feeAllocationStatusEnum = pgEnum('fee_allocation_status', ['pending', 'partial', 'paid', 'overdue']);
@@ -377,6 +383,30 @@ export const homeworkAssignments = pgTable(
   (table) => [
     index('homework_assignments_teacher_idx').on(table.schoolId, table.ownerStaffId, table.dueDate),
     index('homework_assignments_section_idx').on(table.schoolId, table.academicYearId, table.sectionId, table.dueDate),
+  ],
+);
+
+export const homeworkSubmissions = pgTable(
+  'homework_submissions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    assignmentId: uuid('assignment_id').notNull().references(() => homeworkAssignments.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+    content: text('content').notNull(),
+    attachmentUrl: text('attachment_url'),
+    status: homeworkSubmissionStatusEnum('status').default('submitted').notNull(),
+    marksObtained: integer('marks_obtained'),
+    teacherFeedback: text('teacher_feedback'),
+    reviewedByStaffId: uuid('reviewed_by_staff_id').references(() => staff.id, { onDelete: 'set null' }),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }).defaultNow().notNull(),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex('homework_submissions_assignment_student_idx').on(table.assignmentId, table.studentId),
+    index('homework_submissions_school_assignment_idx').on(table.schoolId, table.assignmentId),
+    index('homework_submissions_student_idx').on(table.studentId),
   ],
 );
 

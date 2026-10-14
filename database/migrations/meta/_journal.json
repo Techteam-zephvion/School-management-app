@@ -71,6 +71,13 @@
       "when": 1791888915888,
       "tag": "0009_zippy_shard",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791979672929,
+      "tag": "0010_certain_multiple_man",
+      "breakpoints": true
     }
   ]
 }

@@ -15,6 +15,7 @@ import {
   feePayments,
   feeStructures,
   homeworkAssignments,
+  homeworkSubmissions,
   schools,
   sections,
   staff,
@@ -48,9 +49,11 @@ import type {
   createTimetableEntrySchema,
   createUserSchema,
   saveAttendanceSchema,
+  submitHomeworkSchema,
   timetableQuerySchema,
   updateTeacherMaterialSchema,
   updateHomeworkAssignmentSchema,
+  gradeHomeworkSubmissionSchema,
   updateExamSchema,
   saveExamMarksSchema,
   updateTimetableEntrySchema,
@@ -362,12 +365,20 @@ export function createSchoolRepository(db: Db) {
           sectionName: sections.name,
           subjectName: subjects.name,
           teacherName: staff.fullName,
+          submission: homeworkSubmissions,
         })
         .from(homeworkAssignments)
         .innerJoin(classes, eq(homeworkAssignments.classId, classes.id))
         .innerJoin(sections, eq(homeworkAssignments.sectionId, sections.id))
         .leftJoin(subjects, eq(homeworkAssignments.subjectId, subjects.id))
         .innerJoin(staff, eq(homeworkAssignments.ownerStaffId, staff.id))
+        .leftJoin(
+          homeworkSubmissions,
+          and(
+            eq(homeworkSubmissions.assignmentId, homeworkAssignments.id),
+            eq(homeworkSubmissions.studentId, portalStudent.id),
+          ),
+        )
         .where(
           and(
             eq(homeworkAssignments.schoolId, user.schoolId),
@@ -383,6 +394,108 @@ export function createSchoolRepository(db: Db) {
       return {
         student: portalStudent,
         assignments: rows.map(homeworkWithLabels),
+      };
+    },
+
+    async portalSubmitHomework(
+      user: AuthUser,
+      assignmentId: string,
+      input: z.infer<typeof submitHomeworkSchema>,
+    ) {
+      const portalStudent = await resolvePortalStudent(db, user, input.studentId);
+      const [assignment] = await db
+        .select()
+        .from(homeworkAssignments)
+        .where(
+          and(
+            eq(homeworkAssignments.id, assignmentId),
+            eq(homeworkAssignments.schoolId, user.schoolId),
+            eq(homeworkAssignments.academicYearId, portalStudent.academicYearId),
+            eq(homeworkAssignments.classId, portalStudent.classId),
+            eq(homeworkAssignments.sectionId, portalStudent.sectionId),
+            eq(homeworkAssignments.status, 'published'),
+          ),
+        )
+        .limit(1);
+
+      if (!assignment) {
+        throw new ApiError(404, 'Homework assignment not found or not assigned to this student');
+      }
+
+      const [existing] = await db
+        .select()
+        .from(homeworkSubmissions)
+        .where(
+          and(
+            eq(homeworkSubmissions.assignmentId, assignmentId),
+            eq(homeworkSubmissions.studentId, portalStudent.id),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        const [updated] = await db
+          .update(homeworkSubmissions)
+          .set({
+            content: input.content,
+            attachmentUrl: input.attachmentUrl ?? null,
+            status: existing.status === 'reviewed' ? 'resubmitted' : 'submitted',
+            submittedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(homeworkSubmissions.id, existing.id))
+          .returning();
+        return updated;
+      }
+
+      const [created] = await db
+        .insert(homeworkSubmissions)
+        .values({
+          schoolId: user.schoolId,
+          assignmentId,
+          studentId: portalStudent.id,
+          content: input.content,
+          attachmentUrl: input.attachmentUrl ?? null,
+          status: 'submitted',
+        })
+        .returning();
+      return created;
+    },
+
+    async portalIdCard(user: AuthUser, studentId?: string) {
+      const portalStudent = await resolvePortalStudent(db, user, studentId);
+      const [school] = await db.select().from(schools).where(eq(schools.id, user.schoolId)).limit(1);
+      const [studentDetail] = await db
+        .select()
+        .from(students)
+        .where(eq(students.id, portalStudent.id))
+        .limit(1);
+
+      const verificationPayload = {
+        app: 'Schoolic',
+        type: 'STUDENT_DIGITAL_ID',
+        schoolCode: school?.code ?? 'SCH',
+        schoolName: school?.name ?? 'Schoolic',
+        studentId: portalStudent.id,
+        admissionNumber: portalStudent.admissionNumber,
+        fullName: portalStudent.fullName,
+        className: portalStudent.className,
+        sectionName: portalStudent.sectionName,
+        academicYear: portalStudent.academicYearName,
+        verifiedAt: new Date().toISOString(),
+      };
+
+      return {
+        school: {
+          name: school?.name ?? 'Schoolic',
+          code: school?.code ?? 'SCH',
+        },
+        student: {
+          ...portalStudent,
+          guardianName: studentDetail?.guardianName ?? null,
+          guardianPhone: studentDetail?.guardianPhone ?? null,
+        },
+        qrPayload: JSON.stringify(verificationPayload),
       };
     },
 
@@ -1970,6 +2083,86 @@ export function createSchoolRepository(db: Db) {
       return deleted;
     },
 
+    async listTeacherHomeworkSubmissions(user: AuthUser, assignmentId: string) {
+      if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
+      const [assignment] = await db
+        .select()
+        .from(homeworkAssignments)
+        .where(
+          and(
+            eq(homeworkAssignments.schoolId, user.schoolId),
+            eq(homeworkAssignments.ownerStaffId, user.staffId),
+            eq(homeworkAssignments.id, assignmentId),
+          ),
+        )
+        .limit(1);
+      if (!assignment) throw new ApiError(404, 'Homework assignment not found');
+
+      const studentsInSec = await db
+        .select({
+          studentId: students.id,
+          fullName: students.fullName,
+          admissionNumber: students.admissionNumber,
+          rollNumber: studentEnrollments.rollNumber,
+        })
+        .from(studentEnrollments)
+        .innerJoin(students, eq(studentEnrollments.studentId, students.id))
+        .where(
+          and(
+            eq(studentEnrollments.schoolId, user.schoolId),
+            eq(studentEnrollments.academicYearId, assignment.academicYearId),
+            eq(studentEnrollments.classId, assignment.classId),
+            eq(studentEnrollments.sectionId, assignment.sectionId),
+            eq(students.isActive, true),
+          ),
+        )
+        .orderBy(studentEnrollments.rollNumber, students.fullName);
+
+      const submissions = await db
+        .select()
+        .from(homeworkSubmissions)
+        .where(eq(homeworkSubmissions.assignmentId, assignmentId));
+
+      const subMap = new Map(submissions.map((s) => [s.studentId, s]));
+
+      return {
+        assignment,
+        submissions: studentsInSec.map((st) => ({
+          student: st,
+          submission: subMap.get(st.studentId) ?? null,
+        })),
+      };
+    },
+
+    async gradeHomeworkSubmission(
+      user: AuthUser,
+      submissionId: string,
+      input: z.infer<typeof gradeHomeworkSubmissionSchema>,
+    ) {
+      if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
+      const [submission] = await db
+        .select()
+        .from(homeworkSubmissions)
+        .where(eq(homeworkSubmissions.id, submissionId))
+        .limit(1);
+      if (!submission) throw new ApiError(404, 'Submission not found');
+
+      const [updated] = await db
+        .update(homeworkSubmissions)
+        .set({
+          marksObtained: input.marksObtained === undefined ? submission.marksObtained : input.marksObtained,
+          teacherFeedback: input.teacherFeedback === undefined ? submission.teacherFeedback : input.teacherFeedback,
+          status: input.status ?? 'reviewed',
+          reviewedByStaffId: user.staffId,
+          reviewedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(homeworkSubmissions.id, submissionId))
+        .returning();
+
+      return updated;
+    },
+
     async getTeacherMaterial(user: AuthUser, id: string) {
       if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
       const [row] = await db
@@ -2699,6 +2892,7 @@ function homeworkWithLabels(row: {
   sectionName: string;
   subjectName: string | null;
   teacherName: string;
+  submission?: typeof homeworkSubmissions.$inferSelect | null;
 }) {
   return {
     ...row.assignment,
@@ -2706,6 +2900,18 @@ function homeworkWithLabels(row: {
     sectionName: row.sectionName,
     subjectName: row.subjectName,
     teacherName: row.teacherName,
+    submission: row.submission
+      ? {
+          id: row.submission.id,
+          content: row.submission.content,
+          attachmentUrl: row.submission.attachmentUrl,
+          status: row.submission.status,
+          marksObtained: row.submission.marksObtained,
+          teacherFeedback: row.submission.teacherFeedback,
+          submittedAt: row.submission.submittedAt,
+          reviewedAt: row.submission.reviewedAt,
+        }
+      : null,
   };
 }
 

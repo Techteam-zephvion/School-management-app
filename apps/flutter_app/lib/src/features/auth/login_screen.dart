@@ -232,7 +232,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                ActionChip(
+                                  avatar: const Icon(Icons.school, size: 14),
+                                  label: const Text(
+                                    'Student Demo',
+                                    style: TextStyle(fontFamily: 'Switzer', fontSize: 11),
+                                  ),
+                                  onPressed: () {
+                                    _email.text = 'student@portfolio.schoolic.test';
+                                    _password.text = 'Schoolic@2026';
+                                    setState(() => _validationError = null);
+                                  },
+                                ),
+                                ActionChip(
+                                  avatar: const Icon(Icons.co_present_outlined, size: 14),
+                                  label: const Text(
+                                    'Teacher Demo',
+                                    style: TextStyle(fontFamily: 'Switzer', fontSize: 11),
+                                  ),
+                                  onPressed: () {
+                                    _email.text = 'teacher-login@portfolio.schoolic.test';
+                                    _password.text = 'Schoolic@2026';
+                                    setState(() => _validationError = null);
+                                  },
+                                ),
+                                ActionChip(
+                                  avatar: const Icon(Icons.admin_panel_settings_outlined, size: 14),
+                                  label: const Text(
+                                    'Admin Demo',
+                                    style: TextStyle(fontFamily: 'Switzer', fontSize: 11),
+                                  ),
+                                  onPressed: () {
+                                    _email.text = 'admin@portfolio.schoolic.test';
+                                    _password.text = 'Schoolic@2026';
+                                    setState(() => _validationError = null);
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
                             FilledButton.icon(
                               onPressed: auth.isLoading ? null : _submit,
                               icon: auth.isLoading

@@ -264,6 +264,18 @@ export const createHomeworkAssignmentSchema = z.object({
 
 export const updateHomeworkAssignmentSchema = createHomeworkAssignmentSchema.partial();
 
+export const submitHomeworkSchema = z.object({
+  studentId: z.uuid().optional(),
+  content: z.string().trim().min(1).max(5000),
+  attachmentUrl: z.string().trim().max(1000).nullable().optional(),
+});
+
+export const gradeHomeworkSubmissionSchema = z.object({
+  marksObtained: z.number().int().min(0).max(100).nullable().optional(),
+  teacherFeedback: z.string().trim().max(2000).nullable().optional(),
+  status: z.enum(['submitted', 'reviewed', 'resubmitted']).default('reviewed'),
+});
+
 export const createExamSchema = z.object({
   academicYearId: z.uuid(),
   classId: z.uuid(),
