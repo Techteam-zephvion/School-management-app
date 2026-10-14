@@ -1,5 +1,6 @@
 // ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:html';
 
@@ -14,32 +15,63 @@ Future<Map<String, Object?>> postAuthJson(
   Map<String, Object?> body, {
   http.Client? httpClient,
 }) async {
-  final request = await HttpRequest.request(
-    uri.toString(),
-    method: 'POST',
-    requestHeaders: {'content-type': 'application/json'},
-    sendData: jsonEncode(body),
-    withCredentials: true,
-  );
+  final completer = Completer<HttpRequest>();
+  final xhr = HttpRequest();
+  xhr.open('POST', uri.toString(), async: true);
+  xhr.withCredentials = true;
+  xhr.setRequestHeader('content-type', 'application/json');
+  xhr.setRequestHeader('accept', 'application/json');
+  xhr.onLoad.listen((_) => completer.complete(xhr));
+  xhr.onError.listen((_) {
+    completer.completeError(
+      AuthTransportException(
+        'Unable to connect to authentication service. Please check your network.',
+        503,
+      ),
+    );
+  });
+  xhr.send(jsonEncode(body));
+  final request = await completer.future;
   return _decode(request.status ?? 0, request.responseText ?? '');
 }
 
 Future<Map<String, Object?>> getAuthJson(Uri uri, {http.Client? httpClient}) async {
-  final request = await HttpRequest.request(
-    uri.toString(),
-    method: 'GET',
-    requestHeaders: {'accept': 'application/json'},
-    withCredentials: true,
-  );
+  final completer = Completer<HttpRequest>();
+  final xhr = HttpRequest();
+  xhr.open('GET', uri.toString(), async: true);
+  xhr.withCredentials = true;
+  xhr.setRequestHeader('accept', 'application/json');
+  xhr.onLoad.listen((_) => completer.complete(xhr));
+  xhr.onError.listen((_) {
+    completer.completeError(
+      AuthTransportException(
+        'Unable to connect to authentication service. Please check your network.',
+        503,
+      ),
+    );
+  });
+  xhr.send();
+  final request = await completer.future;
   return _decode(request.status ?? 0, request.responseText ?? '');
 }
 
 Future<void> postAuth(Uri uri, {http.Client? httpClient}) async {
-  final request = await HttpRequest.request(
-    uri.toString(),
-    method: 'POST',
-    withCredentials: true,
-  );
+  final completer = Completer<HttpRequest>();
+  final xhr = HttpRequest();
+  xhr.open('POST', uri.toString(), async: true);
+  xhr.withCredentials = true;
+  xhr.setRequestHeader('accept', 'application/json');
+  xhr.onLoad.listen((_) => completer.complete(xhr));
+  xhr.onError.listen((_) {
+    completer.completeError(
+      AuthTransportException(
+        'Unable to connect to authentication service. Please check your network.',
+        503,
+      ),
+    );
+  });
+  xhr.send();
+  final request = await completer.future;
   final status = request.status ?? 0;
   if (status < 200 || status >= 300) {
     throw AuthTransportException('Authentication request failed', status);

@@ -70,7 +70,7 @@ class ApiClient {
       throw ApiException('Network connection error: ${exception.message}', 503);
     } catch (exception) {
       if (exception is ApiException) rethrow;
-      throw ApiException('Unable to connect to authentication service. Please check your network.', 503);
+      throw ApiException('Unable to connect to authentication service. Please try again.', 503);
     }
 
     final token = tokenResponse['token'] as String?;
