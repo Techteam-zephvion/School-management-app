@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:schoolic/src/core/theme.dart';
+import 'package:schoolic/src/features/admin/views/admin_admissions_view.dart';
+import 'package:schoolic/src/features/admin/views/admin_fees_view.dart';
 import 'package:schoolic/src/features/admin/views/admin_settings_view.dart';
 import 'package:schoolic/src/features/portal/portal_dashboard.dart';
 import 'package:schoolic/src/features/shared/components/page_header.dart';
@@ -217,6 +219,47 @@ void main() {
 
     expect(find.text('Student Portal'), findsOneWidget);
     expect(find.text('Please sign in to continue.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Admin fees view fits phone width without overflow', (
+    tester,
+  ) async {
+    await _pumpAtWidth(
+      tester,
+      390,
+      AdminFeesView(
+        years: const [],
+        classes: const [],
+        sections: const [],
+        students: const [],
+        reload: () async {},
+      ),
+    );
+
+    expect(find.text('Fees & Finance'), findsOneWidget);
+    expect(find.text('TOTAL BILLED'), findsOneWidget);
+    expect(find.text('No student fee allocations found'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Admin admissions view fits phone width without overflow', (
+    tester,
+  ) async {
+    await _pumpAtWidth(
+      tester,
+      390,
+      AdminAdmissionsView(
+        years: const [],
+        classes: const [],
+        sections: const [],
+        reload: () async {},
+      ),
+    );
+
+    expect(find.text('Admissions & Operations'), findsOneWidget);
+    expect(find.text('TOTAL PIPELINE'), findsOneWidget);
+    expect(find.text('No applications found'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

@@ -287,3 +287,99 @@ export const saveExamMarksSchema = z.object({
     }),
   ).min(1).max(200),
 });
+
+export const createFeeStructureSchema = z.object({
+  academicYearId: z.uuid(),
+  name: z.string().trim().min(2).max(100),
+  code: z.string().trim().min(2).max(32),
+  description: z.string().trim().max(300).nullable().optional(),
+  amount: z.number().int().positive().max(10000000),
+  frequency: z.enum(['one_time', 'term', 'monthly', 'annual']).default('term'),
+  dueDate: z.iso.date().nullable().optional(),
+});
+
+export const updateFeeStructureSchema = createFeeStructureSchema.partial();
+
+export const createFeeAllocationSchema = z.object({
+  studentId: z.uuid(),
+  feeStructureId: z.uuid(),
+  academicYearId: z.uuid(),
+  amount: z.number().int().positive().max(10000000).optional(),
+  dueDate: z.iso.date(),
+});
+
+export const recordFeePaymentSchema = z.object({
+  allocationId: z.uuid(),
+  amountPaid: z.number().int().positive().max(10000000),
+  paymentMethod: z.enum(['cash', 'upi', 'card', 'bank_transfer', 'cheque']).default('cash'),
+  transactionReference: z.string().trim().max(100).nullable().optional(),
+  notes: z.string().trim().max(300).nullable().optional(),
+  paidAt: z.iso.date().optional(),
+});
+
+export const feeAllocationQuerySchema = z.object({
+  studentId: z.uuid().optional(),
+  academicYearId: z.uuid().optional(),
+  classId: z.uuid().optional(),
+  sectionId: z.uuid().optional(),
+  status: z.enum(['pending', 'partial', 'paid', 'overdue']).optional(),
+});
+
+export const feePaymentQuerySchema = z.object({
+  studentId: z.uuid().optional(),
+  allocationId: z.uuid().optional(),
+});
+
+export const createAdmissionApplicationSchema = z.object({
+  academicYearId: z.uuid(),
+  applyingForClassId: z.uuid(),
+  applicantName: z.string().trim().min(2).max(100),
+  dateOfBirth: z.iso.date().nullable().optional(),
+  gender: z.enum(['male', 'female', 'other']).nullable().optional(),
+  parentName: z.string().trim().min(2).max(100),
+  parentEmail: z.string().trim().email().nullable().optional(),
+  parentPhone: z.string().trim().min(7).max(20),
+  address: z.string().trim().max(300).nullable().optional(),
+  previousSchool: z.string().trim().max(160).nullable().optional(),
+  applicationDate: z.iso.date().optional(),
+  status: z.enum(['inquiry', 'applied', 'under_review', 'approved', 'enrolled', 'rejected']).default('applied'),
+  notes: z.string().trim().max(500).nullable().optional(),
+  documents: z
+    .array(
+      z.object({
+        title: z.string().trim().min(2).max(120),
+        status: z.enum(['pending', 'submitted', 'verified', 'rejected']).default('pending'),
+        documentNumber: z.string().trim().max(60).nullable().optional(),
+        notes: z.string().trim().max(200).nullable().optional(),
+      }),
+    )
+    .optional(),
+});
+
+export const updateAdmissionApplicationSchema = createAdmissionApplicationSchema.partial().extend({
+  decisionDate: z.iso.date().nullable().optional(),
+});
+
+export const enrollApplicantSchema = z.object({
+  sectionId: z.uuid(),
+  admissionNumber: z.string().trim().min(2).max(32).optional(),
+  rollNumber: z.string().trim().max(16).optional(),
+});
+
+export const admissionQuerySchema = z.object({
+  academicYearId: z.uuid().optional(),
+  classId: z.uuid().optional(),
+  status: z.enum(['inquiry', 'applied', 'under_review', 'approved', 'enrolled', 'rejected']).optional(),
+  search: z.string().trim().max(100).optional(),
+});
+
+export const addAdmissionDocumentSchema = z.object({
+  title: z.string().trim().min(2).max(120),
+  status: z.enum(['pending', 'submitted', 'verified', 'rejected']).default('pending'),
+  documentNumber: z.string().trim().max(60).nullable().optional(),
+  notes: z.string().trim().max(200).nullable().optional(),
+});
+
+export const updateAdmissionDocumentSchema = addAdmissionDocumentSchema.partial();
+
+

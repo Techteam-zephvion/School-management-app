@@ -232,5 +232,124 @@ void main() {
     test('clearAuthCookies purges session cookies', () {
       auth_transport.clearAuthCookies();
     });
+
+    test('refreshToken retrieves a fresh JWT token and fires onTokenRefreshed callback', () async {
+      String? updatedToken;
+      final mock = MockClient((request) async {
+        if (request.url.path.endsWith('/token')) {
+          return http.Response(
+            jsonEncode({'token': 'refreshed-jwt-token-456'}),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('Not found', 404);
+      });
+
+      final client = ApiClient(
+        httpClient: mock,
+        neonAuthUrlOverride: testAuthUrl,
+        apiBaseUrlOverride: testApiUrl,
+      );
+      client.onTokenRefreshed = (token) => updatedToken = token;
+
+      final result = await client.refreshToken();
+      expect(result, 'refreshed-jwt-token-456');
+      expect(updatedToken, 'refreshed-jwt-token-456');
+    });
+
+    test('401 response triggers silent token refresh and retries the request successfully', () async {
+      int requestCount = 0;
+      final session = const AuthSession(
+        email: 'teacher@schoolic.test',
+        roles: [AppRole.teacher],
+        schoolId: 'school-1',
+        bearerToken: 'initial-expired-token',
+      );
+
+      final mock = MockClient((request) async {
+        if (request.url.path.endsWith('/token')) {
+          return http.Response(
+            jsonEncode({'token': 'refreshed-jwt-token-999'}),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.url.path.endsWith('/api/v1/teacher/announcements')) {
+          requestCount++;
+          if (requestCount == 1) {
+            expect(request.headers['authorization'], 'Bearer initial-expired-token');
+            return http.Response(
+              jsonEncode({'error': 'Invalid or expired session'}),
+              401,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          expect(request.headers['authorization'], 'Bearer refreshed-jwt-token-999');
+          return http.Response(
+            jsonEncode([{'id': 'ann-1', 'title': 'Test Announcement'}]),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('Not found', 404);
+      });
+
+      final client = ApiClient(
+        httpClient: mock,
+        neonAuthUrlOverride: testAuthUrl,
+        apiBaseUrlOverride: testApiUrl,
+      );
+
+      String? refreshedToken;
+      client.onTokenRefreshed = (token) => refreshedToken = token;
+
+      final rows = await client.getList('/api/v1/teacher/announcements', session: session);
+      expect(rows, hasLength(1));
+      expect(rows.first['id'], 'ann-1');
+      expect(refreshedToken, 'refreshed-jwt-token-999');
+      expect(requestCount, 2);
+    });
+
+    test('401 response with failed refresh fires onSessionExpired and throws ApiException', () async {
+      bool sessionExpiredFired = false;
+      final session = const AuthSession(
+        email: 'teacher@schoolic.test',
+        roles: [AppRole.teacher],
+        schoolId: 'school-1',
+        bearerToken: 'expired-token',
+      );
+
+      final mock = MockClient((request) async {
+        if (request.url.path.endsWith('/token')) {
+          return http.Response(
+            jsonEncode({'error': 'Session expired'}),
+            401,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.url.path.endsWith('/api/v1/teacher/announcements')) {
+          return http.Response(
+            jsonEncode({'error': 'Invalid or expired session'}),
+            401,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('Not found', 404);
+      });
+
+      final client = ApiClient(
+        httpClient: mock,
+        neonAuthUrlOverride: testAuthUrl,
+        apiBaseUrlOverride: testApiUrl,
+      );
+      client.onSessionExpired = () => sessionExpiredFired = true;
+
+      await expectLater(
+        () => client.getList('/api/v1/teacher/announcements', session: session),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 401)),
+      );
+      expect(sessionExpiredFired, isTrue);
+    });
   });
 }

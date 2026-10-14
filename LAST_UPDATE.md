@@ -1,3 +1,125 @@
+# Last Update (October 13, 2026)
+
+## Phase 8.5: Admissions & Operations MVP
+
+### Summary
+- Implemented complete Admissions & Operations pipeline for Schoolic.
+- Administrators can record prospective inquiries, manage formal admissions applications, verify submitted certificates/documents, track grade-level seat capacity, and enroll approved candidates with a single click.
+- Live pipeline metrics: Total Pipeline, Under Review, Approved for Intake, and Successfully Enrolled in the administrator workspace.
+- Document verification checklist: birth certificates, previous school report/transfer certificates, address proofs, and photos with staff verification tracking.
+- Class intake capacity tracker: calculates nominal intake (40 seats/class), enrolled count, and remaining vacancies with visual progress bars.
+- One-click student enrollment: automatically creates an active student profile, enrolls into the target classroom section, assigns a student admission ID, and transitions application status to `enrolled`.
+
+### Backend
+- Added database schema (`services/api/src/db/schema.ts`):
+  - Enums: `admission_status` (`inquiry`, `applied`, `under_review`, `approved`, `enrolled`, `rejected`), `document_status` (`pending`, `submitted`, `verified`, `rejected`).
+  - Tables: `admission_applications`, `admission_documents` with cascade foreign keys, tenant scoping, and academic year indexing.
+- Generated Drizzle migration `0009_zippy_shard.sql`.
+- Added validation schemas (`services/api/src/http/validation.ts`): `createAdmissionApplicationSchema`, `updateAdmissionApplicationSchema`, `enrollApplicantSchema`, `admissionQuerySchema`, `addAdmissionDocumentSchema`, `updateAdmissionDocumentSchema`.
+- Implemented repository methods (`services/api/src/repositories/school-repository.ts`):
+  - `admissionSummary`: Aggregates total pipeline, status counts, conversion rate, and class capacity breakdown.
+  - `listAdmissionApplications`: Filterable by academic year, class, status, and search string (applicant, parent, phone, application number).
+  - `getAdmissionApplication`: Returns application with joined verification documents.
+  - `createAdmissionApplication`: Generates `APP-YYYY-XXXX`, creates application, initializes default verification checklist documents.
+  - `updateAdmissionApplication`: Updates applicant details, notes, decision dates, and pipeline status.
+  - `deleteAdmissionApplication`: Deletes application and associated documents.
+  - `enrollApplicant`: Creates record in `students`, adds enrollment in `studentEnrollments`, assigns student admission number, marks application as enrolled.
+  - `listAdmissionDocuments`, `addAdmissionDocument`, `updateAdmissionDocument`, `deleteAdmissionDocument`: Document checklist management with staff verification audit.
+- Admin admission routes (`services/api/src/routes/admin.ts`):
+  - `GET /api/v1/admin/admissions/summary`
+  - `GET /api/v1/admin/admissions/applications`
+  - `POST /api/v1/admin/admissions/applications`
+  - `GET /api/v1/admin/admissions/applications/:id`
+  - `PATCH /api/v1/admin/admissions/applications/:id`
+  - `DELETE /api/v1/admin/admissions/applications/:id`
+  - `POST /api/v1/admin/admissions/applications/:id/enroll`
+  - `GET /api/v1/admin/admissions/applications/:id/documents`
+  - `POST /api/v1/admin/admissions/applications/:id/documents`
+  - `PATCH /api/v1/admin/admissions/documents/:id`
+  - `DELETE /api/v1/admin/admissions/documents/:id`
+
+### Frontend
+- Added **Admissions & Operations** workspace to administrator dashboard (`AdminDashboard`, `AdminAdmissionsView`):
+  - Typographic `StatStrip`: Total Pipeline, Under Review, Approved for Intake, Successfully Enrolled.
+  - Subtab navigation: "Applications Pipeline", "Inquiries & Leads", "Class Capacity & Seats".
+  - Search and filter bar (by applicant name, parent name, phone, application number, target class, pipeline status).
+  - Action dialogs:
+    - `_NewApplicationDialog`: Captures applicant name, DOB, gender, parent contact details, previous school, address, notes.
+    - `_ApplicationDetailDialog`: Status updater, notes review, and interactive document verification checklist.
+    - `_EnrollApplicantDialog`: Assigns section, admission ID, and roll number.
+  - Strict compliance with monochrome Switzer design (`AppColors`, `AppTypography`, `AppRadii`, `StatusBadge`, `StatStrip`, `PageHeader`, `EmptyStateView`).
+
+### Verification
+- `pnpm api:typecheck`: PASS (0 errors).
+- `pnpm api:test`: PASS (54/54 tests across 4 files).
+- `flutter analyze`: PASS (0 issues found).
+- `flutter test`: PASS (46/46 tests across 3 files).
+
+### Deployment
+- Not deployed yet.
+
+## Phase 8.4: Fees & Finance MVP
+
+### Summary
+- Implemented complete Fees & Finance management for Schoolic.
+- Administrators can define fee structures (with custom amount, frequency, and due dates), allocate fees to enrolled students, record collected payments, and generate official receipts.
+- Live billing metrics: Total Billed, Total Collected, Outstanding Due, and Overdue Dues in the administrator workspace.
+- Multi-channel payment recording: Cash, UPI / QR, Card, Bank Transfer (NEFT/IMPS), and Cheque with transaction reference notes.
+- Printable / viewable formal digital receipt ledger with auto-generated receipt serial numbers (`REC-YYYYMMDD-XXXX`).
+- Student and Parent Portal integration: parents and students can review fee structures, payment status badges (PAID, PARTIAL, OVERDUE, PENDING), and historical payment receipts for linked students.
+
+### Backend
+- Added database schema (`schema.ts`):
+  - Enums: `fee_frequency` (`one_time`, `term`, `monthly`, `annual`), `fee_allocation_status` (`pending`, `partial`, `paid`, `overdue`), `fee_payment_method` (`cash`, `upi`, `card`, `bank_transfer`, `cheque`).
+  - Tables: `fee_structures`, `student_fee_allocations`, `fee_payments` with cascade foreign keys, tenant scoping, and academic year indexing.
+- Generated Drizzle migration `0008_useful_talos.sql`.
+- Added validation schemas (`validation.ts`): `createFeeStructureSchema`, `updateFeeStructureSchema`, `createFeeAllocationSchema`, `recordFeePaymentSchema`, `feeAllocationQuerySchema`, `feePaymentQuerySchema`.
+- Implemented repository methods (`school-repository.ts`):
+  - `feeSummary`: Aggregates total billed, total collected, total outstanding, and overdue counts.
+  - `listFeeStructures`, `createFeeStructure`, `updateFeeStructure`, `deleteFeeStructure`.
+  - `listFeeAllocations`: Dynamic balance calculation and overdue detection against current date.
+  - `createFeeAllocation`: Enforces tenant bounds, prevents duplicate active allocations.
+  - `recordFeePayment`: Issues unique receipt numbers, tracks partial/complete fulfillment, updates allocation status automatically.
+  - `listFeePayments`: Audit ledger of all recorded receipts.
+  - `portalFeeSummary`: Scoped strictly to linked students for parent/student portal users.
+- Admin fee routes:
+  - `GET /api/v1/admin/fees/summary`
+  - `GET /api/v1/admin/fees/structures`
+  - `POST /api/v1/admin/fees/structures`
+  - `PATCH /api/v1/admin/fees/structures/:id`
+  - `DELETE /api/v1/admin/fees/structures/:id`
+  - `GET /api/v1/admin/fees/allocations`
+  - `POST /api/v1/admin/fees/allocations`
+  - `GET /api/v1/admin/fees/payments`
+  - `POST /api/v1/admin/fees/payments`
+- Portal fee route:
+  - `GET /api/v1/portal/fees` (requires student/parent role, tenant-scoped, student validation).
+
+### Frontend
+- Added **Fees & Finance** section to administrator dashboard (`AdminDashboard`, `AdminFeesView`):
+  - Typographic `StatStrip`: Total Billed, Total Collected, Outstanding Due, Overdue Dues.
+  - Subtab navigation: "Student Dues & Allocations", "Fee Structures", "Receipts Ledger".
+  - Search and filter bar (by student name/admission number, class, payment status).
+  - Modals: `_AddStructureModal`, `_AssignFeeModal`, `_RecordPaymentModal`, `_ReceiptModal`.
+  - Respects strict monochrome design system (`AppColors`, `AppTypography`, `AppRadii`, `StatusBadge`, `FeedbackBanner`, `AppDialog`).
+- Added **Fees & Payments** panel to student & parent portal (`PortalDashboard`):
+  - Metrics breakdown: Billed, Paid, Balance Due.
+  - Allocations list with status badges (`PAID`, `PARTIAL`, `OVERDUE`, `PENDING`).
+  - Historical receipts list with receipt number, amount, payment method, and timestamp.
+  - Responsive layout support in both stacked (mobile) and side-by-side (desktop) views.
+
+### Verification
+- `pnpm api:typecheck`: PASS (0 errors).
+- `pnpm api:test`: PASS (47/47 tests across 4 files).
+- `cd apps/flutter_app && flutter analyze --no-fatal-infos`: PASS (0 issues).
+- `pnpm flutter:test`: PASS (43/43 tests across 3 files).
+
+### Deployment
+- Not deployed yet.
+- Production resources remain completely untouched.
+
+---
+
 # Last Update (October 12, 2026)
 
 ## Phase 8.3: Exams, Marks & Report Cards MVP
@@ -816,3 +938,85 @@
 - Production API Worker was not deployed.
 - Production database was not migrated or queried for mutation.
 - Production secrets, DNS, custom domains, and Hostinger settings were not modified.
+
+---
+
+# Phase 8.0 – 8.5: End-to-End Roadmap Implementation & Staging Deployment
+
+## Overview
+Implemented the full institutional roadmap scope across backend schema, API routes, repositories, validations, and the Flutter Web/Mobile frontend, followed by complete live deployment to staging and end-to-end browser verification.
+
+### Roadmap Phases Implemented
+- **8.0 Homework & Assignments**: Class assignments, due dates, instructions, workload minutes estimation, publication status, linked into teacher workflow and student portal.
+- **8.1 Announcements & Communication**: Central institutional announcements, targeted classes/sections, priority badges, integrated in admin sidebar, teacher top navigation, and student portal.
+- **8.2 Student & Parent Portal**: Dedicated portal shell and views for attendance, timetables, homework, report cards, fees, and announcements with role-based route guard.
+- **8.3 Exams, Marks & Report Cards**: Institutional exam creation, grading schedules, subject marks entry, and report card generation.
+- **8.4 Fees & Finance Management**: Dynamic fee structures, student fee allocations, payment receipts, collection metrics, overdue tracking, and student portal fee statements.
+- **8.5 Admissions & School Operations**: Admissions pipeline (Inquiry, Applied, Under Review, Interview, Offered, Accepted, Rejected), document tracking, and direct student conversion.
+
+---
+
+## Staging Deployment Execution
+
+1. **Staging Database Migration & Backup**:
+   - Pre-migration backup branch created: `backup-pre-8-5` (`br-lively-shadow-b5cslh7o`) on Neon staging project `nameless-dust-81736720`.
+   - Applied migrations to staging branch `main` (`br-floral-mountain-b5s114go`):
+     - `0008_useful_talos.sql` (Fees & Finance: structures, allocations, payments).
+     - `0009_zippy_shard.sql` (Admissions: applications, documents, pipeline).
+
+2. **Cloudflare Workers API Deployment**:
+   - Worker: `schoolic-api-staging`
+   - Deployment version: `16e08fb4-10bc-426b-98b9-6e0b0a025285`
+   - URL: `https://schoolic-api-staging.schoolic-api.workers.dev`
+
+3. **Flutter Web Staging Bundle Compilation**:
+   - Compiled release bundle with staging dart-defines:
+     - `API_BASE_URL=https://schoolic-api-staging.schoolic-api.workers.dev`
+     - `NEON_AUTH_URL=https://ep-billowing-shadow-b56k9cl2.neonauth.c-7.us-east-2.aws.neon.tech/neondb`
+   - Output: `apps/flutter_app/build/web_staging`
+
+4. **Cloudflare Pages Staging Deployment**:
+   - Preview deployment: `https://25840539.schoolic-staging.pages.dev`
+   - Canonical staging site: `https://schoolic-staging.pages.dev`
+
+---
+
+## Live Browser Verification & Visual Evidence
+
+- **Admin Admissions Pipeline (Phase 8.5)**:
+  - Verified live at `/#/admin` -> Admissions tab.
+  - Interactive pipeline stage tabs, application intake form, document checklist, and metrics cards.
+  - Artifact: `deployed_admin_admissions_1791899333075.png`.
+
+- **Admin Fees & Finance (Phase 8.4)**:
+  - Verified live at `/#/admin` -> Fees tab.
+  - Fee structures table, student fee allocations, payment recording modal, and collections metrics.
+  - Artifact: `deployed_admin_fees_1791899350162.png`.
+
+- **Admin Exams & Grading (Phase 8.3)**:
+  - Verified live at `/#/admin` -> Exams tab.
+  - Exam creation, schedules, grading system configuration, marks entry register.
+  - Artifact: `deployed_admin_exams_1791899368179.png`.
+
+- **Teacher Homework & Assignments (Phase 8.0)**:
+  - Authenticated as `teacher-login@portfolio.schoolic.test` / `Schoolic@2026`.
+  - Verified live at `/#/teacher` -> Homework navigation tab.
+  - Assignment form with class selector (`=Stage Class A • Mathematics`), due date, estimated minutes, status, title, instructions, and list container.
+  - Artifact: `deployed_teacher_homework_1791899976451.png`.
+
+- **Role-Based Portal Routing & Auth Guards (Phase 8.2)**:
+  - Tested routing to `/#/portal`: strictly guarded by role; unauthenticated users redirect to login, teacher/admin users redirect to their respective workspaces.
+
+---
+
+## Automated Test Suite
+- `pnpm api:typecheck`: PASS (0 errors).
+- `pnpm api:test`: PASS (4 test files, 54 tests passing).
+- `cd apps/flutter_app && flutter test`: PASS (3 test suites, 46 tests passing).
+
+---
+
+## Production Isolation Guarantee
+- All migrations and operations executed solely against isolated staging Neon project `nameless-dust-81736720` and staging Worker `schoolic-api-staging`.
+- Zero changes, deployments, or database writes made to production (`dark-frost-36120929`, `schoolic-api`, `schoolic.pages.dev`).
+

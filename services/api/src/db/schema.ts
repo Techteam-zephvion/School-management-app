@@ -26,6 +26,24 @@ export const announcementAudienceEnum = pgEnum('announcement_audience', ['school
 export const announcementPriorityEnum = pgEnum('announcement_priority', ['normal', 'important', 'urgent']);
 export const homeworkStatusEnum = pgEnum('homework_status', ['draft', 'published', 'archived']);
 export const examStatusEnum = pgEnum('exam_status', ['draft', 'published', 'archived']);
+export const feeFrequencyEnum = pgEnum('fee_frequency', ['one_time', 'term', 'monthly', 'annual']);
+export const feeAllocationStatusEnum = pgEnum('fee_allocation_status', ['pending', 'partial', 'paid', 'overdue']);
+export const feePaymentMethodEnum = pgEnum('fee_payment_method', ['cash', 'upi', 'card', 'bank_transfer', 'cheque']);
+export const admissionStatusEnum = pgEnum('admission_status', [
+  'inquiry',
+  'applied',
+  'under_review',
+  'approved',
+  'enrolled',
+  'rejected',
+]);
+export const documentStatusEnum = pgEnum('document_status', [
+  'pending',
+  'submitted',
+  'verified',
+  'rejected',
+]);
+
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -400,3 +418,115 @@ export const examMarks = pgTable(
     index('exam_marks_student_idx').on(table.schoolId, table.studentId),
   ],
 );
+
+export const feeStructures = pgTable(
+  'fee_structures',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull().references(() => academicYears.id),
+    name: text('name').notNull(),
+    code: text('code').notNull(),
+    description: text('description'),
+    amount: integer('amount').notNull(),
+    frequency: feeFrequencyEnum('frequency').default('term').notNull(),
+    dueDate: date('due_date'),
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.schoolId, table.academicYearId, table.code),
+    index('fee_structures_school_year_idx').on(table.schoolId, table.academicYearId),
+  ],
+);
+
+export const studentFeeAllocations = pgTable(
+  'student_fee_allocations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+    feeStructureId: uuid('fee_structure_id').notNull().references(() => feeStructures.id, { onDelete: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull().references(() => academicYears.id),
+    amount: integer('amount').notNull(),
+    dueDate: date('due_date').notNull(),
+    status: feeAllocationStatusEnum('status').default('pending').notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index('fee_allocations_student_idx').on(table.schoolId, table.studentId),
+    index('fee_allocations_year_status_idx').on(table.schoolId, table.academicYearId, table.status),
+  ],
+);
+
+export const feePayments = pgTable(
+  'fee_payments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    allocationId: uuid('allocation_id').notNull().references(() => studentFeeAllocations.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+    receiptNumber: text('receipt_number').notNull(),
+    amountPaid: integer('amount_paid').notNull(),
+    paymentMethod: feePaymentMethodEnum('payment_method').default('cash').notNull(),
+    transactionReference: text('transaction_reference'),
+    paidAt: timestamp('paid_at', { withTimezone: true }).defaultNow().notNull(),
+    recordedByStaffId: uuid('recorded_by_staff_id').references(() => staff.id, { onDelete: 'set null' }),
+    notes: text('notes'),
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.schoolId, table.receiptNumber),
+    index('fee_payments_student_idx').on(table.schoolId, table.studentId, table.paidAt),
+    index('fee_payments_allocation_idx').on(table.schoolId, table.allocationId),
+  ],
+);
+
+export const admissionApplications = pgTable(
+  'admission_applications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull().references(() => academicYears.id),
+    applyingForClassId: uuid('applying_for_class_id').notNull().references(() => classes.id),
+    applicationNumber: text('application_number').notNull(),
+    applicantName: text('applicant_name').notNull(),
+    dateOfBirth: date('date_of_birth'),
+    gender: text('gender'),
+    parentName: text('parent_name').notNull(),
+    parentEmail: text('parent_email'),
+    parentPhone: text('parent_phone').notNull(),
+    address: text('address'),
+    previousSchool: text('previous_school'),
+    status: admissionStatusEnum('status').default('applied').notNull(),
+    applicationDate: date('application_date').notNull(),
+    decisionDate: date('decision_date'),
+    enrolledStudentId: uuid('enrolled_student_id').references(() => students.id, { onDelete: 'set null' }),
+    notes: text('notes'),
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.schoolId, table.applicationNumber),
+    index('admission_app_status_idx').on(table.schoolId, table.status),
+    index('admission_app_year_class_idx').on(table.schoolId, table.academicYearId, table.applyingForClassId),
+  ],
+);
+
+export const admissionDocuments = pgTable(
+  'admission_documents',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    applicationId: uuid('application_id').notNull().references(() => admissionApplications.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    status: documentStatusEnum('status').default('pending').notNull(),
+    documentNumber: text('document_number'),
+    verifiedByStaffId: uuid('verified_by_staff_id').references(() => staff.id, { onDelete: 'set null' }),
+    notes: text('notes'),
+    ...timestamps,
+  },
+  (table) => [
+    index('admission_docs_app_idx').on(table.schoolId, table.applicationId),
+  ],
+);
+
+

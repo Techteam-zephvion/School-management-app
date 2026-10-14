@@ -26,6 +26,7 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
   Map<String, Object?>? _timetable;
   Map<String, Object?>? _homework;
   Map<String, Object?>? _reportCard;
+  Map<String, Object?>? _fees;
   List<Map<String, Object?>> _announcements = const [];
 
   List<Map<String, Object?>> get _students {
@@ -90,6 +91,10 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
         '/api/v1/portal/report-card$query',
         session: session,
       );
+      final fees = await api.getJson(
+        '/api/v1/portal/fees$query',
+        session: session,
+      );
       final announcements = await api.getList(
         '/api/v1/portal/announcements$query',
         session: session,
@@ -103,6 +108,7 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
         _timetable = timetable;
         _homework = homework;
         _reportCard = reportCard;
+        _fees = fees;
         _announcements = announcements;
         _loading = false;
       });
@@ -182,6 +188,7 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
                         final stack = constraints.maxWidth < 900;
                         final timetable = _timetablePanel();
                         final announcements = _announcementsPanel();
+                        final fees = _feesPanel();
                         if (stack) {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -192,6 +199,8 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
                               const SizedBox(height: 18),
                               _reportCardPanel(),
                               const SizedBox(height: 18),
+                              fees,
+                              const SizedBox(height: 18),
                               announcements,
                             ],
                           );
@@ -199,7 +208,16 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
                         return Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(flex: 3, child: timetable),
+                            Expanded(
+                              flex: 3,
+                              child: Column(
+                                children: [
+                                  timetable,
+                                  const SizedBox(height: 18),
+                                  fees,
+                                ],
+                              ),
+                            ),
                             const SizedBox(width: 18),
                             Expanded(
                               flex: 2,
@@ -415,6 +433,155 @@ class _PortalDashboardState extends ConsumerState<PortalDashboard> {
     );
   }
 
+  Widget _feesPanel() {
+    final summary = (_fees?['summary'] as Map?)?.cast<String, Object?>();
+    final allocations = ((_fees?['allocations'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((row) => row.cast<String, Object?>())
+        .toList();
+    final payments = ((_fees?['payments'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((row) => row.cast<String, Object?>())
+        .toList();
+
+    final totalBilled = (summary?['totalBilled'] as num?)?.toInt() ?? 0;
+    final totalPaid = (summary?['totalPaid'] as num?)?.toInt() ?? 0;
+    final balanceDue = (summary?['balanceDue'] as num?)?.toInt() ?? 0;
+
+    return _Panel(
+      title: 'Fees & Payments',
+      child: allocations.isEmpty && payments.isEmpty
+          ? const EmptyStateView(
+              title: 'No fee records found',
+              description:
+                  'Fee structures and payment receipts for this student will appear here.',
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondaryBackground,
+                    borderRadius: AppRadii.rMd,
+                    border: Border.all(color: AppColors.primaryBorder),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _feeStatColumn('Billed', '₹$totalBilled'),
+                      Container(
+                        width: 1,
+                        height: 32,
+                        color: AppColors.primaryBorder,
+                      ),
+                      _feeStatColumn('Paid', '₹$totalPaid'),
+                      Container(
+                        width: 1,
+                        height: 32,
+                        color: AppColors.primaryBorder,
+                      ),
+                      _feeStatColumn(
+                        'Balance Due',
+                        '₹$balanceDue',
+                        isHighlight: balanceDue > 0,
+                      ),
+                    ],
+                  ),
+                ),
+                if (allocations.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(top: 14, bottom: 4),
+                    child: Text(
+                      'FEE ALLOCATIONS',
+                      style: AppTypography.metadata.copyWith(
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  ...allocations.map((a) {
+                    final status = a['status'] as String? ?? 'pending';
+                    final billed = (a['amount'] as num?)?.toInt() ?? 0;
+                    final paid = (a['paidAmount'] as num?)?.toInt() ?? 0;
+                    final bal = (a['balanceAmount'] as num?)?.toInt() ?? 0;
+                    final badgeTone = switch (status) {
+                      'paid' => BadgeTone.success,
+                      'partial' => BadgeTone.warning,
+                      'overdue' => BadgeTone.error,
+                      _ => BadgeTone.neutral,
+                    };
+
+                    return _ListRow(
+                      title: a['feeStructureName'] as String? ?? 'Fee',
+                      subtitle:
+                          'Due ${a['dueDate'] ?? '-'} • Billed ₹$billed • Paid ₹$paid${bal > 0 ? ' • Due ₹$bal' : ''}',
+                      trailing: StatusBadge(
+                        label: status.toUpperCase(),
+                        tone: badgeTone,
+                      ),
+                    );
+                  }),
+                ],
+                if (payments.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(top: 14, bottom: 4),
+                    child: Text(
+                      'RECENT RECEIPTS',
+                      style: AppTypography.metadata.copyWith(
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  ...payments.map((p) {
+                    final amount = (p['amountPaid'] as num?)?.toInt() ?? 0;
+                    final method =
+                        (p['paymentMethod'] as String? ?? 'cash').toUpperCase();
+                    final paidAt = p['paidAt'] as String? ?? '';
+                    final dateStr =
+                        paidAt.length >= 10 ? paidAt.substring(0, 10) : paidAt;
+
+                    return _ListRow(
+                      title: 'Receipt ${p['receiptNumber'] ?? '—'} • ₹$amount',
+                      subtitle:
+                          '${p['feeStructureName'] ?? 'Fee'} • $method${dateStr.isNotEmpty ? ' • $dateStr' : ''}',
+                      trailing: const StatusBadge(
+                        label: 'PAID',
+                        tone: BadgeTone.success,
+                      ),
+                    );
+                  }),
+                ],
+              ],
+            ),
+    );
+  }
+
+  Widget _feeStatColumn(String label, String value, {bool isHighlight = false}) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            color: AppColors.secondaryText,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: isHighlight ? AppColors.statusError : AppColors.primaryText,
+          ),
+        ),
+      ],
+    );
+  }
+
   Map<String, Object?>? get _selectedStudent {
     if (_students.isEmpty) return null;
     return _students.firstWhere(
@@ -507,10 +674,15 @@ class _Panel extends StatelessWidget {
 }
 
 class _ListRow extends StatelessWidget {
-  const _ListRow({required this.title, required this.subtitle});
+  const _ListRow({
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+  });
 
   final String title;
   final String subtitle;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -520,16 +692,27 @@ class _ListRow extends StatelessWidget {
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: AppColors.primaryBorder)),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: AppColors.secondaryText, height: 1.35),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: AppColors.secondaryText, height: 1.35),
+                ),
+              ],
+            ),
           ),
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            trailing!,
+          ],
         ],
       ),
     );

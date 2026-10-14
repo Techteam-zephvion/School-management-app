@@ -25,7 +25,20 @@ import {
   timetableQuerySchema,
   updateTimetableEntrySchema,
   updateExamSchema,
+  createFeeStructureSchema,
+  updateFeeStructureSchema,
+  createFeeAllocationSchema,
+  recordFeePaymentSchema,
+  feeAllocationQuerySchema,
+  feePaymentQuerySchema,
+  createAdmissionApplicationSchema,
+  updateAdmissionApplicationSchema,
+  enrollApplicantSchema,
+  admissionQuerySchema,
+  addAdmissionDocumentSchema,
+  updateAdmissionDocumentSchema,
 } from '../http/validation';
+
 
 export const adminRoutes = new Hono<AppBindings>();
 
@@ -252,6 +265,141 @@ adminRoutes.delete('/exams/:id', zValidator('param', idSchema), async (c) => {
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
   return c.json(await repo.deleteAdminExam(c.get('authUser'), c.req.valid('param').id));
 });
+
+adminRoutes.get('/fees/summary', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.feeSummary(c.get('authUser')));
+});
+
+adminRoutes
+  .get('/fees/structures', async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    const yearId = c.req.query('academicYearId');
+    return c.json(await repo.listFeeStructures(c.get('authUser'), yearId));
+  })
+  .post('/fees/structures', zValidator('json', createFeeStructureSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createFeeStructure(c.get('authUser'), c.req.valid('json')), 201);
+  });
+
+adminRoutes.patch(
+  '/fees/structures/:id',
+  zValidator('param', idSchema),
+  zValidator('json', updateFeeStructureSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.updateFeeStructure(c.get('authUser'), c.req.valid('param').id, c.req.valid('json')));
+  },
+);
+
+adminRoutes.delete('/fees/structures/:id', zValidator('param', idSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.deleteFeeStructure(c.get('authUser'), c.req.valid('param').id));
+});
+
+adminRoutes
+  .get('/fees/allocations', zValidator('query', feeAllocationQuerySchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listFeeAllocations(c.get('authUser'), c.req.valid('query')));
+  })
+  .post('/fees/allocations', zValidator('json', createFeeAllocationSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createFeeAllocation(c.get('authUser'), c.req.valid('json')), 201);
+  });
+
+adminRoutes
+  .get('/fees/payments', zValidator('query', feePaymentQuerySchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listFeePayments(c.get('authUser'), c.req.valid('query')));
+  })
+  .post('/fees/payments', zValidator('json', recordFeePaymentSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.recordFeePayment(c.get('authUser'), c.req.valid('json')), 201);
+  });
+
+adminRoutes.get('/admissions/summary', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const yearId = c.req.query('academicYearId');
+  return c.json(await repo.admissionSummary(c.get('authUser'), yearId));
+});
+
+adminRoutes
+  .get('/admissions/applications', zValidator('query', admissionQuerySchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listAdmissionApplications(c.get('authUser'), c.req.valid('query')));
+  })
+  .post('/admissions/applications', zValidator('json', createAdmissionApplicationSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createAdmissionApplication(c.get('authUser'), c.req.valid('json')), 201);
+  });
+
+adminRoutes
+  .get('/admissions/applications/:id', zValidator('param', idSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.getAdmissionApplication(c.get('authUser'), c.req.valid('param').id));
+  })
+  .patch(
+    '/admissions/applications/:id',
+    zValidator('param', idSchema),
+    zValidator('json', updateAdmissionApplicationSchema),
+    async (c) => {
+      const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+      return c.json(await repo.updateAdmissionApplication(c.get('authUser'), c.req.valid('param').id, c.req.valid('json')));
+    },
+  )
+  .delete('/admissions/applications/:id', zValidator('param', idSchema), async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.deleteAdmissionApplication(c.get('authUser'), c.req.valid('param').id));
+  });
+
+adminRoutes.post(
+  '/admissions/applications/:id/enroll',
+  zValidator('param', idSchema),
+  zValidator('json', enrollApplicantSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.enrollApplicant(c.get('authUser'), c.req.valid('param').id, c.req.valid('json')), 201);
+  },
+);
+
+adminRoutes
+  .get(
+    '/admissions/applications/:id/documents',
+    zValidator('param', idSchema),
+    async (c) => {
+      const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+      return c.json(await repo.listAdmissionDocuments(c.get('authUser'), c.req.valid('param').id));
+    },
+  )
+  .post(
+    '/admissions/applications/:id/documents',
+    zValidator('param', idSchema),
+    zValidator('json', addAdmissionDocumentSchema),
+    async (c) => {
+      const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+      return c.json(await repo.addAdmissionDocument(c.get('authUser'), c.req.valid('param').id, c.req.valid('json')), 201);
+    },
+  );
+
+adminRoutes
+  .patch(
+    '/admissions/documents/:id',
+    zValidator('param', idSchema),
+    zValidator('json', updateAdmissionDocumentSchema),
+    async (c) => {
+      const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+      return c.json(await repo.updateAdmissionDocument(c.get('authUser'), c.req.valid('param').id, c.req.valid('json')));
+    },
+  )
+  .delete(
+    '/admissions/documents/:id',
+    zValidator('param', idSchema),
+    async (c) => {
+      const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+      return c.json(await repo.deleteAdmissionDocument(c.get('authUser'), c.req.valid('param').id));
+    },
+  );
+
 
 adminRoutes.post('/ai/attendance-insights', zValidator('json', aiAttendanceInsightsSchema), async (c) => {
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));

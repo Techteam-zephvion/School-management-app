@@ -32,6 +32,7 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
   List<Map<String, Object?>> _recentSessions = [];
   Map<String, Object?>? _selectedAssignment;
   bool _loading = true;
+  bool _hasLoaded = false;
   String? _error;
 
   @override
@@ -48,8 +49,13 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
   }
 
   Future<void> _loadData() async {
-    final session = ref.read(authControllerProvider).session;
-    if (session == null) return;
+    final auth = ref.read(authControllerProvider);
+    if (auth.isLoading) return;
+    final session = auth.session;
+    if (session == null) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
 
     setState(() {
       _loading = true;
@@ -60,7 +66,9 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
       final api = ref.read(apiClientProvider);
       final results = await Future.wait([
         api.getList('/api/v1/teacher/assignments', session: session),
-        api.getList('/api/v1/teacher/timetable', session: session),
+        api
+            .getList('/api/v1/teacher/timetable', session: session)
+            .catchError((_) => <Map<String, Object?>>[]),
         api
             .getJson('/api/v1/teacher/attendance/summary', session: session)
             .catchError((_) => {'sessions': []}),
@@ -72,18 +80,30 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
       final sessions = ((summaryJson['sessions'] as List?) ?? const [])
           .cast<Map<String, Object?>>();
 
-      setState(() {
-        _assignments = assignments;
-        _timetable = timetable;
-        _recentSessions = sessions;
-        if (_selectedAssignment == null && assignments.isNotEmpty) {
-          _selectedAssignment = assignments.first;
-        }
-      });
+      if (mounted) {
+        setState(() {
+          _assignments = assignments;
+          _timetable = timetable;
+          _recentSessions = sessions;
+          _hasLoaded = true;
+          _error = null;
+          if (_selectedAssignment == null && assignments.isNotEmpty) {
+            _selectedAssignment = assignments.first;
+          }
+        });
+      }
     } on ApiException catch (e) {
-      setState(() => _error = e.message);
+      if (mounted) {
+        if (!_hasLoaded) {
+          setState(() => _error = e.message);
+        }
+      }
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (mounted) {
+        if (!_hasLoaded) {
+          setState(() => _error = e.toString());
+        }
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -126,11 +146,19 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final session = ref.watch(authControllerProvider).session;
+    final auth = ref.watch(authControllerProvider);
+    final session = auth.session;
+
+    if (!auth.isLoading && session != null && !_hasLoaded && _error == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_hasLoaded) _loadData();
+      });
+    }
+
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 1000;
 
-    if (_loading) {
+    if ((_loading || auth.isLoading) && !_hasLoaded) {
       return const Scaffold(
         backgroundColor: AppColors.mainBackground,
         body: Center(
@@ -469,7 +497,10 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
     final isSelected = _activeTab == index;
     return InkWell(
       onTap: () {
-        setState(() => _activeTab = index);
+        setState(() {
+          _activeTab = index;
+          _error = null;
+        });
         Navigator.of(context).pop();
       },
       child: Container(
@@ -549,7 +580,10 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
     final isSelected = _activeTab == index;
 
     return InkWell(
-      onTap: () => setState(() => _activeTab = index),
+      onTap: () => setState(() {
+        _activeTab = index;
+        _error = null;
+      }),
       borderRadius: AppRadii.rMd,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

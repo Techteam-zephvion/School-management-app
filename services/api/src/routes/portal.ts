@@ -42,3 +42,9 @@ portalRoutes.get('/report-card', zValidator('query', portalStudentQuerySchema), 
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
   return c.json(await repo.portalReportCard(c.get('authUser'), c.req.valid('query').studentId));
 });
+
+portalRoutes.get('/fees', zValidator('query', portalStudentQuerySchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.portalFeeSummary(c.get('authUser'), c.req.valid('query').studentId));
+});
+

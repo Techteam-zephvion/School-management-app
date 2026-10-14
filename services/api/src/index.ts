@@ -39,6 +39,7 @@ export function createApp() {
       allowHeaders: ['content-type', 'authorization', 'x-dev-neon-user-id', 'x-dev-email', 'x-bootstrap-token'],
       allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       credentials: true,
+      maxAge: 86400,
     });
     return middleware(c, next);
   });

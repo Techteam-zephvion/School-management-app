@@ -16,7 +16,17 @@ final authControllerProvider = ChangeNotifierProvider<AuthController>((ref) {
 });
 
 class AuthController extends ChangeNotifier {
-  AuthController(this._apiClient);
+  AuthController(this._apiClient) {
+    _apiClient.onTokenRefreshed = (newToken) {
+      if (session != null && session!.bearerToken != newToken) {
+        session = session!.copyWith(bearerToken: newToken);
+        _persist();
+      }
+    };
+    _apiClient.onSessionExpired = () {
+      signOut();
+    };
+  }
 
   static const _storageKey = 'schoolic.auth.session';
 
@@ -39,10 +49,23 @@ class AuthController extends ChangeNotifier {
 
     try {
       final cached = AuthSession.fromJson(jsonDecode(raw) as Map<String, Object?>);
-      session = await _apiClient.currentUser(
-        bearerToken: cached.bearerToken,
-        devSession: cached.devNeonUserId == null ? null : cached,
-      );
+      try {
+        session = await _apiClient.currentUser(
+          bearerToken: cached.bearerToken,
+          devSession: cached.devNeonUserId == null ? null : cached,
+        );
+      } catch (e) {
+        if (cached.bearerToken != null && cached.devNeonUserId == null) {
+          final refreshedToken = await _apiClient.refreshToken();
+          if (refreshedToken != null) {
+            session = await _apiClient.currentUser(bearerToken: refreshedToken);
+          } else {
+            rethrow;
+          }
+        } else {
+          rethrow;
+        }
+      }
       await _persist();
     } catch (_) {
       session = null;

@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:schoolic/src/core/models.dart';
 import 'package:schoolic/src/core/theme.dart';
 import 'package:schoolic/src/features/admin/dialogs/student_attendance_dialog.dart';
+import 'package:schoolic/src/features/admin/views/admin_admissions_view.dart';
+import 'package:schoolic/src/features/admin/views/admin_fees_view.dart';
 import 'package:schoolic/src/features/admin/views/admin_overview_view.dart';
 import 'package:schoolic/src/features/admin/views/admin_students_view.dart';
 import 'package:schoolic/src/features/admin/views/admin_timetable_view.dart';
@@ -781,6 +783,206 @@ void main() {
           find.text('First time here? Explore Product Tour'),
           findsOneWidget,
         );
+      },
+    );
+  });
+
+  group('Phase 8.4 — Fees & Finance', () {
+    testWidgets('AdminFeesView renders header, stat strip, tabs, and filters', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildSchoolicTheme(),
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: AdminFeesView(
+                  years: const [
+                    {'id': 'y1', 'name': '2026-2027'},
+                  ],
+                  classes: const [
+                    {'id': 'c1', 'name': 'Grade 6'},
+                  ],
+                  sections: const [
+                    {'id': 's1', 'classId': 'c1', 'name': 'A'},
+                  ],
+                  students: const [
+                    {
+                      'id': 'st1',
+                      'fullName': 'Aarav Sharma',
+                      'admissionNumber': 'SCH-001',
+                    },
+                  ],
+                  reload: () async {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // PageHeader and Action Buttons
+      expect(find.text('Fees & Finance'), findsOneWidget);
+      expect(find.text('Add Fee Structure'), findsOneWidget);
+      expect(find.text('Assign Student Fee'), findsOneWidget);
+
+      // StatStrip metrics
+      expect(find.text('TOTAL BILLED'), findsOneWidget);
+      expect(find.text('TOTAL COLLECTED'), findsOneWidget);
+      expect(find.text('OUTSTANDING DUE'), findsOneWidget);
+      expect(find.text('OVERDUE DUES'), findsOneWidget);
+
+      // Subtabs
+      expect(find.text('Student Dues & Allocations (0)'), findsOneWidget);
+      expect(find.text('Fee Structures (0)'), findsOneWidget);
+      expect(find.text('Receipts Ledger (0)'), findsOneWidget);
+
+      // Empty State
+      expect(find.text('No student fee allocations found'), findsOneWidget);
+
+      // Search & Filter controls
+      expect(find.byType(TextField), findsOneWidget);
+      expect(find.text('All Classes'), findsOneWidget);
+      expect(find.text('All Statuses'), findsOneWidget);
+    });
+
+    testWidgets('AdminFeesView switches between subtabs cleanly', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildSchoolicTheme(),
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: AdminFeesView(
+                  years: const [],
+                  classes: const [],
+                  sections: const [],
+                  students: const [],
+                  reload: () async {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Tap Fee Structures tab
+      await tester.tap(find.text('Fee Structures (0)'));
+      await tester.pumpAndSettle();
+      expect(find.text('No fee structures configured'), findsOneWidget);
+
+      // Tap Receipts Ledger tab
+      await tester.tap(find.text('Receipts Ledger (0)'));
+      await tester.pumpAndSettle();
+      expect(find.text('No payment receipts issued yet'), findsOneWidget);
+    });
+  });
+
+  group('Phase 8.5 — Admissions & Operations', () {
+    testWidgets(
+      'AdminAdmissionsView renders page header, stats strip, subtabs, and filters',
+      (tester) async {
+        tester.view.physicalSize = const Size(1280, 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
+
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp(
+              theme: buildSchoolicTheme(),
+              home: Scaffold(
+                body: SingleChildScrollView(
+                  child: AdminAdmissionsView(
+                    years: const [],
+                    classes: const [],
+                    sections: const [],
+                    reload: () async {},
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.pumpAndSettle();
+
+        // PageHeader and Action Buttons
+        expect(find.text('Admissions & Operations'), findsOneWidget);
+        expect(find.text('New Application'), findsWidgets);
+        expect(find.text('Add Inquiry'), findsOneWidget);
+
+        // StatStrip metrics
+        expect(find.text('TOTAL PIPELINE'), findsOneWidget);
+        expect(find.text('UNDER REVIEW'), findsOneWidget);
+        expect(find.text('APPROVED FOR INTAKE'), findsOneWidget);
+        expect(find.text('SUCCESSFULLY ENROLLED'), findsOneWidget);
+
+        // Subtabs
+        expect(find.text('Applications Pipeline (0)'), findsOneWidget);
+        expect(find.text('Inquiries & Leads (0)'), findsOneWidget);
+        expect(find.text('Class Capacity & Seats (0)'), findsOneWidget);
+
+        // Empty State
+        expect(find.text('No applications found'), findsOneWidget);
+
+        // Filter Controls
+        expect(find.byType(TextField), findsOneWidget);
+        expect(find.text('All Classes'), findsOneWidget);
+        expect(find.text('All Statuses'), findsOneWidget);
+      },
+    );
+
+    testWidgets('AdminAdmissionsView switches between subtabs cleanly', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: buildSchoolicTheme(),
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: AdminAdmissionsView(
+                  years: const [],
+                  classes: const [],
+                  sections: const [],
+                  reload: () async {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+        await tester.pumpAndSettle();
+
+        // Tap Inquiries tab
+        await tester.tap(find.text('Inquiries & Leads (0)'));
+        await tester.pumpAndSettle();
+        expect(find.text('No inquiries recorded'), findsOneWidget);
+
+        // Tap Capacity tab
+        await tester.tap(find.text('Class Capacity & Seats (0)'));
+        await tester.pumpAndSettle();
+        expect(find.text('No classes configured'), findsOneWidget);
       },
     );
   });

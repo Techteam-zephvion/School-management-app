@@ -34,6 +34,23 @@ class AuthSession {
         'devNeonUserId': devNeonUserId,
       };
 
+  AuthSession copyWith({
+    String? email,
+    String? displayName,
+    List<AppRole>? roles,
+    String? schoolId,
+    String? bearerToken,
+    String? devNeonUserId,
+  }) =>
+      AuthSession(
+        email: email ?? this.email,
+        displayName: displayName ?? this.displayName,
+        roles: roles ?? this.roles,
+        schoolId: schoolId ?? this.schoolId,
+        bearerToken: bearerToken ?? this.bearerToken,
+        devNeonUserId: devNeonUserId ?? this.devNeonUserId,
+      );
+
   static AuthSession fromJson(Map<String, Object?> json) => AuthSession(
         email: json['email'] as String,
         displayName: json['displayName'] as String?,

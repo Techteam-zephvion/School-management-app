@@ -49,6 +49,31 @@ function neonAuthBase(authUrl: string): string {
   return trimmed.endsWith('/auth') ? trimmed : `${trimmed}/auth`;
 }
 
+let cachedJwks: { keys: JwkSet; fetchedAt: number; authBase: string } | null = null;
+const JWKS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+async function getJwks(authBase: string): Promise<JwkSet> {
+  const now = Date.now();
+  if (cachedJwks && cachedJwks.authBase === authBase && now - cachedJwks.fetchedAt < JWKS_CACHE_TTL_MS) {
+    return cachedJwks.keys;
+  }
+
+  const jwksResponse = await fetch(`${authBase}/.well-known/jwks.json`, {
+    headers: { accept: 'application/json' },
+  });
+
+  if (!jwksResponse.ok) {
+    if (cachedJwks && cachedJwks.authBase === authBase) {
+      return cachedJwks.keys;
+    }
+    throw new ApiError(503, 'Authentication provider key service unavailable');
+  }
+
+  const keys = (await jwksResponse.json()) as JwkSet;
+  cachedJwks = { keys, fetchedAt: now, authBase };
+  return keys;
+}
+
 async function readNeonJwt(authUrl: string, token: string): Promise<{ id: string; email: string }> {
   const [headerPart, payloadPart, signaturePart] = token.split('.');
   if (!headerPart || !payloadPart || !signaturePart) {
@@ -72,15 +97,13 @@ async function readNeonJwt(authUrl: string, token: string): Promise<{ id: string
     throw new ApiError(401, 'Invalid or expired session');
   }
 
-  const jwksResponse = await fetch(`${authBase}/.well-known/jwks.json`, {
-    headers: { accept: 'application/json' },
-  });
-  if (!jwksResponse.ok) {
-    throw new ApiError(401, 'Authentication verification failed');
+  const jwks = await getJwks(authBase);
+  let jwk = jwks.keys?.find((key) => key.kid === header.kid);
+  if (!jwk && cachedJwks) {
+    cachedJwks = null;
+    const freshJwks = await getJwks(authBase);
+    jwk = freshJwks.keys?.find((key) => key.kid === header.kid);
   }
-
-  const jwks = (await jwksResponse.json()) as JwkSet;
-  const jwk = jwks.keys?.find((key) => key.kid === header.kid);
   if (!jwk) {
     throw new ApiError(401, 'Invalid or expired session');
   }
@@ -130,19 +153,19 @@ async function readNeonSession(
     }
 
     if (!response.ok) {
-      throw new ApiError(401, 'Authentication verification failed');
+      throw new ApiError(401, 'Invalid or expired session');
     }
 
-    const body = (await response.json()) as NeonSessionResponse;
-    if (!body.user?.id || !body.user.email) {
-      throw new ApiError(401, 'Auth session did not include a valid user');
+    const body = (await response.json()) as NeonSessionResponse | null;
+    if (!body || !body.user?.id || !body.user.email) {
+      throw new ApiError(401, 'Invalid or expired session');
     }
 
     return { id: body.user.id, email: body.user.email };
   } catch (error) {
     if (error instanceof ApiError) throw error;
     console.error('Error verifying session with authentication service:', error);
-    throw new ApiError(401, 'Unable to verify authentication credentials');
+    throw new ApiError(401, 'Invalid or expired session');
   }
 }
 

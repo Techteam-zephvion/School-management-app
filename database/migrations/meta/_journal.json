@@ -57,6 +57,20 @@
       "when": 1791883083486,
       "tag": "0007_romantic_scorpion",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791887314076,
+      "tag": "0008_useful_talos",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791888915888,
+      "tag": "0009_zippy_shard",
+      "breakpoints": true
     }
   ]
 }

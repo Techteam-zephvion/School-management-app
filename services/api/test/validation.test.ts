@@ -13,7 +13,18 @@ import {
   saveAttendanceSchema,
   teacherCopilotSchema,
   updateTimetableEntrySchema,
+  createFeeStructureSchema,
+  updateFeeStructureSchema,
+  createFeeAllocationSchema,
+  recordFeePaymentSchema,
+  createAdmissionApplicationSchema,
+  updateAdmissionApplicationSchema,
+  enrollApplicantSchema,
+  admissionQuerySchema,
+  addAdmissionDocumentSchema,
+  updateAdmissionDocumentSchema,
 } from '../src/http/validation';
+
 
 const uuid = '00000000-0000-4000-8000-000000000001';
 
@@ -284,3 +295,174 @@ describe('portal account validation', () => {
     expect(parsed.roles).toEqual(['parent', 'student']);
   });
 });
+
+describe('fee management validation', () => {
+  it('accepts a valid fee structure', () => {
+    const parsed = createFeeStructureSchema.parse({
+      academicYearId: uuid,
+      name: 'Term 1 Tuition Fee',
+      code: 'TUIT-T1-2026',
+      amount: 25000,
+      frequency: 'term',
+      dueDate: '2026-11-15',
+    });
+
+    expect(parsed.name).toBe('Term 1 Tuition Fee');
+    expect(parsed.amount).toBe(25000);
+    expect(parsed.frequency).toBe('term');
+  });
+
+  it('rejects negative or zero fee structure amounts', () => {
+    const parsed = createFeeStructureSchema.safeParse({
+      academicYearId: uuid,
+      name: 'Lab Fee',
+      code: 'LAB-01',
+      amount: -500,
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it('accepts valid fee allocations', () => {
+    const parsed = createFeeAllocationSchema.parse({
+      studentId: uuid,
+      feeStructureId: uuid,
+      academicYearId: uuid,
+      amount: 15000,
+      dueDate: '2026-11-30',
+    });
+
+    expect(parsed.amount).toBe(15000);
+    expect(parsed.dueDate).toBe('2026-11-30');
+  });
+
+  it('accepts valid fee payments with different payment methods', () => {
+    const parsed = recordFeePaymentSchema.parse({
+      allocationId: uuid,
+      amountPaid: 15000,
+      paymentMethod: 'upi',
+      transactionReference: 'UPI/123456789/REF',
+      notes: 'Paid via phonepe',
+    });
+
+    expect(parsed.paymentMethod).toBe('upi');
+    expect(parsed.amountPaid).toBe(15000);
+  });
+
+  it('rejects non-positive payment amounts', () => {
+    const parsed = recordFeePaymentSchema.safeParse({
+      allocationId: uuid,
+      amountPaid: 0,
+      paymentMethod: 'cash',
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe('admissions validation', () => {
+  it('accepts valid admission applications with default status', () => {
+    const parsed = createAdmissionApplicationSchema.parse({
+      academicYearId: uuid,
+      applyingForClassId: uuid,
+      applicantName: 'Aarav Sharma',
+      parentName: 'Rajesh Sharma',
+      parentPhone: '+91 9876543210',
+      parentEmail: 'rajesh.sharma@example.com',
+      gender: 'male',
+      dateOfBirth: '2018-05-12',
+      previousSchool: 'Sunrise Kindergarten',
+    });
+
+    expect(parsed.applicantName).toBe('Aarav Sharma');
+    expect(parsed.status).toBe('applied');
+    expect(parsed.parentPhone).toBe('+91 9876543210');
+  });
+
+  it('accepts admission applications with custom documents checklist', () => {
+    const parsed = createAdmissionApplicationSchema.parse({
+      academicYearId: uuid,
+      applyingForClassId: uuid,
+      applicantName: 'Priya Patel',
+      parentName: 'Sunita Patel',
+      parentPhone: '9876543211',
+      status: 'under_review',
+      documents: [
+        { title: 'Birth Certificate', status: 'verified', documentNumber: 'BC-2018-992' },
+        { title: 'Transfer Certificate', status: 'pending' },
+      ],
+    });
+
+    expect(parsed.status).toBe('under_review');
+    expect(parsed.documents).toHaveLength(2);
+    expect(parsed.documents?.[0]?.status).toBe('verified');
+  });
+
+  it('rejects admission applications with invalid phone or empty applicant name', () => {
+    const invalidPhone = createAdmissionApplicationSchema.safeParse({
+      academicYearId: uuid,
+      applyingForClassId: uuid,
+      applicantName: 'Aarav Sharma',
+      parentName: 'Rajesh Sharma',
+      parentPhone: '123',
+    });
+    expect(invalidPhone.success).toBe(false);
+
+    const emptyName = createAdmissionApplicationSchema.safeParse({
+      academicYearId: uuid,
+      applyingForClassId: uuid,
+      applicantName: '',
+      parentName: 'Rajesh Sharma',
+      parentPhone: '9876543210',
+    });
+    expect(emptyName.success).toBe(false);
+  });
+
+  it('accepts partial application updates and status transitions', () => {
+    const update = updateAdmissionApplicationSchema.parse({
+      status: 'approved',
+      decisionDate: '2026-10-15',
+      notes: 'Passed entrance interview successfully',
+    });
+
+    expect(update.status).toBe('approved');
+    expect(update.decisionDate).toBe('2026-10-15');
+  });
+
+  it('accepts valid enrollment payload', () => {
+    const enrollment = enrollApplicantSchema.parse({
+      sectionId: uuid,
+      admissionNumber: 'ADM-2026-0042',
+      rollNumber: '14',
+    });
+
+    expect(enrollment.sectionId).toBe(uuid);
+    expect(enrollment.admissionNumber).toBe('ADM-2026-0042');
+  });
+
+  it('accepts admission search and status query filters', () => {
+    const query = admissionQuerySchema.parse({
+      status: 'applied',
+      search: 'Sharma',
+      classId: uuid,
+    });
+
+    expect(query.status).toBe('applied');
+    expect(query.search).toBe('Sharma');
+  });
+
+  it('validates document additions and updates', () => {
+    const doc = addAdmissionDocumentSchema.parse({
+      title: 'Previous School Report Card',
+      status: 'submitted',
+      documentNumber: 'REP-401',
+    });
+    expect(doc.status).toBe('submitted');
+
+    const updated = updateAdmissionDocumentSchema.parse({
+      status: 'verified',
+    });
+    expect(updated.status).toBe('verified');
+  });
+});
+

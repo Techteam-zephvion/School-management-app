@@ -15,12 +15,15 @@ import '../shared/views/announcements_view.dart';
 import 'dialogs/add_staff_dialog.dart';
 import 'dialogs/add_student_dialog.dart';
 import 'dialogs/student_attendance_dialog.dart';
+import 'views/admin_admissions_view.dart';
 import 'views/admin_assignments_view.dart';
 import 'views/admin_attendance_view.dart';
 import 'views/admin_ai_usage_view.dart';
 import 'views/admin_classes_view.dart';
 import 'views/admin_exams_view.dart';
+import 'views/admin_fees_view.dart';
 import 'views/admin_insights_view.dart';
+
 import 'views/admin_overview_view.dart';
 import 'views/admin_reports_view.dart';
 import 'views/admin_settings_view.dart';
@@ -34,15 +37,18 @@ enum AdminNavSection {
   insights,
   aiUsage,
   announcements,
+  admissions,
   students,
   staff,
   classesAndSubjects,
   teacherAssignments,
   timetable,
   exams,
+  fees,
   reports,
   settings,
 }
+
 
 class AdminDashboard extends ConsumerStatefulWidget {
   const AdminDashboard({super.key});
@@ -67,6 +73,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   List<Map<String, Object?>> _summaries = [];
   String _schoolName = 'Schoolic Academy';
   bool _loading = true;
+  bool _hasLoaded = false;
   String? _error;
 
   String? _selectedClassId;
@@ -97,8 +104,13 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
   }
 
   Future<void> _load() async {
-    final session = ref.read(authControllerProvider).session;
-    if (session == null) return;
+    final auth = ref.read(authControllerProvider);
+    if (auth.isLoading) return;
+    final session = auth.session;
+    if (session == null) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -136,12 +148,14 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         _assignments = results[6];
         _timetable = results[7];
         _exams = results[8];
+        _hasLoaded = true;
+        _error = null;
       });
       await _loadSummaries();
     } on ApiException catch (exception) {
-      setState(() => _error = exception.message);
+      if (!_hasLoaded) setState(() => _error = exception.message);
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (!_hasLoaded) setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -282,7 +296,16 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    final auth = ref.watch(authControllerProvider);
+    final session = auth.session;
+
+    if (!auth.isLoading && session != null && !_hasLoaded && _error == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_hasLoaded) _load();
+      });
+    }
+
+    if ((_loading || auth.isLoading) && !_hasLoaded) {
       return const Scaffold(
         backgroundColor: AppColors.mainBackground,
         body: Center(
@@ -431,6 +454,12 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     isDrawer: isDrawer,
                   ),
                   _sidebarItem(
+                    AdminNavSection.admissions,
+                    Icons.how_to_reg_outlined,
+                    'Admissions',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
                     AdminNavSection.students,
                     Icons.people_outline,
                     'Students',
@@ -467,11 +496,18 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     isDrawer: isDrawer,
                   ),
                   _sidebarItem(
+                    AdminNavSection.fees,
+                    Icons.payments_outlined,
+                    'Fees & Finance',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
                     AdminNavSection.reports,
                     Icons.analytics_outlined,
                     'Reports',
                     isDrawer: isDrawer,
                   ),
+
                   _sidebarItem(
                     AdminNavSection.settings,
                     Icons.settings_outlined,
@@ -833,6 +869,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         return 'AI Usage';
       case AdminNavSection.announcements:
         return 'Announcements';
+      case AdminNavSection.admissions:
+        return 'Admissions & Operations';
       case AdminNavSection.students:
         return 'Students';
       case AdminNavSection.staff:
@@ -845,12 +883,15 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
         return 'Timetable';
       case AdminNavSection.exams:
         return 'Exams & Marks';
+      case AdminNavSection.fees:
+        return 'Fees & Finance';
       case AdminNavSection.reports:
         return 'Reports & Export';
       case AdminNavSection.settings:
         return 'Settings';
     }
   }
+
 
   Widget _buildCurrentView() {
     final activeYear = _years.isNotEmpty
@@ -972,8 +1013,24 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
           subjects: _subjects,
           reload: _load,
         );
+      case AdminNavSection.fees:
+        return AdminFeesView(
+          years: _years,
+          classes: _classes,
+          sections: _sections,
+          students: _students,
+          reload: _load,
+        );
+      case AdminNavSection.admissions:
+        return AdminAdmissionsView(
+          years: _years,
+          classes: _classes,
+          sections: _sections,
+          reload: _load,
+        );
       case AdminNavSection.reports:
         return AdminReportsView(
+
           summaries: _summaries,
           students: _students,
           classes: _classes,

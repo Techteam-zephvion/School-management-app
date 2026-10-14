@@ -213,7 +213,7 @@ class ShortcutsDialog extends StatelessWidget {
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
                               itemCount: category.shortcuts.length,
-                              separatorBuilder: (_, __) => const Divider(
+                              separatorBuilder: (_, _) => const Divider(
                                 height: 1,
                                 color: AppColors.primaryBorder,
                               ),

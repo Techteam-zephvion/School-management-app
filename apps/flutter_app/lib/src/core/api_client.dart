@@ -80,6 +80,72 @@ class ApiClient {
     return currentUser(bearerToken: token);
   }
 
+  void Function(String newToken)? onTokenRefreshed;
+  void Function()? onSessionExpired;
+
+  Future<String?>? _inFlightRefresh;
+
+  Future<String?> refreshToken() async {
+    if (neonAuthUrl.isEmpty) return null;
+    if (_inFlightRefresh != null) {
+      return _inFlightRefresh;
+    }
+    final future = _performRefreshToken();
+    _inFlightRefresh = future;
+    try {
+      return await future;
+    } finally {
+      _inFlightRefresh = null;
+    }
+  }
+
+  Future<String?> _performRefreshToken() async {
+    try {
+      final tokenResponse = await auth_transport.getAuthJson(
+        Uri.parse('$neonAuthBase/token'),
+        httpClient: _httpClient,
+      );
+      final token = tokenResponse['token'] as String?;
+      if (token != null && token.isNotEmpty) {
+        onTokenRefreshed?.call(token);
+        return token;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<http.Response> _sendWithRetry({
+    required Future<http.Response> Function(String? token) request,
+    String? bearerToken,
+  }) async {
+    http.Response response;
+    try {
+      response = await request(bearerToken);
+    } on http.ClientException {
+      // First attempt encountered a transient browser fetch / preflight / network glitch.
+      // Wait a short moment and retry once.
+      await Future.delayed(const Duration(milliseconds: 350));
+      response = await request(bearerToken);
+    }
+
+    if (response.statusCode == 401 && bearerToken != null) {
+      final newToken = await refreshToken();
+      if (newToken != null) {
+        try {
+          return await request(newToken);
+        } on http.ClientException {
+          await Future.delayed(const Duration(milliseconds: 350));
+          return await request(newToken);
+        }
+      } else {
+        onSessionExpired?.call();
+      }
+    }
+    return response;
+  }
+
   Future<void> signOutWithNeon() async {
     if (neonAuthUrl.isEmpty) return;
     try {
@@ -116,12 +182,15 @@ class ApiClient {
     AuthSession? devSession,
     AuthSession? session,
   }) async {
-    final token = bearerToken ?? session?.bearerToken;
+    final initialToken = bearerToken ?? session?.bearerToken;
     final dev = devSession ?? (session?.devNeonUserId != null ? session : null);
     try {
-      final response = await _httpClient.get(
-        Uri.parse('$apiBaseUrl$path'),
-        headers: _headers(bearerToken: token, devSession: dev),
+      final response = await _sendWithRetry(
+        bearerToken: initialToken,
+        request: (token) => _httpClient.get(
+          Uri.parse('$apiBaseUrl$path'),
+          headers: _headers(bearerToken: token, devSession: dev),
+        ),
       );
       _ensureSuccess(response);
       return _decode(response);
@@ -136,9 +205,12 @@ class ApiClient {
 
   Future<List<Map<String, Object?>>> getList(String path, {required AuthSession session}) async {
     try {
-      final response = await _httpClient.get(
-        Uri.parse('$apiBaseUrl$path'),
-        headers: _headers(bearerToken: session.bearerToken, devSession: session),
+      final response = await _sendWithRetry(
+        bearerToken: session.bearerToken,
+        request: (token) => _httpClient.get(
+          Uri.parse('$apiBaseUrl$path'),
+          headers: _headers(bearerToken: token, devSession: session),
+        ),
       );
       _ensureSuccess(response);
       return (_decodeList(response)).cast<Map<String, Object?>>();
@@ -157,10 +229,13 @@ class ApiClient {
     required AuthSession session,
   }) async {
     try {
-      final response = await _httpClient.post(
-        Uri.parse('$apiBaseUrl$path'),
-        headers: _headers(bearerToken: session.bearerToken, devSession: session),
-        body: jsonEncode(body),
+      final response = await _sendWithRetry(
+        bearerToken: session.bearerToken,
+        request: (token) => _httpClient.post(
+          Uri.parse('$apiBaseUrl$path'),
+          headers: _headers(bearerToken: token, devSession: session),
+          body: jsonEncode(body),
+        ),
       );
       _ensureSuccess(response);
       return _decode(response);
@@ -179,10 +254,13 @@ class ApiClient {
     required AuthSession session,
   }) async {
     try {
-      final response = await _httpClient.put(
-        Uri.parse('$apiBaseUrl$path'),
-        headers: _headers(bearerToken: session.bearerToken, devSession: session),
-        body: jsonEncode(body),
+      final response = await _sendWithRetry(
+        bearerToken: session.bearerToken,
+        request: (token) => _httpClient.put(
+          Uri.parse('$apiBaseUrl$path'),
+          headers: _headers(bearerToken: token, devSession: session),
+          body: jsonEncode(body),
+        ),
       );
       _ensureSuccess(response);
       return _decode(response);
@@ -201,10 +279,13 @@ class ApiClient {
     required AuthSession session,
   }) async {
     try {
-      final response = await _httpClient.patch(
-        Uri.parse('$apiBaseUrl$path'),
-        headers: _headers(bearerToken: session.bearerToken, devSession: session),
-        body: jsonEncode(body),
+      final response = await _sendWithRetry(
+        bearerToken: session.bearerToken,
+        request: (token) => _httpClient.patch(
+          Uri.parse('$apiBaseUrl$path'),
+          headers: _headers(bearerToken: token, devSession: session),
+          body: jsonEncode(body),
+        ),
       );
       _ensureSuccess(response);
       return _decode(response);
@@ -219,9 +300,12 @@ class ApiClient {
 
   Future<Map<String, Object?>> deleteJson(String path, {required AuthSession session}) async {
     try {
-      final response = await _httpClient.delete(
-        Uri.parse('$apiBaseUrl$path'),
-        headers: _headers(bearerToken: session.bearerToken, devSession: session),
+      final response = await _sendWithRetry(
+        bearerToken: session.bearerToken,
+        request: (token) => _httpClient.delete(
+          Uri.parse('$apiBaseUrl$path'),
+          headers: _headers(bearerToken: token, devSession: session),
+        ),
       );
       _ensureSuccess(response);
       return _decode(response);

@@ -2,6 +2,8 @@ import { and, desc, eq, gte, lte, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import {
   academicYears,
+  admissionApplications,
+  admissionDocuments,
   aiUsageEvents,
   announcements,
   appUsers,
@@ -10,11 +12,14 @@ import {
   classes,
   examMarks,
   exams,
+  feePayments,
+  feeStructures,
   homeworkAssignments,
   schools,
   sections,
   staff,
   studentEnrollments,
+  studentFeeAllocations,
   studentGuardians,
   students,
   subjects,
@@ -23,6 +28,7 @@ import {
   teacherAssignments,
   userRoles,
 } from '../db/schema';
+
 import { ApiError } from '../http/errors';
 import type { AuthUser } from '../types';
 import type {
@@ -48,7 +54,20 @@ import type {
   updateExamSchema,
   saveExamMarksSchema,
   updateTimetableEntrySchema,
+  createFeeStructureSchema,
+  updateFeeStructureSchema,
+  createFeeAllocationSchema,
+  recordFeePaymentSchema,
+  feeAllocationQuerySchema,
+  feePaymentQuerySchema,
+  createAdmissionApplicationSchema,
+  updateAdmissionApplicationSchema,
+  enrollApplicantSchema,
+  admissionQuerySchema,
+  addAdmissionDocumentSchema,
+  updateAdmissionDocumentSchema,
 } from '../http/validation';
+
 import type { z } from 'zod';
 
 export type SchoolRepository = ReturnType<typeof createSchoolRepository>;
@@ -63,6 +82,18 @@ type HomeworkAssignmentInput = z.infer<typeof createHomeworkAssignmentSchema>;
 type HomeworkAssignmentUpdateInput = z.infer<typeof updateHomeworkAssignmentSchema>;
 type ExamInput = z.infer<typeof createExamSchema>;
 type ExamUpdateInput = z.infer<typeof updateExamSchema>;
+type FeeStructureInput = z.infer<typeof createFeeStructureSchema>;
+type FeeStructureUpdateInput = z.infer<typeof updateFeeStructureSchema>;
+type FeeAllocationInput = z.infer<typeof createFeeAllocationSchema>;
+type FeePaymentInput = z.infer<typeof recordFeePaymentSchema>;
+type FeeAllocationFilters = z.infer<typeof feeAllocationQuerySchema>;
+type FeePaymentFilters = z.infer<typeof feePaymentQuerySchema>;
+type AdmissionApplicationInput = z.infer<typeof createAdmissionApplicationSchema>;
+type AdmissionApplicationUpdateInput = z.infer<typeof updateAdmissionApplicationSchema>;
+type EnrollApplicantInput = z.infer<typeof enrollApplicantSchema>;
+type AdmissionQueryFilters = z.infer<typeof admissionQuerySchema>;
+type AddAdmissionDocumentInput = z.infer<typeof addAdmissionDocumentSchema>;
+type UpdateAdmissionDocumentInput = z.infer<typeof updateAdmissionDocumentSchema>;
 
 export function createSchoolRepository(db: Db) {
   return {
@@ -956,6 +987,900 @@ export function createSchoolRepository(db: Db) {
 
       return this.examRosterForTeacher(user, input.examId);
     },
+
+    async feeSummary(user: AuthUser) {
+      const allocations = await db
+        .select()
+        .from(studentFeeAllocations)
+        .where(eq(studentFeeAllocations.schoolId, user.schoolId));
+
+      const payments = await db
+        .select()
+        .from(feePayments)
+        .where(eq(feePayments.schoolId, user.schoolId));
+
+      let totalBilled = 0;
+      let overdueCount = 0;
+      const today = new Date().toISOString().slice(0, 10);
+
+      for (const a of allocations) {
+        totalBilled += a.amount;
+        if (a.status === 'overdue' || (a.status !== 'paid' && a.dueDate < today)) {
+          overdueCount++;
+        }
+      }
+
+      let totalCollected = 0;
+      for (const p of payments) {
+        totalCollected += p.amountPaid;
+      }
+
+      const totalOutstanding = Math.max(0, totalBilled - totalCollected);
+
+      return {
+        totalBilled,
+        totalCollected,
+        totalOutstanding,
+        overdueCount,
+        allocationCount: allocations.length,
+        paymentCount: payments.length,
+      };
+    },
+
+    async listFeeStructures(user: AuthUser, academicYearId?: string) {
+      const conditions = [eq(feeStructures.schoolId, user.schoolId)];
+      if (academicYearId) conditions.push(eq(feeStructures.academicYearId, academicYearId));
+
+      const rows = await db
+        .select({
+          structure: feeStructures,
+          academicYearName: academicYears.name,
+        })
+        .from(feeStructures)
+        .innerJoin(academicYears, eq(feeStructures.academicYearId, academicYears.id))
+        .where(and(...conditions))
+        .orderBy(desc(feeStructures.createdAt))
+        .limit(200);
+
+      return rows.map((r) => ({
+        ...r.structure,
+        academicYearName: r.academicYearName,
+      }));
+    },
+
+    async createFeeStructure(user: AuthUser, input: FeeStructureInput) {
+      const [year] = await db
+        .select({ id: academicYears.id })
+        .from(academicYears)
+        .where(and(eq(academicYears.schoolId, user.schoolId), eq(academicYears.id, input.academicYearId)))
+        .limit(1);
+      if (!year) throw new ApiError(422, 'Selected academic year is not available');
+
+      const [created] = await db
+        .insert(feeStructures)
+        .values({
+          ...input,
+          schoolId: user.schoolId,
+          description: input.description ?? null,
+          dueDate: input.dueDate ?? null,
+        })
+        .returning({ id: feeStructures.id });
+      if (!created) throw new ApiError(500, 'Unable to create fee structure');
+
+      return (await this.listFeeStructures(user)).find((item) => item.id === created.id) ?? created;
+    },
+
+    async updateFeeStructure(user: AuthUser, id: string, input: FeeStructureUpdateInput) {
+      const [existing] = await db
+        .select()
+        .from(feeStructures)
+        .where(and(eq(feeStructures.schoolId, user.schoolId), eq(feeStructures.id, id)))
+        .limit(1);
+      if (!existing) throw new ApiError(404, 'Fee structure not found');
+
+      const [updated] = await db
+        .update(feeStructures)
+        .set({
+          ...input,
+          description: input.description === undefined ? existing.description : input.description ?? null,
+          dueDate: input.dueDate === undefined ? existing.dueDate : input.dueDate ?? null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(feeStructures.schoolId, user.schoolId), eq(feeStructures.id, id)))
+        .returning({ id: feeStructures.id });
+      if (!updated) throw new ApiError(500, 'Unable to update fee structure');
+
+      return (await this.listFeeStructures(user)).find((item) => item.id === updated.id) ?? updated;
+    },
+
+    async deleteFeeStructure(user: AuthUser, id: string) {
+      const [deleted] = await db
+        .delete(feeStructures)
+        .where(and(eq(feeStructures.schoolId, user.schoolId), eq(feeStructures.id, id)))
+        .returning({ id: feeStructures.id });
+      if (!deleted) throw new ApiError(404, 'Fee structure not found');
+      return deleted;
+    },
+
+    async listFeeAllocations(user: AuthUser, filters: FeeAllocationFilters = {}) {
+      const conditions = [eq(studentFeeAllocations.schoolId, user.schoolId)];
+      if (filters.studentId) conditions.push(eq(studentFeeAllocations.studentId, filters.studentId));
+      if (filters.academicYearId) conditions.push(eq(studentFeeAllocations.academicYearId, filters.academicYearId));
+      if (filters.status) conditions.push(eq(studentFeeAllocations.status, filters.status));
+
+      const rows = await db
+        .select({
+          allocation: studentFeeAllocations,
+          student: students,
+          structure: feeStructures,
+          academicYearName: academicYears.name,
+        })
+        .from(studentFeeAllocations)
+        .innerJoin(students, eq(studentFeeAllocations.studentId, students.id))
+        .innerJoin(feeStructures, eq(studentFeeAllocations.feeStructureId, feeStructures.id))
+        .innerJoin(academicYears, eq(studentFeeAllocations.academicYearId, academicYears.id))
+        .where(and(...conditions))
+        .orderBy(desc(studentFeeAllocations.dueDate), desc(studentFeeAllocations.createdAt))
+        .limit(500);
+
+      const studentIds = Array.from(new Set(rows.map((r) => r.allocation.studentId)));
+      const enrollmentsMap = new Map<string, { className: string; sectionName: string; rollNumber: string | null; classId: string; sectionId: string }>();
+
+      if (studentIds.length > 0) {
+        const enrollments = await db
+          .select({
+            studentId: studentEnrollments.studentId,
+            className: classes.name,
+            sectionName: sections.name,
+            rollNumber: studentEnrollments.rollNumber,
+            classId: classes.id,
+            sectionId: sections.id,
+          })
+          .from(studentEnrollments)
+          .innerJoin(classes, eq(studentEnrollments.classId, classes.id))
+          .innerJoin(sections, eq(studentEnrollments.sectionId, sections.id))
+          .where(
+            eq(studentEnrollments.schoolId, user.schoolId),
+          );
+
+
+        for (const e of enrollments) {
+          enrollmentsMap.set(e.studentId, e);
+        }
+      }
+
+      const allocationIds = rows.map((r) => r.allocation.id);
+      const paidMap = new Map<string, number>();
+      if (allocationIds.length > 0) {
+        const payments = await db
+          .select({
+            allocationId: feePayments.allocationId,
+            amountPaid: feePayments.amountPaid,
+          })
+          .from(feePayments)
+          .where(eq(feePayments.schoolId, user.schoolId));
+
+        for (const p of payments) {
+          paidMap.set(p.allocationId, (paidMap.get(p.allocationId) ?? 0) + p.amountPaid);
+        }
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+
+      let result = rows.map((r) => {
+        const enrollment = enrollmentsMap.get(r.allocation.studentId);
+        const totalPaid = paidMap.get(r.allocation.id) ?? 0;
+        const balance = Math.max(0, r.allocation.amount - totalPaid);
+        let status = r.allocation.status;
+
+        if (totalPaid >= r.allocation.amount) {
+          status = 'paid';
+        } else if (totalPaid > 0) {
+          status = 'partial';
+        } else if (r.allocation.dueDate < today) {
+          status = 'overdue';
+        } else {
+          status = 'pending';
+        }
+
+        return {
+          id: r.allocation.id,
+          studentId: r.allocation.studentId,
+          feeStructureId: r.allocation.feeStructureId,
+          academicYearId: r.allocation.academicYearId,
+          amount: r.allocation.amount,
+          paidAmount: totalPaid,
+          balanceAmount: balance,
+          dueDate: r.allocation.dueDate,
+          status,
+          createdAt: r.allocation.createdAt,
+          updatedAt: r.allocation.updatedAt,
+          studentName: r.student.fullName,
+          admissionNumber: r.student.admissionNumber,
+          feeStructureName: r.structure.name,
+          feeStructureCode: r.structure.code,
+          frequency: r.structure.frequency,
+          academicYearName: r.academicYearName,
+          className: enrollment?.className ?? 'Unassigned',
+          sectionName: enrollment?.sectionName ?? '',
+          classId: enrollment?.classId,
+          sectionId: enrollment?.sectionId,
+          rollNumber: enrollment?.rollNumber ?? null,
+        };
+      });
+
+      if (filters.classId) {
+        result = result.filter((item) => item.classId === filters.classId);
+      }
+      if (filters.sectionId) {
+        result = result.filter((item) => item.sectionId === filters.sectionId);
+      }
+
+      return result;
+    },
+
+    async createFeeAllocation(user: AuthUser, input: FeeAllocationInput) {
+      const [student] = await db
+        .select()
+        .from(students)
+        .where(and(eq(students.schoolId, user.schoolId), eq(students.id, input.studentId)))
+        .limit(1);
+      if (!student) throw new ApiError(404, 'Student not found');
+
+      const [structure] = await db
+        .select()
+        .from(feeStructures)
+        .where(and(eq(feeStructures.schoolId, user.schoolId), eq(feeStructures.id, input.feeStructureId)))
+        .limit(1);
+      if (!structure) throw new ApiError(404, 'Fee structure not found');
+
+      const billedAmount = input.amount ?? structure.amount;
+      const today = new Date().toISOString().slice(0, 10);
+      const initialStatus = input.dueDate < today ? 'overdue' : 'pending';
+
+      const [created] = await db
+        .insert(studentFeeAllocations)
+        .values({
+          schoolId: user.schoolId,
+          studentId: input.studentId,
+          feeStructureId: input.feeStructureId,
+          academicYearId: input.academicYearId,
+          amount: billedAmount,
+          dueDate: input.dueDate,
+          status: initialStatus,
+        })
+        .returning({ id: studentFeeAllocations.id });
+
+      if (!created) throw new ApiError(500, 'Unable to create fee allocation');
+
+      return (await this.listFeeAllocations(user, { studentId: input.studentId })).find((a) => a.id === created.id) ?? created;
+    },
+
+    async recordFeePayment(user: AuthUser, input: FeePaymentInput) {
+      const [allocation] = await db
+        .select()
+        .from(studentFeeAllocations)
+        .where(and(eq(studentFeeAllocations.schoolId, user.schoolId), eq(studentFeeAllocations.id, input.allocationId)))
+        .limit(1);
+      if (!allocation) throw new ApiError(404, 'Fee allocation not found');
+
+      const datePrefix = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000).toString();
+      const receiptNumber = `REC-${datePrefix}-${randomSuffix}`;
+
+      const [payment] = await db
+        .insert(feePayments)
+        .values({
+          schoolId: user.schoolId,
+          allocationId: input.allocationId,
+          studentId: allocation.studentId,
+          receiptNumber,
+          amountPaid: input.amountPaid,
+          paymentMethod: input.paymentMethod,
+          transactionReference: input.transactionReference ?? null,
+          notes: input.notes ?? null,
+          paidAt: input.paidAt ? new Date(input.paidAt) : new Date(),
+          recordedByStaffId: user.staffId ?? null,
+        })
+        .returning();
+
+      if (!payment) throw new ApiError(500, 'Unable to record payment');
+
+      const existingPayments = await db
+        .select({ amountPaid: feePayments.amountPaid })
+        .from(feePayments)
+        .where(eq(feePayments.allocationId, allocation.id));
+
+      const totalPaid = existingPayments.reduce((sum, p) => sum + p.amountPaid, 0);
+      const newStatus = totalPaid >= allocation.amount ? 'paid' : totalPaid > 0 ? 'partial' : 'pending';
+
+      await db
+        .update(studentFeeAllocations)
+        .set({ status: newStatus, updatedAt: new Date() })
+        .where(eq(studentFeeAllocations.id, allocation.id));
+
+      return {
+        ...payment,
+        allocationAmount: allocation.amount,
+        totalPaid,
+        remainingBalance: Math.max(0, allocation.amount - totalPaid),
+      };
+    },
+
+    async listFeePayments(user: AuthUser, filters: FeePaymentFilters = {}) {
+      const conditions = [eq(feePayments.schoolId, user.schoolId)];
+      if (filters.studentId) conditions.push(eq(feePayments.studentId, filters.studentId));
+      if (filters.allocationId) conditions.push(eq(feePayments.allocationId, filters.allocationId));
+
+      const rows = await db
+        .select({
+          payment: feePayments,
+          student: students,
+          structureName: feeStructures.name,
+          structureCode: feeStructures.code,
+          staffName: staff.fullName,
+        })
+        .from(feePayments)
+        .innerJoin(students, eq(feePayments.studentId, students.id))
+        .innerJoin(studentFeeAllocations, eq(feePayments.allocationId, studentFeeAllocations.id))
+        .innerJoin(feeStructures, eq(studentFeeAllocations.feeStructureId, feeStructures.id))
+        .leftJoin(staff, eq(feePayments.recordedByStaffId, staff.id))
+        .where(and(...conditions))
+        .orderBy(desc(feePayments.paidAt))
+        .limit(300);
+
+      return rows.map((r) => ({
+        ...r.payment,
+        studentName: r.student.fullName,
+        admissionNumber: r.student.admissionNumber,
+        feeStructureName: r.structureName,
+        feeStructureCode: r.structureCode,
+        recordedByStaffName: r.staffName ?? 'Administrator',
+      }));
+    },
+
+    async portalFeeSummary(user: AuthUser, studentId?: string) {
+      const allowed = await portalStudentsFor(db, user);
+      if (allowed.length === 0) throw new ApiError(403, 'No students linked to this account');
+
+      const portalStudent = studentId ? allowed.find((item) => item.id === studentId) : allowed[0];
+      if (!portalStudent) throw new ApiError(403, 'Unauthorized student request');
+
+      const allocations = await this.listFeeAllocations(user, { studentId: portalStudent.id });
+      const payments = await this.listFeePayments(user, { studentId: portalStudent.id });
+
+      let totalBilled = 0;
+      let totalPaid = 0;
+
+      for (const a of allocations) {
+        totalBilled += a.amount;
+        totalPaid += a.paidAmount;
+      }
+
+      const balanceDue = Math.max(0, totalBilled - totalPaid);
+
+      return {
+        student: portalStudent,
+        summary: {
+          totalBilled,
+          totalPaid,
+          balanceDue,
+          allocationCount: allocations.length,
+          paymentCount: payments.length,
+        },
+        allocations,
+        payments,
+      };
+    },
+
+    async admissionSummary(user: AuthUser, academicYearId?: string) {
+      const yearConditions = [eq(academicYears.schoolId, user.schoolId)];
+      if (academicYearId) {
+        yearConditions.push(eq(academicYears.id, academicYearId));
+      } else {
+        yearConditions.push(eq(academicYears.isActive, true));
+      }
+      const [targetYear] = await db
+        .select({ id: academicYears.id, name: academicYears.name })
+        .from(academicYears)
+        .where(and(...yearConditions))
+        .limit(1);
+
+      const appConditions = [eq(admissionApplications.schoolId, user.schoolId)];
+      if (targetYear) {
+        appConditions.push(eq(admissionApplications.academicYearId, targetYear.id));
+      } else if (academicYearId) {
+        appConditions.push(eq(admissionApplications.academicYearId, academicYearId));
+      }
+
+      const allApps = await db
+        .select()
+        .from(admissionApplications)
+        .where(and(...appConditions))
+        .limit(1000);
+
+      const byStatus = {
+        inquiry: 0,
+        applied: 0,
+        under_review: 0,
+        approved: 0,
+        enrolled: 0,
+        rejected: 0,
+      };
+
+      for (const app of allApps) {
+        if (app.status in byStatus) {
+          byStatus[app.status as keyof typeof byStatus]++;
+        }
+      }
+
+      const totalApplications = allApps.length;
+      const enrolledCount = byStatus.enrolled;
+      const actionableCount = allApps.filter((a) => a.status !== 'inquiry').length;
+      const conversionRate = actionableCount > 0 ? Math.round((enrolledCount / actionableCount) * 1000) / 10 : 0;
+
+      const schoolClasses = await db
+        .select({ id: classes.id, name: classes.name })
+        .from(classes)
+        .where(eq(classes.schoolId, user.schoolId))
+        .orderBy(classes.name);
+
+      const enrollmentsConditions = [eq(studentEnrollments.schoolId, user.schoolId)];
+      if (targetYear) {
+        enrollmentsConditions.push(eq(studentEnrollments.academicYearId, targetYear.id));
+      }
+      const enrollments = await db
+        .select({ classId: studentEnrollments.classId })
+        .from(studentEnrollments)
+        .where(and(...enrollmentsConditions));
+
+      const enrolledMap = new Map<string, number>();
+      for (const e of enrollments) {
+        enrolledMap.set(e.classId, (enrolledMap.get(e.classId) ?? 0) + 1);
+      }
+
+      const classBreakdown = schoolClasses.map((cls) => {
+        const appsForClass = allApps.filter((a) => a.applyingForClassId === cls.id);
+        const enrolledInClass = enrolledMap.get(cls.id) ?? 0;
+        const capacity = 40;
+        const availableSeats = Math.max(0, capacity - enrolledInClass);
+        return {
+          classId: cls.id,
+          className: cls.name,
+          capacity,
+          enrolledCount: enrolledInClass,
+          availableSeats,
+          applicationsCount: appsForClass.length,
+          pendingCount: appsForClass.filter((a) => a.status === 'applied' || a.status === 'under_review').length,
+          approvedCount: appsForClass.filter((a) => a.status === 'approved').length,
+          enrolledFromAdmissions: appsForClass.filter((a) => a.status === 'enrolled').length,
+        };
+      });
+
+      return {
+        academicYear: targetYear ?? null,
+        totalApplications,
+        byStatus,
+        conversionRate,
+        classBreakdown,
+      };
+    },
+
+    async listAdmissionApplications(user: AuthUser, filters: AdmissionQueryFilters = {}) {
+      const conditions = [eq(admissionApplications.schoolId, user.schoolId)];
+      if (filters.academicYearId) {
+        conditions.push(eq(admissionApplications.academicYearId, filters.academicYearId));
+      }
+      if (filters.classId) {
+        conditions.push(eq(admissionApplications.applyingForClassId, filters.classId));
+      }
+      if (filters.status) {
+        conditions.push(eq(admissionApplications.status, filters.status));
+      }
+
+      const rows = await db
+        .select({
+          app: admissionApplications,
+          className: classes.name,
+          yearName: academicYears.name,
+          enrolledStudentAdmissionNumber: students.admissionNumber,
+          enrolledStudentName: students.fullName,
+        })
+        .from(admissionApplications)
+        .innerJoin(classes, eq(admissionApplications.applyingForClassId, classes.id))
+        .innerJoin(academicYears, eq(admissionApplications.academicYearId, academicYears.id))
+        .leftJoin(students, eq(admissionApplications.enrolledStudentId, students.id))
+        .where(and(...conditions))
+        .orderBy(desc(admissionApplications.applicationDate), desc(admissionApplications.createdAt))
+        .limit(300);
+
+      const docRows = await db
+        .select({
+          applicationId: admissionDocuments.applicationId,
+          status: admissionDocuments.status,
+        })
+        .from(admissionDocuments)
+        .where(eq(admissionDocuments.schoolId, user.schoolId));
+
+      const docStatsMap = new Map<string, { totalDocuments: number; verifiedDocuments: number }>();
+      for (const doc of docRows) {
+        const stats = docStatsMap.get(doc.applicationId) ?? { totalDocuments: 0, verifiedDocuments: 0 };
+        stats.totalDocuments++;
+        if (doc.status === 'verified') stats.verifiedDocuments++;
+        docStatsMap.set(doc.applicationId, stats);
+      }
+
+      let results = rows.map((r) => {
+        const stats = docStatsMap.get(r.app.id) ?? { totalDocuments: 0, verifiedDocuments: 0 };
+        return {
+          ...r.app,
+          className: r.className,
+          academicYearName: r.yearName,
+          enrolledStudentAdmissionNumber: r.enrolledStudentAdmissionNumber ?? null,
+          enrolledStudentName: r.enrolledStudentName ?? null,
+          totalDocuments: stats.totalDocuments,
+          verifiedDocuments: stats.verifiedDocuments,
+        };
+      });
+
+      if (filters.search) {
+        const s = filters.search.toLowerCase();
+        results = results.filter(
+          (a) =>
+            a.applicantName.toLowerCase().includes(s) ||
+            a.parentName.toLowerCase().includes(s) ||
+            a.parentPhone.toLowerCase().includes(s) ||
+            a.applicationNumber.toLowerCase().includes(s) ||
+            (a.previousSchool && a.previousSchool.toLowerCase().includes(s)),
+        );
+      }
+
+      return results;
+    },
+
+    async getAdmissionApplication(user: AuthUser, id: string) {
+      const [appRow] = await db
+        .select({
+          app: admissionApplications,
+          className: classes.name,
+          yearName: academicYears.name,
+          enrolledStudentAdmissionNumber: students.admissionNumber,
+          enrolledStudentName: students.fullName,
+        })
+        .from(admissionApplications)
+        .innerJoin(classes, eq(admissionApplications.applyingForClassId, classes.id))
+        .innerJoin(academicYears, eq(admissionApplications.academicYearId, academicYears.id))
+        .leftJoin(students, eq(admissionApplications.enrolledStudentId, students.id))
+        .where(and(eq(admissionApplications.schoolId, user.schoolId), eq(admissionApplications.id, id)))
+        .limit(1);
+
+      if (!appRow) throw new ApiError(404, 'Admission application not found');
+
+      const docs = await db
+        .select({
+          doc: admissionDocuments,
+          verifiedByStaffName: staff.fullName,
+        })
+        .from(admissionDocuments)
+        .leftJoin(staff, eq(admissionDocuments.verifiedByStaffId, staff.id))
+        .where(and(eq(admissionDocuments.schoolId, user.schoolId), eq(admissionDocuments.applicationId, id)))
+        .orderBy(admissionDocuments.createdAt);
+
+      const documents = docs.map((d) => ({
+        ...d.doc,
+        verifiedByStaffName: d.verifiedByStaffName ?? null,
+      }));
+
+      return {
+        ...appRow.app,
+        className: appRow.className,
+        academicYearName: appRow.yearName,
+        enrolledStudentAdmissionNumber: appRow.enrolledStudentAdmissionNumber ?? null,
+        enrolledStudentName: appRow.enrolledStudentName ?? null,
+        documents,
+      };
+    },
+
+    async createAdmissionApplication(user: AuthUser, input: AdmissionApplicationInput) {
+      const [targetClass] = await db
+        .select({ id: classes.id })
+        .from(classes)
+        .where(and(eq(classes.schoolId, user.schoolId), eq(classes.id, input.applyingForClassId)))
+        .limit(1);
+      if (!targetClass) throw new ApiError(422, 'Selected class is not available');
+
+      const [targetYear] = await db
+        .select({ id: academicYears.id })
+        .from(academicYears)
+        .where(and(eq(academicYears.schoolId, user.schoolId), eq(academicYears.id, input.academicYearId)))
+        .limit(1);
+      if (!targetYear) throw new ApiError(422, 'Selected academic year is not available');
+
+      const currentYear = new Date().getFullYear();
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      const appNumber = `APP-${currentYear}-${randomSuffix}`;
+      const applicationDate = input.applicationDate ?? new Date().toISOString().slice(0, 10);
+
+      const [created] = await db
+        .insert(admissionApplications)
+        .values({
+          schoolId: user.schoolId,
+          academicYearId: input.academicYearId,
+          applyingForClassId: input.applyingForClassId,
+          applicationNumber: appNumber,
+          applicantName: input.applicantName,
+          dateOfBirth: input.dateOfBirth ?? null,
+          gender: input.gender ?? null,
+          parentName: input.parentName,
+          parentEmail: input.parentEmail ?? null,
+          parentPhone: input.parentPhone,
+          address: input.address ?? null,
+          previousSchool: input.previousSchool ?? null,
+          status: input.status,
+          applicationDate,
+          notes: input.notes ?? null,
+        })
+        .returning();
+
+      if (!created) throw new ApiError(500, 'Unable to create admission application');
+
+      const docTemplates =
+        input.documents && input.documents.length > 0
+          ? input.documents
+          : [
+              { title: 'Birth Certificate', status: 'pending' as const },
+              { title: 'Transfer Certificate / Previous Report', status: 'pending' as const },
+              { title: 'Address Proof / Parent Identity Card', status: 'pending' as const },
+              { title: 'Recent Passport Photograph', status: 'pending' as const },
+            ];
+
+      for (const doc of docTemplates) {
+        await db.insert(admissionDocuments).values({
+          schoolId: user.schoolId,
+          applicationId: created.id,
+          title: doc.title,
+          status: doc.status,
+          documentNumber: doc.documentNumber ?? null,
+          notes: doc.notes ?? null,
+        });
+      }
+
+      return this.getAdmissionApplication(user, created.id);
+    },
+
+    async updateAdmissionApplication(user: AuthUser, id: string, input: AdmissionApplicationUpdateInput) {
+      const [existing] = await db
+        .select()
+        .from(admissionApplications)
+        .where(and(eq(admissionApplications.schoolId, user.schoolId), eq(admissionApplications.id, id)))
+        .limit(1);
+
+      if (!existing) throw new ApiError(404, 'Admission application not found');
+
+      if (input.applyingForClassId && input.applyingForClassId !== existing.applyingForClassId) {
+        const [targetClass] = await db
+          .select({ id: classes.id })
+          .from(classes)
+          .where(and(eq(classes.schoolId, user.schoolId), eq(classes.id, input.applyingForClassId)))
+          .limit(1);
+        if (!targetClass) throw new ApiError(422, 'Selected class is not available');
+      }
+
+      let decisionDate = input.decisionDate !== undefined ? input.decisionDate : existing.decisionDate;
+      if (!decisionDate && input.status && (input.status === 'approved' || input.status === 'rejected')) {
+        decisionDate = new Date().toISOString().slice(0, 10);
+      }
+
+      const [updated] = await db
+        .update(admissionApplications)
+        .set({
+          academicYearId: input.academicYearId ?? existing.academicYearId,
+          applyingForClassId: input.applyingForClassId ?? existing.applyingForClassId,
+          applicantName: input.applicantName ?? existing.applicantName,
+          dateOfBirth: input.dateOfBirth !== undefined ? input.dateOfBirth : existing.dateOfBirth,
+          gender: input.gender !== undefined ? input.gender : existing.gender,
+          parentName: input.parentName ?? existing.parentName,
+          parentEmail: input.parentEmail !== undefined ? input.parentEmail : existing.parentEmail,
+          parentPhone: input.parentPhone ?? existing.parentPhone,
+          address: input.address !== undefined ? input.address : existing.address,
+          previousSchool: input.previousSchool !== undefined ? input.previousSchool : existing.previousSchool,
+          status: input.status ?? existing.status,
+          applicationDate: input.applicationDate ?? existing.applicationDate,
+          decisionDate,
+          notes: input.notes !== undefined ? input.notes : existing.notes,
+          updatedAt: new Date(),
+        })
+        .where(eq(admissionApplications.id, id))
+        .returning();
+
+      if (!updated) throw new ApiError(500, 'Unable to update admission application');
+
+      return this.getAdmissionApplication(user, id);
+    },
+
+    async deleteAdmissionApplication(user: AuthUser, id: string) {
+      const [existing] = await db
+        .select({ id: admissionApplications.id })
+        .from(admissionApplications)
+        .where(and(eq(admissionApplications.schoolId, user.schoolId), eq(admissionApplications.id, id)))
+        .limit(1);
+
+      if (!existing) throw new ApiError(404, 'Admission application not found');
+
+      await db.delete(admissionDocuments).where(eq(admissionDocuments.applicationId, id));
+      await db.delete(admissionApplications).where(eq(admissionApplications.id, id));
+
+      return { success: true, id };
+    },
+
+    async enrollApplicant(user: AuthUser, id: string, input: EnrollApplicantInput) {
+      const [app] = await db
+        .select()
+        .from(admissionApplications)
+        .where(and(eq(admissionApplications.schoolId, user.schoolId), eq(admissionApplications.id, id)))
+        .limit(1);
+
+      if (!app) throw new ApiError(404, 'Admission application not found');
+
+      if (app.status === 'enrolled' || app.enrolledStudentId) {
+        throw new ApiError(409, 'Applicant is already enrolled');
+      }
+
+      const [targetSection] = await db
+        .select()
+        .from(sections)
+        .where(
+          and(
+            eq(sections.schoolId, user.schoolId),
+            eq(sections.id, input.sectionId),
+            eq(sections.classId, app.applyingForClassId),
+          ),
+        )
+        .limit(1);
+
+      if (!targetSection) {
+        throw new ApiError(422, 'Selected section does not belong to the target class');
+      }
+
+      const admissionNumber =
+        input.admissionNumber ||
+        `ADM-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const [student] = await db
+        .insert(students)
+        .values({
+          schoolId: user.schoolId,
+          admissionNumber,
+          fullName: app.applicantName,
+          guardianName: app.parentName,
+          guardianPhone: app.parentPhone,
+          isActive: true,
+        })
+        .returning();
+
+      if (!student) throw new ApiError(500, 'Unable to create student profile');
+
+      await db.insert(studentEnrollments).values({
+        schoolId: user.schoolId,
+        studentId: student.id,
+        academicYearId: app.academicYearId,
+        classId: app.applyingForClassId,
+        sectionId: input.sectionId,
+        rollNumber: input.rollNumber ?? null,
+      });
+
+      const [updatedApp] = await db
+        .update(admissionApplications)
+        .set({
+          status: 'enrolled',
+          enrolledStudentId: student.id,
+          decisionDate: new Date().toISOString().slice(0, 10),
+          updatedAt: new Date(),
+        })
+        .where(eq(admissionApplications.id, id))
+        .returning();
+
+      return {
+        application: updatedApp,
+        student,
+      };
+    },
+
+    async listAdmissionDocuments(user: AuthUser, applicationId: string) {
+      const [app] = await db
+        .select({ id: admissionApplications.id })
+        .from(admissionApplications)
+        .where(and(eq(admissionApplications.schoolId, user.schoolId), eq(admissionApplications.id, applicationId)))
+        .limit(1);
+      if (!app) throw new ApiError(404, 'Admission application not found');
+
+      const docs = await db
+        .select({
+          doc: admissionDocuments,
+          verifiedByStaffName: staff.fullName,
+        })
+        .from(admissionDocuments)
+        .leftJoin(staff, eq(admissionDocuments.verifiedByStaffId, staff.id))
+        .where(and(eq(admissionDocuments.schoolId, user.schoolId), eq(admissionDocuments.applicationId, applicationId)))
+        .orderBy(admissionDocuments.createdAt);
+
+      return docs.map((d) => ({
+        ...d.doc,
+        verifiedByStaffName: d.verifiedByStaffName ?? null,
+      }));
+    },
+
+    async addAdmissionDocument(user: AuthUser, applicationId: string, input: AddAdmissionDocumentInput) {
+      const [app] = await db
+        .select({ id: admissionApplications.id })
+        .from(admissionApplications)
+        .where(and(eq(admissionApplications.schoolId, user.schoolId), eq(admissionApplications.id, applicationId)))
+        .limit(1);
+      if (!app) throw new ApiError(404, 'Admission application not found');
+
+      const [doc] = await db
+        .insert(admissionDocuments)
+        .values({
+          schoolId: user.schoolId,
+          applicationId,
+          title: input.title,
+          status: input.status,
+          documentNumber: input.documentNumber ?? null,
+          verifiedByStaffId: input.status === 'verified' ? (user.staffId ?? null) : null,
+          notes: input.notes ?? null,
+        })
+        .returning();
+
+      if (!doc) throw new ApiError(500, 'Unable to add admission document');
+      return doc;
+    },
+
+    async updateAdmissionDocument(user: AuthUser, documentId: string, input: UpdateAdmissionDocumentInput) {
+      const [existing] = await db
+        .select()
+        .from(admissionDocuments)
+        .where(and(eq(admissionDocuments.schoolId, user.schoolId), eq(admissionDocuments.id, documentId)))
+        .limit(1);
+
+      if (!existing) throw new ApiError(404, 'Admission document not found');
+
+      const verifiedByStaffId =
+        input.status === 'verified'
+          ? (user.staffId ?? existing.verifiedByStaffId)
+          : input.status
+            ? null
+            : existing.verifiedByStaffId;
+
+      const [updated] = await db
+        .update(admissionDocuments)
+        .set({
+          title: input.title ?? existing.title,
+          status: input.status ?? existing.status,
+          documentNumber: input.documentNumber !== undefined ? input.documentNumber : existing.documentNumber,
+          verifiedByStaffId,
+          notes: input.notes !== undefined ? input.notes : existing.notes,
+          updatedAt: new Date(),
+        })
+        .where(eq(admissionDocuments.id, documentId))
+        .returning();
+
+      if (!updated) throw new ApiError(500, 'Unable to update admission document');
+      return updated;
+    },
+
+    async deleteAdmissionDocument(user: AuthUser, documentId: string) {
+      const [existing] = await db
+        .select({ id: admissionDocuments.id })
+        .from(admissionDocuments)
+        .where(and(eq(admissionDocuments.schoolId, user.schoolId), eq(admissionDocuments.id, documentId)))
+        .limit(1);
+
+      if (!existing) throw new ApiError(404, 'Admission document not found');
+
+      await db.delete(admissionDocuments).where(eq(admissionDocuments.id, documentId));
+      return { success: true, id: documentId };
+    },
+
 
     async createTeacherHomework(user: AuthUser, input: HomeworkAssignmentInput) {
       if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');

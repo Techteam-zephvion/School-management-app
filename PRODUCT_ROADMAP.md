@@ -1,17 +1,17 @@
 # Schoolic Product Roadmap
 
-Last updated: October 12, 2026
+Last updated: October 13, 2026
 
 ## Current Status
 
-Phase 8.0 through 8.3 MVP slices are implemented on top of the completed production-ready core.
+Phase 8.0 through 8.5 MVP slices are implemented on top of the completed production-ready core.
 
 - Fully implemented and tested: production Neon Auth, trusted production frontend domain, production Worker auth configuration, production Flutter auth configuration, real admin and teacher auth identities mapped to `app_users`, role-based smoke tests, invalid-session rejection, and blocked production development-bypass headers.
 - Implemented and deployed: default-domain production frontend and API.
 - Deployed to production: Phase 5.2 Product UX Redesign.
 - Deployed to production: Phase 5.3 Timetable & Daily Schedule.
-- Completed after the original production promotion: AI MVP/productization, native build pipeline, mobile UX adaptation, homework/assignments MVP, announcements MVP, initial student/parent portal MVP, and exams/marks/report cards MVP.
-- Planned next: fees and finance, admissions, and deeper student/parent workflows.
+- Completed after the original production promotion: AI MVP/productization, native build pipeline, mobile UX adaptation, homework/assignments MVP, announcements MVP, initial student/parent portal MVP, exams/marks/report cards MVP, fees & finance MVP, and admissions & operations MVP.
+- Planned next: deeper student/parent portal workflows (Phase 8.6).
 
 ## Phase 5.2: Product UX Redesign
 
@@ -60,9 +60,9 @@ Status: Complete and deployed to production with synthetic portfolio timetable d
 
 ## Later Feature Priorities
 
-1. Student and parent portal expansion: homework read receipts, submissions, academic progress, and profile/account management.
-2. Fee management: fee structures, student fee assignments, payment records, outstanding balances, and synthetic portfolio transactions.
-3. Admissions and school operations: application tracking, enrollment workflow, document collection, and operational reports.
+1. Fee management (Phase 8.4): Complete (fee structures, student fee allocations, payment records, receipts ledger, outstanding balances, and student/parent portal visibility).
+2. Admissions and school operations (Phase 8.5): Complete (application tracking, enrollment workflow, document verification checklist, class seat capacity tracking, and operational reports).
+3. Student and parent portal expansion (Phase 8.6): homework submissions, academic progress, and profile/account management.
 
 ## Guardrails
 
