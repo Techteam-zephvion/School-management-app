@@ -846,41 +846,6 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
                 color: AppColors.secondaryText,
               ),
             ),
-            const SizedBox(width: 4),
-            // Live Sync Status Pill
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              margin: const EdgeInsets.only(right: 6),
-              decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green.withValues(alpha: 0.25)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  const Text(
-                    'LIVE SYNC',
-                    style: TextStyle(
-                      fontFamily: 'Switzer',
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.green,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
             IconButton(
               tooltip: 'Refresh data',
               iconSize: 18,

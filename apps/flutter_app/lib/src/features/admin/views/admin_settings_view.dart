@@ -52,11 +52,6 @@ class AdminSettingsView extends StatelessWidget {
                 isPhone: isPhone,
               ),
               _settingRow(
-                'Real-time Sync',
-                'Active (Automated Live Background Sync)',
-                isPhone: isPhone,
-              ),
-              _settingRow(
                 'Typography',
                 'Switzer (Bundled Fontshare Free License)',
                 isPhone: isPhone,
