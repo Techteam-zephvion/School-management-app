@@ -41,6 +41,18 @@ import {
   feeConcessions,
   studentFeeConcessions,
   feeRefunds,
+  studentLeaves,
+  staffLeaves,
+  transportVehicles,
+  transportDrivers,
+  transportRoutes,
+  transportStops,
+  studentTransportAllocations,
+  transportLogs,
+  issuedCertificates,
+  calendarEvents,
+  ptmSchedules,
+  ptmSlots,
 } from '../db/schema';
 
 import { BulkImporter } from '../importers/bulk-importer';
@@ -93,6 +105,23 @@ import type {
   createChatConversationSchema,
   sendChatMessageSchema,
   updateTeacherAvailabilitySchema,
+  createStudentLeaveSchema,
+  updateStudentLeaveStatusSchema,
+  createStaffLeaveSchema,
+  updateStaffLeaveStatusSchema,
+  createTransportVehicleSchema,
+  createTransportDriverSchema,
+  createTransportRouteSchema,
+  createTransportStopSchema,
+  createTransportAllocationSchema,
+  createTransportLogSchema,
+  issueCertificateSchema,
+  revokeCertificateSchema,
+  publicInquirySchema,
+  createCalendarEventSchema,
+  createPtmScheduleSchema,
+  bookPtmSlotSchema,
+  updatePtmSlotNotesSchema,
 } from '../http/validation';
 
 import type { z } from 'zod';
@@ -1947,6 +1976,9 @@ export function createSchoolRepository(db: Db) {
       if (filters.status) {
         conditions.push(eq(admissionApplications.status, filters.status));
       }
+      if (filters.quotaCategory) {
+        conditions.push(eq(admissionApplications.quotaCategory, filters.quotaCategory));
+      }
 
       const rows = await db
         .select({
@@ -2087,6 +2119,8 @@ export function createSchoolRepository(db: Db) {
           address: input.address ?? null,
           previousSchool: input.previousSchool ?? null,
           status: input.status,
+          quotaCategory: input.quotaCategory ?? 'general',
+          casteCategory: input.casteCategory ?? 'general',
           applicationDate,
           notes: input.notes ?? null,
         })
@@ -4427,6 +4461,1196 @@ export function createSchoolRepository(db: Db) {
       });
 
       return refund;
+    },
+
+    // ==========================================
+    // Phase 12: School Operations & Daily Differentiators
+    // ==========================================
+
+    // 1. Student Leaves
+    async createStudentLeave(
+      user: AuthUser,
+      input: z.infer<typeof createStudentLeaveSchema>,
+    ) {
+      const studentId = input.studentId;
+      if (!studentId) {
+        throw new ApiError(400, 'Student ID is required');
+      }
+
+      const [student] = await db
+        .select({ id: students.id, fullName: students.fullName })
+        .from(students)
+        .where(and(eq(students.id, studentId), eq(students.schoolId, user.schoolId)))
+        .limit(1);
+
+      if (!student) {
+        throw new ApiError(404, 'Student not found in this institution');
+      }
+
+      const [leave] = await db
+        .insert(studentLeaves)
+        .values({
+          schoolId: user.schoolId,
+          studentId,
+          startDate: input.startDate,
+          endDate: input.endDate,
+          reason: input.reason,
+          documentUrl: input.documentUrl ?? null,
+          status: 'pending',
+        })
+        .returning();
+
+      await this.createAuditLog({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        userEmail: user.email,
+        userRole: user.roles[0] ?? 'parent',
+        action: 'create_student_leave',
+        resourceType: 'student_leave',
+        resourceId: leave?.id,
+        details: { studentId, startDate: input.startDate, endDate: input.endDate, reason: input.reason },
+      });
+
+      return leave;
+    },
+
+    async listStudentLeaves(
+      user: AuthUser,
+      filters?: { studentId?: string | undefined; status?: ('pending' | 'approved' | 'rejected') | undefined },
+    ) {
+      const conditions = [eq(studentLeaves.schoolId, user.schoolId)];
+      if (filters?.studentId) conditions.push(eq(studentLeaves.studentId, filters.studentId));
+      if (filters?.status) conditions.push(eq(studentLeaves.status, filters.status));
+
+      return db
+        .select({
+          id: studentLeaves.id,
+          studentId: studentLeaves.studentId,
+          studentName: students.fullName,
+          admissionNumber: students.admissionNumber,
+          startDate: studentLeaves.startDate,
+          endDate: studentLeaves.endDate,
+          reason: studentLeaves.reason,
+          documentUrl: studentLeaves.documentUrl,
+          status: studentLeaves.status,
+          reviewedByStaffId: studentLeaves.reviewedByStaffId,
+          reviewedByStaffName: staff.fullName,
+          reviewerNotes: studentLeaves.reviewerNotes,
+          reviewedAt: studentLeaves.reviewedAt,
+          createdAt: studentLeaves.createdAt,
+        })
+        .from(studentLeaves)
+        .innerJoin(students, eq(students.id, studentLeaves.studentId))
+        .leftJoin(staff, eq(staff.id, studentLeaves.reviewedByStaffId))
+        .where(and(...conditions))
+        .orderBy(desc(studentLeaves.createdAt));
+    },
+
+    async updateStudentLeaveStatus(
+      user: AuthUser,
+      leaveId: string,
+      input: z.infer<typeof updateStudentLeaveStatusSchema>,
+    ) {
+      const [updated] = await db
+        .update(studentLeaves)
+        .set({
+          status: input.status,
+          reviewerNotes: input.reviewerNotes ?? null,
+          reviewedByStaffId: user.staffId ?? null,
+          reviewedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(studentLeaves.id, leaveId), eq(studentLeaves.schoolId, user.schoolId)))
+        .returning();
+
+      if (!updated) throw new ApiError(404, 'Student leave request not found');
+
+      await this.createAuditLog({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        userEmail: user.email,
+        userRole: user.roles[0] ?? 'teacher',
+        action: `student_leave_${input.status}`,
+        resourceType: 'student_leave',
+        resourceId: leaveId,
+        details: { status: input.status, reviewerNotes: input.reviewerNotes },
+      });
+
+      return updated;
+    },
+
+    // 2. Staff Leaves & Timetable Substitute Suggestion Engine
+    async createStaffLeave(
+      user: AuthUser,
+      input: z.infer<typeof createStaffLeaveSchema>,
+    ) {
+      const staffId = input.staffId ?? user.staffId;
+      if (!staffId) {
+        throw new ApiError(400, 'Staff ID is required');
+      }
+
+      const [staffMember] = await db
+        .select({ id: staff.id, fullName: staff.fullName })
+        .from(staff)
+        .where(and(eq(staff.id, staffId), eq(staff.schoolId, user.schoolId)))
+        .limit(1);
+
+      if (!staffMember) {
+        throw new ApiError(404, 'Staff member not found');
+      }
+
+      const [leave] = await db
+        .insert(staffLeaves)
+        .values({
+          schoolId: user.schoolId,
+          staffId,
+          leaveType: input.leaveType,
+          startDate: input.startDate,
+          endDate: input.endDate,
+          reason: input.reason,
+          status: 'pending',
+        })
+        .returning();
+
+      await this.createAuditLog({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        userEmail: user.email,
+        userRole: user.roles[0] ?? 'teacher',
+        action: 'create_staff_leave',
+        resourceType: 'staff_leave',
+        resourceId: leave?.id,
+        details: { staffId, leaveType: input.leaveType, startDate: input.startDate, endDate: input.endDate },
+      });
+
+      return leave;
+    },
+
+    async listStaffLeaves(
+      user: AuthUser,
+      filters?: { staffId?: string | undefined; status?: ('pending' | 'approved' | 'rejected') | undefined },
+    ) {
+      const conditions = [eq(staffLeaves.schoolId, user.schoolId)];
+      if (filters?.staffId) conditions.push(eq(staffLeaves.staffId, filters.staffId));
+      if (filters?.status) conditions.push(eq(staffLeaves.status, filters.status));
+
+      return db
+        .select({
+          id: staffLeaves.id,
+          staffId: staffLeaves.staffId,
+          staffName: staff.fullName,
+          staffEmail: staff.email,
+          staffCode: staff.staffCode,
+          leaveType: staffLeaves.leaveType,
+          startDate: staffLeaves.startDate,
+          endDate: staffLeaves.endDate,
+          reason: staffLeaves.reason,
+          status: staffLeaves.status,
+          reviewedByUserId: staffLeaves.reviewedByUserId,
+          reviewerNotes: staffLeaves.reviewerNotes,
+          reviewedAt: staffLeaves.reviewedAt,
+          createdAt: staffLeaves.createdAt,
+        })
+        .from(staffLeaves)
+        .innerJoin(staff, eq(staff.id, staffLeaves.staffId))
+        .where(and(...conditions))
+        .orderBy(desc(staffLeaves.createdAt));
+    },
+
+    async updateStaffLeaveStatus(
+      user: AuthUser,
+      leaveId: string,
+      input: z.infer<typeof updateStaffLeaveStatusSchema>,
+    ) {
+      const [updated] = await db
+        .update(staffLeaves)
+        .set({
+          status: input.status,
+          reviewerNotes: input.reviewerNotes ?? null,
+          reviewedByUserId: user.appUserId,
+          reviewedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(staffLeaves.id, leaveId), eq(staffLeaves.schoolId, user.schoolId)))
+        .returning();
+
+      if (!updated) throw new ApiError(404, 'Staff leave request not found');
+
+      await this.createAuditLog({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        userEmail: user.email,
+        userRole: user.roles[0] ?? 'admin',
+        action: `staff_leave_${input.status}`,
+        resourceType: 'staff_leave',
+        resourceId: leaveId,
+        details: { status: input.status, reviewerNotes: input.reviewerNotes },
+      });
+
+      return updated;
+    },
+
+    async suggestStaffLeaveSubstitutes(user: AuthUser, leaveId: string) {
+      const [leave] = await db
+        .select()
+        .from(staffLeaves)
+        .where(and(eq(staffLeaves.id, leaveId), eq(staffLeaves.schoolId, user.schoolId)))
+        .limit(1);
+
+      if (!leave) throw new ApiError(404, 'Staff leave request not found');
+
+      const start = new Date(leave.startDate);
+      const end = new Date(leave.endDate);
+      const daysOfWeekSet = new Set<number>();
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const day = d.getDay() === 0 ? 7 : d.getDay();
+        daysOfWeekSet.add(day);
+      }
+      const daysOfWeek = Array.from(daysOfWeekSet);
+
+      const teacherLessons = await db
+        .select({
+          id: timetableEntries.id,
+          academicYearId: timetableEntries.academicYearId,
+          dayOfWeek: timetableEntries.dayOfWeek,
+          periodNumber: timetableEntries.periodNumber,
+          startTime: timetableEntries.startTime,
+          endTime: timetableEntries.endTime,
+          label: timetableEntries.label,
+          classId: timetableEntries.classId,
+          className: classes.name,
+          sectionId: timetableEntries.sectionId,
+          sectionName: sections.name,
+          subjectId: timetableEntries.subjectId,
+          subjectName: subjects.name,
+        })
+        .from(timetableEntries)
+        .innerJoin(classes, eq(classes.id, timetableEntries.classId))
+        .innerJoin(sections, eq(sections.id, timetableEntries.sectionId))
+        .innerJoin(subjects, eq(subjects.id, timetableEntries.subjectId))
+        .where(
+          and(
+            eq(timetableEntries.schoolId, user.schoolId),
+            eq(timetableEntries.staffId, leave.staffId),
+          ),
+        );
+
+      const relevantLessons = teacherLessons.filter((l) => daysOfWeek.includes(l.dayOfWeek));
+
+      const allTeachers = await db
+        .select({
+          id: staff.id,
+          fullName: staff.fullName,
+          email: staff.email,
+          staffCode: staff.staffCode,
+        })
+        .from(staff)
+        .where(
+          and(
+            eq(staff.schoolId, user.schoolId),
+            eq(staff.isTeacher, true),
+            ne(staff.id, leave.staffId),
+          ),
+        );
+
+      const otherTimetables = await db
+        .select({
+          staffId: timetableEntries.staffId,
+          dayOfWeek: timetableEntries.dayOfWeek,
+          startTime: timetableEntries.startTime,
+          endTime: timetableEntries.endTime,
+          subjectId: timetableEntries.subjectId,
+        })
+        .from(timetableEntries)
+        .where(
+          and(
+            eq(timetableEntries.schoolId, user.schoolId),
+            ne(timetableEntries.staffId, leave.staffId),
+          ),
+        );
+
+      const periodSubstitutions = relevantLessons.map((lesson) => {
+        const availableSubstitutes = allTeachers
+          .filter((candidate) => {
+            const hasConflict = otherTimetables.some(
+              (other) =>
+                other.staffId === candidate.id &&
+                other.dayOfWeek === lesson.dayOfWeek &&
+                overlaps(lesson.startTime, lesson.endTime, other.startTime, other.endTime),
+            );
+            return !hasConflict;
+          })
+          .map((candidate) => {
+            const teachesSameSubject = otherTimetables.some(
+              (o) => o.staffId === candidate.id && o.subjectId === lesson.subjectId,
+            );
+            return {
+              ...candidate,
+              teachesSameSubject,
+            };
+          })
+          .sort((a, b) => (b.teachesSameSubject ? 1 : 0) - (a.teachesSameSubject ? 1 : 0));
+
+        return {
+          lessonId: lesson.id,
+          dayOfWeek: lesson.dayOfWeek,
+          periodNumber: lesson.periodNumber,
+          startTime: lesson.startTime,
+          endTime: lesson.endTime,
+          label: lesson.label,
+          className: lesson.className,
+          sectionName: lesson.sectionName,
+          subjectName: lesson.subjectName,
+          subjectId: lesson.subjectId,
+          availableSubstitutes,
+        };
+      });
+
+      return {
+        staffLeaveId: leave.id,
+        staffId: leave.staffId,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        totalLessonsRequiringCoverage: relevantLessons.length,
+        periodSubstitutions,
+      };
+    },
+
+    // 3. School Transport Management
+    async createTransportVehicle(user: AuthUser, input: z.infer<typeof createTransportVehicleSchema>) {
+      const [vehicle] = await db
+        .insert(transportVehicles)
+        .values({
+          schoolId: user.schoolId,
+          vehicleNumber: input.vehicleNumber,
+          model: input.model,
+          capacity: input.capacity,
+          insuranceExpiry: input.insuranceExpiry ?? null,
+          pollutionExpiry: input.pollutionExpiry ?? null,
+          status: input.status,
+        })
+        .returning();
+      return vehicle;
+    },
+
+    async listTransportVehicles(user: AuthUser) {
+      return db
+        .select()
+        .from(transportVehicles)
+        .where(eq(transportVehicles.schoolId, user.schoolId))
+        .orderBy(transportVehicles.vehicleNumber);
+    },
+
+    async createTransportDriver(user: AuthUser, input: z.infer<typeof createTransportDriverSchema>) {
+      const [driver] = await db
+        .insert(transportDrivers)
+        .values({
+          schoolId: user.schoolId,
+          fullName: input.fullName,
+          phone: input.phone,
+          licenseNumber: input.licenseNumber,
+          licenseExpiry: input.licenseExpiry ?? null,
+          status: input.status,
+        })
+        .returning();
+      return driver;
+    },
+
+    async listTransportDrivers(user: AuthUser) {
+      return db
+        .select()
+        .from(transportDrivers)
+        .where(eq(transportDrivers.schoolId, user.schoolId))
+        .orderBy(transportDrivers.fullName);
+    },
+
+    async createTransportRoute(user: AuthUser, input: z.infer<typeof createTransportRouteSchema>) {
+      const [route] = await db
+        .insert(transportRoutes)
+        .values({
+          schoolId: user.schoolId,
+          routeNumber: input.routeNumber,
+          routeName: input.routeName,
+          startPoint: input.startPoint,
+          endPoint: input.endPoint,
+          vehicleId: input.vehicleId ?? null,
+          driverId: input.driverId ?? null,
+          status: input.status,
+        })
+        .returning();
+      return route;
+    },
+
+    async listTransportRoutes(user: AuthUser) {
+      const routes = await db
+        .select({
+          route: transportRoutes,
+          vehicleNumber: transportVehicles.vehicleNumber,
+          vehicleModel: transportVehicles.model,
+          vehicleCapacity: transportVehicles.capacity,
+          driverName: transportDrivers.fullName,
+          driverPhone: transportDrivers.phone,
+        })
+        .from(transportRoutes)
+        .leftJoin(transportVehicles, eq(transportVehicles.id, transportRoutes.vehicleId))
+        .leftJoin(transportDrivers, eq(transportDrivers.id, transportRoutes.driverId))
+        .where(eq(transportRoutes.schoolId, user.schoolId))
+        .orderBy(transportRoutes.routeNumber);
+
+      const stopCounts = await db
+        .select({
+          routeId: transportStops.routeId,
+          count: sql<number>`count(*)`.mapWith(Number),
+        })
+        .from(transportStops)
+        .where(eq(transportStops.schoolId, user.schoolId))
+        .groupBy(transportStops.routeId);
+
+      const countMap = new Map<string, number>();
+      for (const sc of stopCounts) {
+        countMap.set(sc.routeId, sc.count);
+      }
+
+      return routes.map((r) => ({
+        ...r.route,
+        vehicleNumber: r.vehicleNumber ?? null,
+        vehicleModel: r.vehicleModel ?? null,
+        vehicleCapacity: r.vehicleCapacity ?? null,
+        driverName: r.driverName ?? null,
+        driverPhone: r.driverPhone ?? null,
+        totalStops: countMap.get(r.route.id) ?? 0,
+      }));
+    },
+
+    async createTransportStop(user: AuthUser, input: z.infer<typeof createTransportStopSchema>) {
+      const [stop] = await db
+        .insert(transportStops)
+        .values({
+          schoolId: user.schoolId,
+          routeId: input.routeId,
+          stopName: input.stopName,
+          pickupTime: input.pickupTime,
+          dropTime: input.dropTime,
+          stopOrder: input.stopOrder,
+          monthlyFeeAmount: input.monthlyFeeAmount,
+          latitude: input.latitude ?? null,
+          longitude: input.longitude ?? null,
+        })
+        .returning();
+      return stop;
+    },
+
+    async listTransportStops(user: AuthUser, routeId: string) {
+      return db
+        .select()
+        .from(transportStops)
+        .where(and(eq(transportStops.schoolId, user.schoolId), eq(transportStops.routeId, routeId)))
+        .orderBy(transportStops.stopOrder);
+    },
+
+    async createStudentTransportAllocation(
+      user: AuthUser,
+      input: z.infer<typeof createTransportAllocationSchema>,
+    ) {
+      let academicYearId = input.academicYearId;
+      if (!academicYearId) {
+        const [activeYear] = await db
+          .select({ id: academicYears.id })
+          .from(academicYears)
+          .where(and(eq(academicYears.schoolId, user.schoolId), eq(academicYears.isActive, true)))
+          .limit(1);
+        academicYearId = activeYear?.id;
+      }
+      if (!academicYearId) {
+        throw new ApiError(400, 'Academic year is required');
+      }
+
+      const [alloc] = await db
+        .insert(studentTransportAllocations)
+        .values({
+          schoolId: user.schoolId,
+          studentId: input.studentId,
+          routeId: input.routeId,
+          stopId: input.stopId,
+          academicYearId,
+          status: 'active',
+          startDate: input.startDate ?? new Date().toISOString().slice(0, 10),
+          endDate: input.endDate ?? null,
+        })
+        .returning();
+
+      return alloc;
+    },
+
+    async listStudentTransportAllocations(
+      user: AuthUser,
+      filters?: { studentId?: string | undefined; routeId?: string | undefined },
+    ) {
+      const conditions = [eq(studentTransportAllocations.schoolId, user.schoolId)];
+      if (filters?.studentId) conditions.push(eq(studentTransportAllocations.studentId, filters.studentId));
+      if (filters?.routeId) conditions.push(eq(studentTransportAllocations.routeId, filters.routeId));
+
+      return db
+        .select({
+          id: studentTransportAllocations.id,
+          studentId: studentTransportAllocations.studentId,
+          studentName: students.fullName,
+          admissionNumber: students.admissionNumber,
+          routeId: studentTransportAllocations.routeId,
+          routeNumber: transportRoutes.routeNumber,
+          routeName: transportRoutes.routeName,
+          stopId: studentTransportAllocations.stopId,
+          stopName: transportStops.stopName,
+          pickupTime: transportStops.pickupTime,
+          dropTime: transportStops.dropTime,
+          monthlyFeeAmount: transportStops.monthlyFeeAmount,
+          status: studentTransportAllocations.status,
+          startDate: studentTransportAllocations.startDate,
+          endDate: studentTransportAllocations.endDate,
+        })
+        .from(studentTransportAllocations)
+        .innerJoin(students, eq(students.id, studentTransportAllocations.studentId))
+        .innerJoin(transportRoutes, eq(transportRoutes.id, studentTransportAllocations.routeId))
+        .innerJoin(transportStops, eq(transportStops.id, studentTransportAllocations.stopId))
+        .where(and(...conditions))
+        .orderBy(desc(studentTransportAllocations.createdAt));
+    },
+
+    async createTransportLog(user: AuthUser, input: z.infer<typeof createTransportLogSchema>) {
+      const [log] = await db
+        .insert(transportLogs)
+        .values({
+          schoolId: user.schoolId,
+          routeId: input.routeId,
+          date: input.date ?? new Date().toISOString().slice(0, 10),
+          tripType: input.tripType,
+          status: input.status,
+          currentStopId: input.currentStopId ?? null,
+          notes: input.notes ?? null,
+        })
+        .returning();
+      return log;
+    },
+
+    async listTransportLogs(
+      user: AuthUser,
+      filters?: { routeId?: string | undefined; date?: string | undefined },
+    ) {
+      const conditions = [eq(transportLogs.schoolId, user.schoolId)];
+      if (filters?.routeId) conditions.push(eq(transportLogs.routeId, filters.routeId));
+      if (filters?.date) conditions.push(eq(transportLogs.date, filters.date));
+
+      return db
+        .select({
+          id: transportLogs.id,
+          routeId: transportLogs.routeId,
+          routeNumber: transportRoutes.routeNumber,
+          routeName: transportRoutes.routeName,
+          date: transportLogs.date,
+          tripType: transportLogs.tripType,
+          status: transportLogs.status,
+          currentStopId: transportLogs.currentStopId,
+          currentStopName: transportStops.stopName,
+          notes: transportLogs.notes,
+          createdAt: transportLogs.createdAt,
+        })
+        .from(transportLogs)
+        .innerJoin(transportRoutes, eq(transportRoutes.id, transportLogs.routeId))
+        .leftJoin(transportStops, eq(transportStops.id, transportLogs.currentStopId))
+        .where(and(...conditions))
+        .orderBy(desc(transportLogs.createdAt))
+        .limit(100);
+    },
+
+    async getStudentTransportOverview(user: AuthUser, studentId: string) {
+      const [alloc] = await db
+        .select({
+          allocation: studentTransportAllocations,
+          route: transportRoutes,
+          stop: transportStops,
+          vehicle: transportVehicles,
+          driver: transportDrivers,
+        })
+        .from(studentTransportAllocations)
+        .innerJoin(transportRoutes, eq(transportRoutes.id, studentTransportAllocations.routeId))
+        .innerJoin(transportStops, eq(transportStops.id, studentTransportAllocations.stopId))
+        .leftJoin(transportVehicles, eq(transportVehicles.id, transportRoutes.vehicleId))
+        .leftJoin(transportDrivers, eq(transportDrivers.id, transportRoutes.driverId))
+        .where(
+          and(
+            eq(studentTransportAllocations.schoolId, user.schoolId),
+            eq(studentTransportAllocations.studentId, studentId),
+            eq(studentTransportAllocations.status, 'active'),
+          ),
+        )
+        .limit(1);
+
+      if (!alloc) {
+        return { isAllocated: false };
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+      const [latestLog] = await db
+        .select({
+          id: transportLogs.id,
+          date: transportLogs.date,
+          tripType: transportLogs.tripType,
+          status: transportLogs.status,
+          currentStopName: transportStops.stopName,
+          notes: transportLogs.notes,
+          updatedAt: transportLogs.updatedAt,
+        })
+        .from(transportLogs)
+        .leftJoin(transportStops, eq(transportStops.id, transportLogs.currentStopId))
+        .where(
+          and(
+            eq(transportLogs.schoolId, user.schoolId),
+            eq(transportLogs.routeId, alloc.route.id),
+            eq(transportLogs.date, today),
+          ),
+        )
+        .orderBy(desc(transportLogs.createdAt))
+        .limit(1);
+
+      return {
+        isAllocated: true,
+        routeNumber: alloc.route.routeNumber,
+        routeName: alloc.route.routeName,
+        stopName: alloc.stop.stopName,
+        pickupTime: alloc.stop.pickupTime,
+        dropTime: alloc.stop.dropTime,
+        monthlyFeeAmount: alloc.stop.monthlyFeeAmount,
+        vehicleNumber: alloc.vehicle?.vehicleNumber ?? null,
+        vehicleModel: alloc.vehicle?.model ?? null,
+        driverName: alloc.driver?.fullName ?? null,
+        driverPhone: alloc.driver?.phone ?? null,
+        currentLog: latestLog ?? null,
+      };
+    },
+
+    // 4. Certificates Generator & Public Verification
+    async issueCertificate(
+      user: AuthUser,
+      input: z.infer<typeof issueCertificateSchema>,
+    ) {
+      const [student] = await db
+        .select({
+          id: students.id,
+          fullName: students.fullName,
+          admissionNumber: students.admissionNumber,
+        })
+        .from(students)
+        .where(and(eq(students.id, input.studentId), eq(students.schoolId, user.schoolId)))
+        .limit(1);
+
+      if (!student) throw new ApiError(404, 'Student not found');
+
+      const prefix =
+        input.certificateType === 'transfer_certificate'
+          ? 'TC'
+          : input.certificateType === 'bonafide'
+          ? 'BON'
+          : 'CHAR';
+
+      const existingCount = await db
+        .select({ count: sql<number>`count(*)`.mapWith(Number) })
+        .from(issuedCertificates)
+        .where(
+          and(
+            eq(issuedCertificates.schoolId, user.schoolId),
+            eq(issuedCertificates.certificateType, input.certificateType),
+          ),
+        );
+
+      const nextNum = (existingCount[0]?.count ?? 0) + 1;
+      const year = new Date().getFullYear();
+      const certificateNumber = `${prefix}-${year}-${String(nextNum).padStart(4, '0')}`;
+      const verificationCode = `SCH-${prefix}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+      const [cert] = await db
+        .insert(issuedCertificates)
+        .values({
+          schoolId: user.schoolId,
+          studentId: input.studentId,
+          certificateType: input.certificateType,
+          certificateNumber,
+          academicYearId: input.academicYearId ?? null,
+          issueDate: input.issueDate ?? new Date().toISOString().slice(0, 10),
+          verificationCode,
+          metadata: input.metadata ?? null,
+          issuedByStaffId: user.staffId ?? null,
+          status: 'valid',
+        })
+        .returning();
+
+      await this.createAuditLog({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        userEmail: user.email,
+        userRole: user.roles[0] ?? 'admin',
+        action: 'issue_certificate',
+        resourceType: 'issued_certificate',
+        resourceId: cert?.id,
+        details: { certificateNumber, certificateType: input.certificateType, studentId: input.studentId },
+      });
+
+      return {
+        ...cert,
+        studentName: student.fullName,
+        admissionNumber: student.admissionNumber,
+      };
+    },
+
+    async listCertificates(
+      user: AuthUser,
+      filters?: { studentId?: string | undefined; certificateType?: ('transfer_certificate' | 'bonafide' | 'character_conduct') | undefined },
+    ) {
+      const conditions = [eq(issuedCertificates.schoolId, user.schoolId)];
+      if (filters?.studentId) conditions.push(eq(issuedCertificates.studentId, filters.studentId));
+      if (filters?.certificateType) conditions.push(eq(issuedCertificates.certificateType, filters.certificateType));
+
+      return db
+        .select({
+          id: issuedCertificates.id,
+          studentId: issuedCertificates.studentId,
+          studentName: students.fullName,
+          admissionNumber: students.admissionNumber,
+          certificateType: issuedCertificates.certificateType,
+          certificateNumber: issuedCertificates.certificateNumber,
+          issueDate: issuedCertificates.issueDate,
+          verificationCode: issuedCertificates.verificationCode,
+          metadata: issuedCertificates.metadata,
+          issuedByStaffName: staff.fullName,
+          status: issuedCertificates.status,
+          createdAt: issuedCertificates.createdAt,
+        })
+        .from(issuedCertificates)
+        .innerJoin(students, eq(students.id, issuedCertificates.studentId))
+        .leftJoin(staff, eq(staff.id, issuedCertificates.issuedByStaffId))
+        .where(and(...conditions))
+        .orderBy(desc(issuedCertificates.createdAt));
+    },
+
+    async getCertificateById(user: AuthUser, id: string) {
+      const [cert] = await db
+        .select({
+          cert: issuedCertificates,
+          studentName: students.fullName,
+          admissionNumber: students.admissionNumber,
+          schoolName: schools.name,
+          schoolCode: schools.code,
+        })
+        .from(issuedCertificates)
+        .innerJoin(students, eq(students.id, issuedCertificates.studentId))
+        .innerJoin(schools, eq(schools.id, issuedCertificates.schoolId))
+        .where(and(eq(issuedCertificates.id, id), eq(issuedCertificates.schoolId, user.schoolId)))
+        .limit(1);
+
+      if (!cert) throw new ApiError(404, 'Certificate not found');
+
+      return {
+        ...cert.cert,
+        studentName: cert.studentName,
+        admissionNumber: cert.admissionNumber,
+        schoolName: cert.schoolName,
+        schoolCode: cert.schoolCode,
+      };
+    },
+
+    async revokeCertificate(user: AuthUser, id: string, reason?: string) {
+      const [updated] = await db
+        .update(issuedCertificates)
+        .set({
+          status: 'revoked',
+          updatedAt: new Date(),
+        })
+        .where(and(eq(issuedCertificates.id, id), eq(issuedCertificates.schoolId, user.schoolId)))
+        .returning();
+
+      if (!updated) throw new ApiError(404, 'Certificate not found');
+
+      await this.createAuditLog({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        userEmail: user.email,
+        userRole: user.roles[0] ?? 'admin',
+        action: 'revoke_certificate',
+        resourceType: 'issued_certificate',
+        resourceId: id,
+        details: { reason },
+      });
+
+      return updated;
+    },
+
+    async verifyCertificatePublic(verificationCode: string) {
+      const [record] = await db
+        .select({
+          cert: issuedCertificates,
+          studentName: students.fullName,
+          admissionNumber: students.admissionNumber,
+          schoolName: schools.name,
+          schoolCode: schools.code,
+        })
+        .from(issuedCertificates)
+        .innerJoin(students, eq(students.id, issuedCertificates.studentId))
+        .innerJoin(schools, eq(schools.id, issuedCertificates.schoolId))
+        .where(eq(issuedCertificates.verificationCode, verificationCode))
+        .limit(1);
+
+      if (!record) {
+        return {
+          verified: false,
+          message: 'Invalid certificate verification code. No record found.',
+        };
+      }
+
+      if (record.cert.status === 'revoked') {
+        return {
+          verified: false,
+          status: 'revoked',
+          certificateNumber: record.cert.certificateNumber,
+          certificateType: record.cert.certificateType,
+          studentName: record.studentName,
+          schoolName: record.schoolName,
+          issueDate: record.cert.issueDate,
+          message: 'This certificate was officially REVOKED by the institution.',
+        };
+      }
+
+      return {
+        verified: true,
+        status: 'valid',
+        certificateNumber: record.cert.certificateNumber,
+        certificateType: record.cert.certificateType,
+        studentName: record.studentName,
+        admissionNumber: record.admissionNumber,
+        schoolName: record.schoolName,
+        schoolCode: record.schoolCode,
+        issueDate: record.cert.issueDate,
+        message: 'This certificate is valid, genuine, and verified by Schoolic institutional registry.',
+      };
+    },
+
+    // 5. Public Inquiries & School Landing Page Profile
+    async getSchoolPublicProfile(schoolCode: string) {
+      const [school] = await db
+        .select({ id: schools.id, name: schools.name, code: schools.code })
+        .from(schools)
+        .where(eq(schools.code, schoolCode))
+        .limit(1);
+
+      if (!school) throw new ApiError(404, 'School not found');
+
+      const [activeYear] = await db
+        .select({ id: academicYears.id, name: academicYears.name })
+        .from(academicYears)
+        .where(and(eq(academicYears.schoolId, school.id), eq(academicYears.isActive, true)))
+        .limit(1);
+
+      const availableClasses = await db
+        .select({ id: classes.id, name: classes.name })
+        .from(classes)
+        .where(eq(classes.schoolId, school.id))
+        .orderBy(classes.name);
+
+      return {
+        id: school.id,
+        name: school.name,
+        code: school.code,
+        activeAcademicYear: activeYear ?? null,
+        availableClasses,
+      };
+    },
+
+    async createPublicInquiry(input: z.infer<typeof publicInquirySchema>) {
+      const [school] = await db
+        .select({ id: schools.id })
+        .from(schools)
+        .where(eq(schools.code, input.schoolCode))
+        .limit(1);
+
+      if (!school) throw new ApiError(404, 'School not found');
+
+      let academicYearId: string | null = null;
+      const [activeYear] = await db
+        .select({ id: academicYears.id })
+        .from(academicYears)
+        .where(and(eq(academicYears.schoolId, school.id), eq(academicYears.isActive, true)))
+        .limit(1);
+      academicYearId = activeYear?.id ?? null;
+
+      if (!academicYearId) {
+        const [anyYear] = await db
+          .select({ id: academicYears.id })
+          .from(academicYears)
+          .where(eq(academicYears.schoolId, school.id))
+          .limit(1);
+        academicYearId = anyYear?.id ?? null;
+      }
+
+      if (!academicYearId) throw new ApiError(422, 'School has no active academic year configured');
+
+      let targetClassId = input.applyingForClassId;
+      if (!targetClassId) {
+        const [firstClass] = await db
+          .select({ id: classes.id })
+          .from(classes)
+          .where(eq(classes.schoolId, school.id))
+          .limit(1);
+        targetClassId = firstClass?.id;
+      }
+
+      if (!targetClassId) throw new ApiError(422, 'School has no classes configured');
+
+      const year = new Date().getFullYear();
+      const inqNumber = `INQ-${year}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const [inquiry] = await db
+        .insert(admissionApplications)
+        .values({
+          schoolId: school.id,
+          academicYearId,
+          applyingForClassId: targetClassId,
+          applicationNumber: inqNumber,
+          applicantName: input.applicantName,
+          dateOfBirth: input.dateOfBirth ?? null,
+          gender: input.gender ?? null,
+          parentName: input.parentName,
+          parentEmail: input.parentEmail ?? null,
+          parentPhone: input.parentPhone,
+          address: input.address ?? null,
+          previousSchool: input.previousSchool ?? null,
+          status: 'inquiry',
+          quotaCategory: input.quotaCategory,
+          casteCategory: input.casteCategory,
+          applicationDate: new Date().toISOString().slice(0, 10),
+          notes: input.notes ?? null,
+        })
+        .returning();
+
+      return inquiry;
+    },
+
+    // 6. Calendar Events & PTM Scheduling
+    async createCalendarEvent(user: AuthUser, input: z.infer<typeof createCalendarEventSchema>) {
+      const [event] = await db
+        .insert(calendarEvents)
+        .values({
+          schoolId: user.schoolId,
+          academicYearId: input.academicYearId ?? null,
+          title: input.title,
+          description: input.description ?? null,
+          eventType: input.eventType,
+          startDate: input.startDate,
+          endDate: input.endDate,
+          isAllDay: input.isAllDay,
+          targetAudience: input.targetAudience,
+        })
+        .returning();
+      return event;
+    },
+
+    async listCalendarEvents(
+      user: AuthUser,
+      filters?: { targetAudience?: string | undefined; startDate?: string | undefined; endDate?: string | undefined },
+    ) {
+      const conditions = [eq(calendarEvents.schoolId, user.schoolId)];
+      if (filters?.targetAudience && filters.targetAudience !== 'all') {
+        conditions.push(
+          sql`(${calendarEvents.targetAudience} = 'all' OR ${calendarEvents.targetAudience} = ${filters.targetAudience})`,
+        );
+      }
+      if (filters?.startDate) {
+        conditions.push(gte(calendarEvents.endDate, filters.startDate));
+      }
+      if (filters?.endDate) {
+        conditions.push(lte(calendarEvents.startDate, filters.endDate));
+      }
+
+      return db
+        .select()
+        .from(calendarEvents)
+        .where(and(...conditions))
+        .orderBy(calendarEvents.startDate);
+    },
+
+    async deleteCalendarEvent(user: AuthUser, id: string) {
+      const [deleted] = await db
+        .delete(calendarEvents)
+        .where(and(eq(calendarEvents.id, id), eq(calendarEvents.schoolId, user.schoolId)))
+        .returning();
+      if (!deleted) throw new ApiError(404, 'Calendar event not found');
+      return { success: true };
+    },
+
+    async createPtmSchedule(user: AuthUser, input: z.infer<typeof createPtmScheduleSchema>) {
+      const [schedule] = await db
+        .insert(ptmSchedules)
+        .values({
+          schoolId: user.schoolId,
+          academicYearId: input.academicYearId ?? null,
+          title: input.title,
+          eventDate: input.eventDate,
+          startTime: input.startTime,
+          endTime: input.endTime,
+          slotDurationMinutes: input.slotDurationMinutes,
+          status: 'scheduled',
+        })
+        .returning();
+
+      if (!schedule) throw new ApiError(500, 'Unable to create PTM schedule');
+
+      let teacherStaffIds = input.teacherStaffIds;
+      if (!teacherStaffIds || teacherStaffIds.length === 0) {
+        const teachers = await db
+          .select({ id: staff.id })
+          .from(staff)
+          .where(
+            and(
+              eq(staff.schoolId, user.schoolId),
+              eq(staff.isTeacher, true),
+            ),
+          );
+        teacherStaffIds = teachers.map((t) => t.id);
+      }
+
+      const startMin = toMinutes(input.startTime);
+      const endMin = toMinutes(input.endTime);
+      const duration = input.slotDurationMinutes;
+
+      const formatMin = (m: number) => {
+        const h = Math.floor(m / 60);
+        const mins = m % 60;
+        return `${String(h).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+      };
+
+      const slotValues: Array<typeof ptmSlots.$inferInsert> = [];
+      for (const staffId of teacherStaffIds) {
+        for (let current = startMin; current + duration <= endMin; current += duration) {
+          slotValues.push({
+            schoolId: user.schoolId,
+            scheduleId: schedule.id,
+            teacherStaffId: staffId,
+            startTime: formatMin(current),
+            endTime: formatMin(current + duration),
+            status: 'available',
+          });
+        }
+      }
+
+      if (slotValues.length > 0) {
+        await db.insert(ptmSlots).values(slotValues);
+      }
+
+      return {
+        ...schedule,
+        totalSlotsGenerated: slotValues.length,
+      };
+    },
+
+    async listPtmSchedules(user: AuthUser) {
+      return db
+        .select()
+        .from(ptmSchedules)
+        .where(eq(ptmSchedules.schoolId, user.schoolId))
+        .orderBy(desc(ptmSchedules.eventDate));
+    },
+
+    async listPtmSlots(
+      user: AuthUser,
+      filters?: { scheduleId?: string | undefined; teacherStaffId?: string | undefined; studentId?: string | undefined; status?: ('available' | 'booked' | 'completed' | 'cancelled') | undefined },
+    ) {
+      const conditions = [eq(ptmSlots.schoolId, user.schoolId)];
+      if (filters?.scheduleId) conditions.push(eq(ptmSlots.scheduleId, filters.scheduleId));
+      if (filters?.teacherStaffId) conditions.push(eq(ptmSlots.teacherStaffId, filters.teacherStaffId));
+      if (filters?.studentId) conditions.push(eq(ptmSlots.bookedByStudentId, filters.studentId));
+      if (filters?.status) conditions.push(eq(ptmSlots.status, filters.status));
+
+      return db
+        .select({
+          id: ptmSlots.id,
+          scheduleId: ptmSlots.scheduleId,
+          scheduleTitle: ptmSchedules.title,
+          eventDate: ptmSchedules.eventDate,
+          teacherStaffId: ptmSlots.teacherStaffId,
+          teacherName: staff.fullName,
+          startTime: ptmSlots.startTime,
+          endTime: ptmSlots.endTime,
+          status: ptmSlots.status,
+          bookedByStudentId: ptmSlots.bookedByStudentId,
+          studentName: students.fullName,
+          parentNotes: ptmSlots.parentNotes,
+          teacherNotes: ptmSlots.teacherNotes,
+        })
+        .from(ptmSlots)
+        .innerJoin(ptmSchedules, eq(ptmSchedules.id, ptmSlots.scheduleId))
+        .innerJoin(staff, eq(staff.id, ptmSlots.teacherStaffId))
+        .leftJoin(students, eq(students.id, ptmSlots.bookedByStudentId))
+        .where(and(...conditions))
+        .orderBy(ptmSlots.startTime);
+    },
+
+    async bookPtmSlot(
+      user: AuthUser,
+      input: z.infer<typeof bookPtmSlotSchema>,
+    ) {
+      const [slot] = await db
+        .select()
+        .from(ptmSlots)
+        .where(and(eq(ptmSlots.id, input.slotId), eq(ptmSlots.schoolId, user.schoolId)))
+        .limit(1);
+
+      if (!slot) throw new ApiError(404, 'PTM Slot not found');
+      if (slot.status !== 'available') {
+        throw new ApiError(409, 'This slot is already booked or unavailable');
+      }
+
+      const [updated] = await db
+        .update(ptmSlots)
+        .set({
+          status: 'booked',
+          bookedByStudentId: input.studentId ?? null,
+          parentNotes: input.parentNotes ?? null,
+          updatedAt: new Date(),
+        })
+        .where(eq(ptmSlots.id, input.slotId))
+        .returning();
+
+      return updated;
+    },
+
+    async cancelPtmBooking(user: AuthUser, slotId: string) {
+      const [updated] = await db
+        .update(ptmSlots)
+        .set({
+          status: 'available',
+          bookedByStudentId: null,
+          parentNotes: null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(ptmSlots.id, slotId), eq(ptmSlots.schoolId, user.schoolId)))
+        .returning();
+
+      if (!updated) throw new ApiError(404, 'PTM Slot not found');
+      return updated;
+    },
+
+    async updatePtmSlotNotes(user: AuthUser, slotId: string, input: z.infer<typeof updatePtmSlotNotesSchema>) {
+      const updates: { teacherNotes?: string | null; status?: 'available' | 'booked' | 'completed' | 'cancelled'; updatedAt: Date } = {
+        updatedAt: new Date(),
+      };
+      if (input.teacherNotes !== undefined) updates.teacherNotes = input.teacherNotes;
+      if (input.status !== undefined) updates.status = input.status;
+
+      const [updated] = await db
+        .update(ptmSlots)
+        .set(updates)
+        .where(and(eq(ptmSlots.id, slotId), eq(ptmSlots.schoolId, user.schoolId)))
+        .returning();
+
+      if (!updated) throw new ApiError(404, 'PTM Slot not found');
+      return updated;
     },
   };
 }

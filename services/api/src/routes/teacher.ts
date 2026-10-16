@@ -21,6 +21,9 @@ import {
   gradeHomeworkSubmissionSchema,
   sendChatMessageSchema,
   updateTeacherAvailabilitySchema,
+  createStaffLeaveSchema,
+  updateStudentLeaveStatusSchema,
+  updatePtmSlotNotesSchema,
 } from '../http/validation';
 import type { AppBindings } from '../types';
 
@@ -320,6 +323,76 @@ teacherRoutes.post(
     return c.json(
       await repo.sendChatMessage(c.get('authUser'), c.req.valid('param').id, c.req.valid('json')),
       201,
+    );
+  },
+);
+
+// ==========================================
+// Phase 12: Teacher Operations & Daily Differentiators
+// ==========================================
+
+// Leaves
+teacherRoutes.get('/my-leaves', async (c) => {
+  const authUser = c.get('authUser');
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.listStaffLeaves(authUser, { staffId: authUser.staffId ?? undefined }));
+});
+
+teacherRoutes.post('/my-leaves', zValidator('json', createStaffLeaveSchema), async (c) => {
+  const authUser = c.get('authUser');
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createStaffLeave(authUser, c.req.valid('json')), 201);
+});
+
+teacherRoutes.get('/student-leaves', async (c) => {
+  const authUser = c.get('authUser');
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.listStudentLeaves(authUser));
+});
+
+teacherRoutes.put(
+  '/student-leaves/:id/status',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('json', updateStudentLeaveStatusSchema),
+  async (c) => {
+    const authUser = c.get('authUser');
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.updateStudentLeaveStatus(
+        authUser,
+        c.req.valid('param').id,
+        c.req.valid('json'),
+      ),
+    );
+  },
+);
+
+// Calendar & PTM
+teacherRoutes.get('/calendar', async (c) => {
+  const authUser = c.get('authUser');
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.listCalendarEvents(authUser, { targetAudience: 'teachers' }));
+});
+
+teacherRoutes.get('/ptm/slots', async (c) => {
+  const authUser = c.get('authUser');
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.listPtmSlots(authUser, { teacherStaffId: authUser.staffId ?? undefined }));
+});
+
+teacherRoutes.put(
+  '/ptm/slots/:id/notes',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('json', updatePtmSlotNotesSchema),
+  async (c) => {
+    const authUser = c.get('authUser');
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.updatePtmSlotNotes(
+        authUser,
+        c.req.valid('param').id,
+        c.req.valid('json'),
+      ),
     );
   },
 );

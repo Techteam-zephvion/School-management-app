@@ -34,6 +34,7 @@ import 'views/admin_students_view.dart';
 import 'views/admin_timetable_view.dart';
 import 'views/admin_communications_view.dart';
 import 'views/admin_compliance_view.dart';
+import 'views/admin_operations_view.dart';
 
 enum AdminNavSection {
   overview,
@@ -42,6 +43,7 @@ enum AdminNavSection {
   aiUsage,
   announcements,
   admissions,
+  operations,
   students,
   staff,
   classesAndSubjects,
@@ -490,6 +492,12 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
                     isDrawer: isDrawer,
                   ),
                   _sidebarItem(
+                    AdminNavSection.operations,
+                    Icons.commute_outlined,
+                    'Operations',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
                     AdminNavSection.students,
                     Icons.people_outline,
                     'Students',
@@ -911,7 +919,9 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
       case AdminNavSection.announcements:
         return 'Announcements';
       case AdminNavSection.admissions:
-        return 'Admissions & Operations';
+        return 'Admissions';
+      case AdminNavSection.operations:
+        return 'School Operations';
       case AdminNavSection.students:
         return 'Students';
       case AdminNavSection.staff:
@@ -1072,6 +1082,13 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
           classes: _classes,
           sections: _sections,
           reload: _load,
+        );
+      case AdminNavSection.operations:
+        return AdminOperationsView(
+          students: _students,
+          staff: _staff,
+          classes: _classes,
+          sections: _sections,
         );
       case AdminNavSection.communications:
         return AdminCommunicationsView(

@@ -8,6 +8,7 @@ import { bootstrapRoutes } from './routes/bootstrap';
 import { portalRoutes } from './routes/portal';
 import { teacherRoutes } from './routes/teacher';
 import { webhookRoutes } from './routes/webhooks';
+import { publicRoutes } from './routes/public';
 import type { AppBindings } from './types';
 
 export function createApp() {
@@ -50,9 +51,10 @@ export function createApp() {
 
   app.route('/api/v1/bootstrap', bootstrapRoutes);
   app.route('/api/v1/webhooks', webhookRoutes);
+  app.route('/api/v1/public', publicRoutes);
 
   app.use('/api/v1/*', async (c, next) => {
-    if (c.req.path.startsWith('/api/v1/webhooks')) {
+    if (c.req.path.startsWith('/api/v1/webhooks') || c.req.path.startsWith('/api/v1/public')) {
       return next();
     }
     return authenticate(c, next);

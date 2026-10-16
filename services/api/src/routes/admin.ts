@@ -53,6 +53,21 @@ import {
   updateRefundStatusSchema,
   createFeeStructureHeadSchema,
   assignSectionClassTeacherSchema,
+  createStudentLeaveSchema,
+  updateStudentLeaveStatusSchema,
+  createStaffLeaveSchema,
+  updateStaffLeaveStatusSchema,
+  createTransportVehicleSchema,
+  createTransportDriverSchema,
+  createTransportRouteSchema,
+  createTransportStopSchema,
+  createTransportAllocationSchema,
+  createTransportLogSchema,
+  issueCertificateSchema,
+  revokeCertificateSchema,
+  createCalendarEventSchema,
+  createPtmScheduleSchema,
+  updatePtmSlotNotesSchema,
 } from '../http/validation';
 
 
@@ -99,7 +114,8 @@ adminRoutes.use('*', async (c, next) => {
       path.includes('/students') ||
       path.includes('/onboarding') ||
       path.includes('/overview') ||
-      path.includes('/dpdp');
+      path.includes('/dpdp') ||
+      path.includes('/certificates');
     if (!isAdmissions) {
       throw new ApiError(403, 'Admissions Officer role is restricted to admissions and enrollment');
     }
@@ -914,5 +930,228 @@ adminRoutes.post(
     );
   },
 );
+
+// ==========================================
+// Phase 12: School Operations & Daily Differentiators
+// ==========================================
+
+// 1. Leaves
+adminRoutes.get('/leaves/students', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listStudentLeaves(c.get('authUser'), {
+    studentId: query.studentId,
+    status: query.status as any,
+  }));
+});
+
+adminRoutes.put(
+  '/leaves/students/:id/status',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('json', updateStudentLeaveStatusSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.updateStudentLeaveStatus(
+        c.get('authUser'),
+        c.req.valid('param').id,
+        c.req.valid('json'),
+      ),
+    );
+  },
+);
+
+adminRoutes.get('/leaves/staff', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listStaffLeaves(c.get('authUser'), {
+    staffId: query.staffId,
+    status: query.status as any,
+  }));
+});
+
+adminRoutes.post('/leaves/staff', zValidator('json', createStaffLeaveSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createStaffLeave(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+adminRoutes.put(
+  '/leaves/staff/:id/status',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('json', updateStaffLeaveStatusSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.updateStaffLeaveStatus(
+        c.get('authUser'),
+        c.req.valid('param').id,
+        c.req.valid('json'),
+      ),
+    );
+  },
+);
+
+adminRoutes.get(
+  '/leaves/staff/:id/substitutes',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.suggestStaffLeaveSubstitutes(c.get('authUser'), c.req.valid('param').id));
+  },
+);
+
+// 2. Transport
+adminRoutes.get('/transport/vehicles', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.listTransportVehicles(c.get('authUser')));
+});
+
+adminRoutes.post('/transport/vehicles', zValidator('json', createTransportVehicleSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createTransportVehicle(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+adminRoutes.get('/transport/drivers', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.listTransportDrivers(c.get('authUser')));
+});
+
+adminRoutes.post('/transport/drivers', zValidator('json', createTransportDriverSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createTransportDriver(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+adminRoutes.get('/transport/routes', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.listTransportRoutes(c.get('authUser')));
+});
+
+adminRoutes.post('/transport/routes', zValidator('json', createTransportRouteSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createTransportRoute(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+adminRoutes.get(
+  '/transport/routes/:id/stops',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listTransportStops(c.get('authUser'), c.req.valid('param').id));
+  },
+);
+
+adminRoutes.post('/transport/stops', zValidator('json', createTransportStopSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createTransportStop(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+adminRoutes.get('/transport/allocations', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listStudentTransportAllocations(c.get('authUser'), {
+    studentId: query.studentId,
+    routeId: query.routeId,
+  }));
+});
+
+adminRoutes.post('/transport/allocations', zValidator('json', createTransportAllocationSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createStudentTransportAllocation(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+adminRoutes.get('/transport/logs', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listTransportLogs(c.get('authUser'), {
+    routeId: query.routeId,
+    date: query.date,
+  }));
+});
+
+adminRoutes.post('/transport/logs', zValidator('json', createTransportLogSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createTransportLog(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+// 3. Certificates
+adminRoutes.get('/certificates', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listCertificates(c.get('authUser'), {
+    studentId: query.studentId,
+    certificateType: query.certificateType as any,
+  }));
+});
+
+adminRoutes.post('/certificates/issue', zValidator('json', issueCertificateSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.issueCertificate(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+adminRoutes.get(
+  '/certificates/:id',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.getCertificateById(c.get('authUser'), c.req.valid('param').id));
+  },
+);
+
+adminRoutes.put(
+  '/certificates/:id/revoke',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('json', revokeCertificateSchema.optional()),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    const reason = c.req.valid('json')?.reason;
+    return c.json(await repo.revokeCertificate(c.get('authUser'), c.req.valid('param').id, reason));
+  },
+);
+
+// 4. Calendar & PTM
+adminRoutes.get('/calendar', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listCalendarEvents(c.get('authUser'), {
+    targetAudience: query.targetAudience,
+    startDate: query.startDate,
+    endDate: query.endDate,
+  }));
+});
+
+adminRoutes.post('/calendar', zValidator('json', createCalendarEventSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createCalendarEvent(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+adminRoutes.delete(
+  '/calendar/:id',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.deleteCalendarEvent(c.get('authUser'), c.req.valid('param').id));
+  },
+);
+
+adminRoutes.get('/ptm/schedules', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.listPtmSchedules(c.get('authUser')));
+});
+
+adminRoutes.post('/ptm/schedules', zValidator('json', createPtmScheduleSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createPtmSchedule(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+adminRoutes.get('/ptm/slots', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listPtmSlots(c.get('authUser'), {
+    scheduleId: query.scheduleId,
+    teacherStaffId: query.teacherStaffId,
+    studentId: query.studentId,
+    status: query.status as any,
+  }));
+});
 
 

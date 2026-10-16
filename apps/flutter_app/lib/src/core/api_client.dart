@@ -884,6 +884,449 @@ class ApiClient {
     );
   }
 
+  // --- Phase 12: Operations (Leaves, Transport, Certificates, Calendar & PTM) ---
+
+  // 1. Leaves
+  Future<List<Map<String, Object?>>> getStudentLeaves({
+    required AuthSession session,
+    String? studentId,
+    String? status,
+  }) async {
+    final params = <String, String>{
+      'studentId': ?studentId,
+      if (status != null && status != 'all') 'status': status,
+    };
+    return getList(
+      '/api/v1/admin/leaves/students',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> reviewStudentLeave({
+    required AuthSession session,
+    required String leaveId,
+    required String status,
+    String? reviewerNotes,
+  }) async {
+    return putJson(
+      '/api/v1/admin/leaves/students/$leaveId/status',
+      {
+        'status': status,
+        'reviewerNotes': ?reviewerNotes,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getStaffLeaves({
+    required AuthSession session,
+    String? staffId,
+    String? status,
+  }) async {
+    final params = <String, String>{
+      'staffId': ?staffId,
+      if (status != null && status != 'all') 'status': status,
+    };
+    return getList(
+      '/api/v1/admin/leaves/staff',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> createStaffLeave({
+    required AuthSession session,
+    String? staffId,
+    required String leaveType,
+    required String startDate,
+    required String endDate,
+    required String reason,
+  }) async {
+    return postJson(
+      '/api/v1/admin/leaves/staff',
+      {
+        'staffId': ?staffId,
+        'leaveType': leaveType,
+        'startDate': startDate,
+        'endDate': endDate,
+        'reason': reason,
+      },
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> reviewStaffLeave({
+    required AuthSession session,
+    required String leaveId,
+    required String status,
+    String? reviewerNotes,
+  }) async {
+    return putJson(
+      '/api/v1/admin/leaves/staff/$leaveId/status',
+      {
+        'status': status,
+        'reviewerNotes': ?reviewerNotes,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getStaffLeaveSubstitutes({
+    required AuthSession session,
+    required String leaveId,
+  }) async {
+    return getList('/api/v1/admin/leaves/staff/$leaveId/substitutes', session: session);
+  }
+
+  // 2. Transport
+  Future<List<Map<String, Object?>>> getTransportVehicles({required AuthSession session}) async {
+    return getList('/api/v1/admin/transport/vehicles', session: session);
+  }
+
+  Future<Map<String, Object?>> createTransportVehicle({
+    required AuthSession session,
+    required String vehicleNumber,
+    required String model,
+    required int capacity,
+    String? gpsDeviceId,
+    String? insuranceExpiry,
+    String? fitnessExpiry,
+    String status = 'active',
+  }) async {
+    return postJson(
+      '/api/v1/admin/transport/vehicles',
+      {
+        'vehicleNumber': vehicleNumber,
+        'model': model,
+        'capacity': capacity,
+        'gpsDeviceId': ?gpsDeviceId,
+        'insuranceExpiry': ?insuranceExpiry,
+        'fitnessExpiry': ?fitnessExpiry,
+        'status': status,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getTransportDrivers({required AuthSession session}) async {
+    return getList('/api/v1/admin/transport/drivers', session: session);
+  }
+
+  Future<Map<String, Object?>> createTransportDriver({
+    required AuthSession session,
+    required String fullName,
+    required String phone,
+    required String licenseNumber,
+    String? licenseExpiry,
+    String status = 'active',
+  }) async {
+    return postJson(
+      '/api/v1/admin/transport/drivers',
+      {
+        'fullName': fullName,
+        'phone': phone,
+        'licenseNumber': licenseNumber,
+        'licenseExpiry': ?licenseExpiry,
+        'status': status,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getTransportRoutes({required AuthSession session}) async {
+    return getList('/api/v1/admin/transport/routes', session: session);
+  }
+
+  Future<Map<String, Object?>> createTransportRoute({
+    required AuthSession session,
+    required String routeNumber,
+    required String routeName,
+    required String startPoint,
+    required String endPoint,
+    String? vehicleId,
+    String? driverId,
+    String status = 'active',
+  }) async {
+    return postJson(
+      '/api/v1/admin/transport/routes',
+      {
+        'routeNumber': routeNumber,
+        'routeName': routeName,
+        'startPoint': startPoint,
+        'endPoint': endPoint,
+        'vehicleId': ?vehicleId,
+        'driverId': ?driverId,
+        'status': status,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getTransportStops({
+    required AuthSession session,
+    required String routeId,
+  }) async {
+    return getList('/api/v1/admin/transport/routes/$routeId/stops', session: session);
+  }
+
+  Future<Map<String, Object?>> createTransportStop({
+    required AuthSession session,
+    required String routeId,
+    required String stopName,
+    required String pickupTime,
+    required String dropTime,
+    int stopOrder = 1,
+    int monthlyFeeAmount = 0,
+    String? latitude,
+    String? longitude,
+  }) async {
+    return postJson(
+      '/api/v1/admin/transport/stops',
+      {
+        'routeId': routeId,
+        'stopName': stopName,
+        'pickupTime': pickupTime,
+        'dropTime': dropTime,
+        'stopOrder': stopOrder,
+        'monthlyFeeAmount': monthlyFeeAmount,
+        'latitude': ?latitude,
+        'longitude': ?longitude,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getTransportAllocations({
+    required AuthSession session,
+    String? studentId,
+    String? routeId,
+  }) async {
+    final params = <String, String>{
+      'studentId': ?studentId,
+      'routeId': ?routeId,
+    };
+    return getList(
+      '/api/v1/admin/transport/allocations',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> createTransportAllocation({
+    required AuthSession session,
+    required String studentId,
+    required String routeId,
+    required String stopId,
+    String? academicYearId,
+    String? startDate,
+  }) async {
+    return postJson(
+      '/api/v1/admin/transport/allocations',
+      {
+        'studentId': studentId,
+        'routeId': routeId,
+        'stopId': stopId,
+        'academicYearId': ?academicYearId,
+        'startDate': ?startDate,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getTransportLogs({
+    required AuthSession session,
+    String? routeId,
+    String? date,
+  }) async {
+    final params = <String, String>{
+      'routeId': ?routeId,
+      'date': ?date,
+    };
+    return getList(
+      '/api/v1/admin/transport/logs',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> createTransportLog({
+    required AuthSession session,
+    required String routeId,
+    String? date,
+    required String tripType,
+    required String status,
+    String? currentStopId,
+    String? notes,
+  }) async {
+    return postJson(
+      '/api/v1/admin/transport/logs',
+      {
+        'routeId': routeId,
+        'date': ?date,
+        'tripType': tripType,
+        'status': status,
+        'currentStopId': ?currentStopId,
+        'notes': ?notes,
+      },
+      session: session,
+    );
+  }
+
+  // 3. Certificates
+  Future<List<Map<String, Object?>>> getCertificates({
+    required AuthSession session,
+    String? studentId,
+    String? certificateType,
+  }) async {
+    final params = <String, String>{
+      'studentId': ?studentId,
+      if (certificateType != null && certificateType != 'all') 'certificateType': certificateType,
+    };
+    return getList(
+      '/api/v1/admin/certificates',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> issueCertificate({
+    required AuthSession session,
+    required String studentId,
+    required String certificateType,
+    String? academicYearId,
+    String? issueDate,
+    Map<String, Object?>? metadata,
+  }) async {
+    return postJson(
+      '/api/v1/admin/certificates',
+      {
+        'studentId': studentId,
+        'certificateType': certificateType,
+        'academicYearId': ?academicYearId,
+        'issueDate': ?issueDate,
+        'metadata': ?metadata,
+      },
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> revokeCertificate({
+    required AuthSession session,
+    required String certificateId,
+    String? reason,
+  }) async {
+    return postJson(
+      '/api/v1/admin/certificates/$certificateId/revoke',
+      {
+        'reason': ?reason,
+      },
+      session: session,
+    );
+  }
+
+  // 4. Calendar & PTM
+  Future<List<Map<String, Object?>>> getCalendarEvents({
+    required AuthSession session,
+    String? targetAudience,
+    String? startDate,
+    String? endDate,
+  }) async {
+    final params = <String, String>{
+      if (targetAudience != null && targetAudience != 'all') 'targetAudience': targetAudience,
+      'startDate': ?startDate,
+      'endDate': ?endDate,
+    };
+    return getList(
+      '/api/v1/admin/calendar',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> createCalendarEvent({
+    required AuthSession session,
+    required String title,
+    String? description,
+    required String eventType,
+    required String startDate,
+    required String endDate,
+    bool isAllDay = true,
+    String targetAudience = 'all',
+    String? academicYearId,
+  }) async {
+    return postJson(
+      '/api/v1/admin/calendar',
+      {
+        'title': title,
+        'description': ?description,
+        'eventType': eventType,
+        'startDate': startDate,
+        'endDate': endDate,
+        'isAllDay': isAllDay,
+        'targetAudience': targetAudience,
+        'academicYearId': ?academicYearId,
+      },
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> deleteCalendarEvent({
+    required AuthSession session,
+    required String eventId,
+  }) async {
+    return deleteJson('/api/v1/admin/calendar/$eventId', session: session);
+  }
+
+  Future<List<Map<String, Object?>>> getPtmSchedules({required AuthSession session}) async {
+    return getList('/api/v1/admin/ptm/schedules', session: session);
+  }
+
+  Future<Map<String, Object?>> createPtmSchedule({
+    required AuthSession session,
+    required String title,
+    required String eventDate,
+    required String startTime,
+    required String endTime,
+    int slotDurationMinutes = 15,
+    List<String>? teacherStaffIds,
+    String? academicYearId,
+  }) async {
+    return postJson(
+      '/api/v1/admin/ptm/schedules',
+      {
+        'title': title,
+        'eventDate': eventDate,
+        'startTime': startTime,
+        'endTime': endTime,
+        'slotDurationMinutes': slotDurationMinutes,
+        'teacherStaffIds': ?teacherStaffIds,
+        'academicYearId': ?academicYearId,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getPtmSlots({
+    required AuthSession session,
+    String? scheduleId,
+    String? teacherStaffId,
+    String? studentId,
+    String? status,
+  }) async {
+    final params = <String, String>{
+      'scheduleId': ?scheduleId,
+      'teacherStaffId': ?teacherStaffId,
+      'studentId': ?studentId,
+      if (status != null && status != 'all') 'status': status,
+    };
+    return getList(
+      '/api/v1/admin/ptm/slots',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
   Map<String, String> _headers({String? bearerToken, AuthSession? devSession}) {
     return {
       'content-type': 'application/json',

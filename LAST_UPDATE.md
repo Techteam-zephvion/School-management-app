@@ -1,5 +1,60 @@
 # Last Update (October 16, 2026)
 
+## Phase 12: School Operations & Daily Differentiators
+
+### Summary
+- **Student & Staff Leave Management:**
+  - `studentLeaves` table: Parent/student leave applications with start/end date, leave type (`sick`, `casual`, `emergency`, `family`), reason, optional medical certificate URL/key, and teacher approval flow (`pending`, `approved`, `rejected`).
+  - `staffLeaves` table: Staff leave tracking with approval flow, reason, and substitute assignment.
+  - Automated Timetable Substitute Suggestion Engine (`suggestStaffLeaveSubstitutes` / `/api/v1/admin/operations/staff-leaves/suggest-substitutes`): cross-references target teacher's scheduled timetable slots during leave dates against other staff members to identify available teachers with zero period conflicts.
+  - Endpoints:
+    - Admin: `GET/POST /api/v1/admin/operations/student-leaves`, `PUT /api/v1/admin/operations/student-leaves/:id/status`, `GET/POST /api/v1/admin/operations/staff-leaves`, `PUT /api/v1/admin/operations/staff-leaves/:id/status`, `POST /api/v1/admin/operations/staff-leaves/suggest-substitutes`.
+    - Teacher: `GET /api/v1/teacher/student-leaves`, `PUT /api/v1/teacher/student-leaves/:id/status`, `GET/POST /api/v1/teacher/my-leaves`.
+    - Portal: `GET/POST /api/v1/portal/leaves`.
+- **School Transport Fleet Management:**
+  - Fleet management schema & migration `0014_sad_dormammu.sql`:
+    - `transportVehicles`: Vehicle number, capacity, vehicle type (`bus`, `van`, `minibus`), GPS tracking device ID, insurance expiry date.
+    - `transportDrivers`: Driver name, phone, driving license number, license expiry date, active status.
+    - `transportRoutes`: Route name, code, start location, end location, assigned vehicle & driver.
+    - `transportStops`: Ordered route stops with pickup & drop-off timings and sequence indexing.
+    - `studentTransportAllocations`: Student allocation to routes and specific stops for morning/evening shifts with fee linkages.
+    - `transportLogs`: Live vehicle checkpoint logging (checkpoint location, direction, speed, timestamp).
+  - Endpoints:
+    - Admin: `GET/POST /api/v1/admin/operations/transport/vehicles`, `GET/POST /api/v1/admin/operations/transport/drivers`, `GET/POST /api/v1/admin/operations/transport/routes`, `GET/POST /api/v1/admin/operations/transport/stops`, `GET/POST /api/v1/admin/operations/transport/allocations`, `GET/POST /api/v1/admin/operations/transport/logs`.
+    - Portal: `GET /api/v1/portal/transport`.
+- **Verifiable Official PDF Certificate Generator:**
+  - `issuedCertificates` table: Tracks certificate type (`transfer_certificate`, `bonafide`, `conduct`, `character`, `sports_merit`), unique serial number (`TC-YYYY-XXXXX`), student ID, issue date, metadata (admission date, conduct remarks, counter-signature authority), revocation status (`active`, `revoked`), and unique 12-char digital verification code.
+  - Public verification API (`GET /api/v1/public/certificates/verify/:code`): instant public verification of certificate validity without login.
+  - Endpoints: `GET/POST /api/v1/admin/operations/certificates`, `PUT /api/v1/admin/operations/certificates/:id/revoke`.
+- **Public Inquiry & Admission Landing Page + RTE Quota:**
+  - Extended `admissionApplications` with `quotaCategory` (`general`, `rte_25`, `management`, `staff_ward`, `sports`) and `casteCategory` (`general`, `obc`, `sc`, `st`, `ews`).
+  - Public unauthenticated endpoints:
+    - `GET /api/v1/public/schools/:code`: School profile, name, affiliation, contact info for public web visitors.
+    - `POST /api/v1/public/inquiries`: Public prospective student and parent inquiry form feeding directly into the Schoolic admissions pipeline.
+- **Institutional Calendar & Parent-Teacher Meeting (PTM) Scheduling:**
+  - `calendarEvents` table: Master institutional calendar (`holiday`, `examination`, `event`, `sports_day`, `ptm`, `staff_meeting`, `term_start`, `term_end`) with title, description, start/end dates, and public visibility toggle.
+  - `ptmSchedules` table: PTM session definition (title, meeting date, start/end time, slot duration in minutes, status).
+  - `ptmSlots` table: Auto-generated individual parent-teacher meeting time slots (`available`, `reserved`, `completed`, `cancelled`) with teacher assignment and parent reservation capabilities.
+  - Endpoints:
+    - Admin: `GET/POST /api/v1/admin/operations/calendar/events`, `DELETE /api/v1/admin/operations/calendar/events/:id`, `GET/POST /api/v1/admin/operations/ptm/schedules`, `POST /api/v1/admin/operations/ptm/schedules/:id/generate-slots`, `GET /api/v1/admin/operations/ptm/schedules/:id/slots`.
+    - Teacher: `GET /api/v1/teacher/ptm/slots`, `PUT /api/v1/teacher/ptm/slots/:id/status`.
+    - Portal: `GET /api/v1/portal/calendar/events`, `GET /api/v1/portal/ptm/slots`, `POST /api/v1/portal/ptm/slots/:id/reserve`.
+- **Frontend (Flutter):**
+  - Implemented `AdminOperationsView` in `apps/flutter_app/lib/src/features/admin/views/admin_operations_view.dart`:
+    - Tab 1: **Leaves & Substitutes** with stats strip, student/staff leave lists, status badge, review modal, and substitute suggestion engine trigger.
+    - Tab 2: **Transport Fleet** with vehicle and driver rosters, route details, and vehicle registration dialog.
+    - Tab 3: **Official Certificates** with serial tracking, verification codes, revoke actions, and certificate issuance modal.
+    - Tab 4: **Calendar & PTM** with institutional events list, event creation dialog, PTM sessions with automatic slot generation modal.
+  - Integrated `AdminNavSection.operations` into `AdminDashboard` with navigation switcher, sidebar item, and operations badge.
+  - Added all Phase 12 API methods to `ApiClient`.
+- **Verification:**
+  - Backend: 11/11 Vitest test suites passing (112 passed, 1 skipped).
+  - TypeScript: 0 typecheck errors (`npm run typecheck --prefix services/api`).
+  - Frontend: 75/75 Flutter unit/widget tests passing (`flutter test`).
+  - Lint: 0 analyzer warnings (`flutter analyze apps/flutter_app`).
+
+---
+
 ## Phase 11: Enterprise Roles, DPDP Compliance & Financial Depth
 
 ### Summary

@@ -355,6 +355,8 @@ export const createAdmissionApplicationSchema = z.object({
   previousSchool: z.string().trim().max(160).nullable().optional(),
   applicationDate: z.iso.date().optional(),
   status: z.enum(['inquiry', 'applied', 'under_review', 'approved', 'enrolled', 'rejected']).default('applied'),
+  quotaCategory: z.enum(['general', 'rte', 'sibling', 'staff_child', 'management']).default('general'),
+  casteCategory: z.enum(['general', 'obc', 'sc', 'st', 'ews']).default('general'),
   notes: z.string().trim().max(500).nullable().optional(),
   documents: z
     .array(
@@ -382,6 +384,7 @@ export const admissionQuerySchema = z.object({
   academicYearId: z.uuid().optional(),
   classId: z.uuid().optional(),
   status: z.enum(['inquiry', 'applied', 'under_review', 'approved', 'enrolled', 'rejected']).optional(),
+  quotaCategory: z.enum(['general', 'rte', 'sibling', 'staff_child', 'management']).optional(),
   search: z.string().trim().max(100).optional(),
 });
 
@@ -549,5 +552,149 @@ export const createFeeStructureHeadSchema = z.object({
   headName: z.string().trim().min(2).max(80),
   amount: z.number().int().min(0),
   isOptional: z.boolean().default(false),
+});
+
+// Phase 12: School Operations & Daily Differentiators
+
+export const createStudentLeaveSchema = z.object({
+  studentId: z.uuid().optional(),
+  startDate: z.iso.date(),
+  endDate: z.iso.date(),
+  reason: z.string().trim().min(2).max(500),
+  documentUrl: z.string().trim().url().nullable().optional(),
+});
+
+export const updateStudentLeaveStatusSchema = z.object({
+  status: z.enum(['approved', 'rejected']),
+  reviewerNotes: z.string().trim().max(300).nullable().optional(),
+});
+
+export const createStaffLeaveSchema = z.object({
+  staffId: z.uuid().optional(),
+  leaveType: z.enum(['casual', 'sick', 'earned', 'maternity_paternity', 'unpaid']).default('casual'),
+  startDate: z.iso.date(),
+  endDate: z.iso.date(),
+  reason: z.string().trim().min(2).max(500),
+});
+
+export const updateStaffLeaveStatusSchema = z.object({
+  status: z.enum(['approved', 'rejected']),
+  reviewerNotes: z.string().trim().max(300).nullable().optional(),
+});
+
+export const createTransportVehicleSchema = z.object({
+  vehicleNumber: z.string().trim().min(2).max(30),
+  model: z.string().trim().min(2).max(60),
+  capacity: z.number().int().positive(),
+  insuranceExpiry: z.iso.date().nullable().optional(),
+  pollutionExpiry: z.iso.date().nullable().optional(),
+  status: z.enum(['active', 'maintenance', 'retired']).default('active'),
+});
+
+export const createTransportDriverSchema = z.object({
+  fullName: z.string().trim().min(2).max(100),
+  phone: z.string().trim().min(7).max(20),
+  licenseNumber: z.string().trim().min(3).max(50),
+  licenseExpiry: z.iso.date().nullable().optional(),
+  status: z.enum(['active', 'on_leave', 'inactive']).default('active'),
+});
+
+export const createTransportRouteSchema = z.object({
+  routeNumber: z.string().trim().min(1).max(20),
+  routeName: z.string().trim().min(2).max(100),
+  startPoint: z.string().trim().min(2).max(120),
+  endPoint: z.string().trim().min(2).max(120),
+  vehicleId: z.uuid().nullable().optional(),
+  driverId: z.uuid().nullable().optional(),
+  status: z.enum(['active', 'inactive']).default('active'),
+});
+
+export const createTransportStopSchema = z.object({
+  routeId: z.uuid(),
+  stopName: z.string().trim().min(2).max(100),
+  pickupTime: z.string().trim().regex(/^\d{1,2}:\d{2}$/, 'Invalid time (HH:MM)'),
+  dropTime: z.string().trim().regex(/^\d{1,2}:\d{2}$/, 'Invalid time (HH:MM)'),
+  stopOrder: z.number().int().default(1),
+  monthlyFeeAmount: z.number().int().default(0),
+  latitude: z.union([z.string(), z.number().transform((n) => String(n))]).optional(),
+  longitude: z.union([z.string(), z.number().transform((n) => String(n))]).optional(),
+});
+
+export const createTransportAllocationSchema = z.object({
+  studentId: z.uuid(),
+  routeId: z.uuid(),
+  stopId: z.uuid(),
+  academicYearId: z.uuid().optional(),
+  startDate: z.iso.date().optional(),
+  endDate: z.iso.date().nullable().optional(),
+});
+
+export const createTransportLogSchema = z.object({
+  routeId: z.uuid(),
+  date: z.iso.date().optional(),
+  tripType: z.enum(['pickup', 'drop']),
+  status: z.enum(['scheduled', 'in_transit', 'completed', 'delayed']).default('scheduled'),
+  currentStopId: z.uuid().nullable().optional(),
+  notes: z.string().trim().max(300).nullable().optional(),
+});
+
+export const issueCertificateSchema = z.object({
+  studentId: z.uuid(),
+  certificateType: z.enum(['transfer_certificate', 'bonafide', 'character_conduct']),
+  academicYearId: z.uuid().optional(),
+  issueDate: z.iso.date().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const revokeCertificateSchema = z.object({
+  reason: z.string().trim().max(300).optional(),
+});
+
+export const publicInquirySchema = z.object({
+  schoolCode: z.string().trim().min(1),
+  applicantName: z.string().trim().min(2).max(100),
+  dateOfBirth: z.iso.date().nullable().optional(),
+  gender: z.enum(['male', 'female', 'other']).nullable().optional(),
+  parentName: z.string().trim().min(2).max(100),
+  parentEmail: z.string().trim().email().nullable().optional(),
+  parentPhone: z.string().trim().min(7).max(20),
+  applyingForClassId: z.uuid().nullable().optional(),
+  address: z.string().trim().max(300).nullable().optional(),
+  previousSchool: z.string().trim().max(160).nullable().optional(),
+  quotaCategory: z.enum(['general', 'rte', 'sibling', 'staff_child', 'management']).default('general'),
+  casteCategory: z.enum(['general', 'obc', 'sc', 'st', 'ews']).default('general'),
+  notes: z.string().trim().max(500).nullable().optional(),
+});
+
+export const createCalendarEventSchema = z.object({
+  academicYearId: z.uuid().optional(),
+  title: z.string().trim().min(2).max(120),
+  description: z.string().trim().max(500).nullable().optional(),
+  eventType: z.enum(['holiday', 'exam', 'sports', 'cultural', 'ptm', 'meeting', 'other']).default('holiday'),
+  startDate: z.iso.date(),
+  endDate: z.iso.date(),
+  isAllDay: z.boolean().default(true),
+  targetAudience: z.enum(['all', 'teachers', 'students', 'parents']).default('all'),
+});
+
+export const createPtmScheduleSchema = z.object({
+  academicYearId: z.uuid().optional(),
+  title: z.string().trim().min(2).max(120),
+  eventDate: z.iso.date(),
+  startTime: z.string().trim().regex(/^\d{1,2}:\d{2}$/, 'Invalid time (HH:MM)'),
+  endTime: z.string().trim().regex(/^\d{1,2}:\d{2}$/, 'Invalid time (HH:MM)'),
+  slotDurationMinutes: z.number().int().min(5).max(60).default(15),
+  teacherStaffIds: z.array(z.uuid()).optional(),
+});
+
+export const bookPtmSlotSchema = z.object({
+  slotId: z.uuid(),
+  studentId: z.uuid().optional(),
+  parentNotes: z.string().trim().max(300).nullable().optional(),
+});
+
+export const updatePtmSlotNotesSchema = z.object({
+  teacherNotes: z.string().trim().max(500).optional(),
+  status: z.enum(['available', 'booked', 'completed', 'cancelled']).optional(),
 });
 

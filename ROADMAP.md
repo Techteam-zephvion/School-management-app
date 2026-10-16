@@ -7,14 +7,16 @@ Schoolic already covers the core: attendance, timetable, homework, exams, fees w
 ## Current Status & Git Baseline
 
 * **Repository Health:**
-  * Backend API (`vitest`): 85/85 tests passing (84 passed, 1 live gateway test skipped when unconfigured).
+  * Backend API (`vitest`): 112/113 tests passing (112 passed, 1 live gateway test skipped when unconfigured).
   * Backend Typecheck (`tsc --noEmit`): 0 errors.
   * Flutter App (`flutter analyze`): 0 issues found.
-  * Flutter Test Suite (`flutter test`): 63/63 tests passing.
+  * Flutter Test Suite (`flutter test`): 75/75 tests passing.
 * **Process Status:**
   * **Phase 9 (Foundation Fixes, R2 Storage & Production Hardening):** Fully completed.
   * **Phase 10 (Institutional Onboarding & High-Impact Communication):** Fully completed.
-  * **Phase 11 (Enterprise Roles, DPDP Compliance & Financial Depth):** Ready to execute.
+  * **Phase 11 (Enterprise Roles, DPDP Compliance & Financial Depth):** Fully completed.
+  * **Phase 12 (School Operations & Daily Differentiators):** Fully completed.
+  * **Phase 13 (Academic Depth, Regional Languages & Offline App):** Ready to execute.
 
 ---
 
@@ -108,9 +110,12 @@ Schoolic already covers the core: attendance, timetable, homework, exams, fees w
 
 ---
 
-## Phase 12: School Operations & Daily Differentiators
+## Phase 12: School Operations & Daily Differentiators [COMPLETED]
 
-> **Focus:** Solving common, daily operational headaches that sell the platform to school principals.
+> **Status: COMPLETED & FULLY VERIFIED (100%)**
+> - **Backend:** Leave management for students and staff with timetable substitute suggestion engine (`suggestStaffLeaveSubstitutes`), school transport management (vehicles, drivers, routes, stops, student transport allocations, live checkpoint logs), verifiable official certificate generator (Transfer Certificate, Bonafide, Conduct) with public verification codes, public inquiries and school profile feeding into admissions with RTE/caste metadata, and institutional calendar & PTM time-slot reservation system.
+> - **Frontend (Flutter):** `AdminOperationsView` with 4 operational tabs (Leaves & Substitutes, Transport Fleet, Official Certificates, Calendar & PTM), action modals for leave review, vehicle/route registration, certificate issuance, and PTM slot generation.
+> - **Verification:** 11 backend test files passing (112 passed, 1 skipped), 0 TypeScript errors (`tsc --noEmit`), 75/75 Flutter tests passing (`flutter test`), 0 analyzer issues (`flutter analyze`).
 
 ### Deliverables:
 1. **Student & Staff Leave Management:**

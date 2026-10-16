@@ -65,6 +65,48 @@ export const consentStatusEnum = pgEnum('consent_status', ['granted', 'revoked',
 export const dsrStatusEnum = pgEnum('dsr_status', ['pending', 'in_review', 'fulfilled', 'rejected']);
 export const concessionTypeEnum = pgEnum('concession_type', ['percentage', 'flat']);
 export const feeRefundStatusEnum = pgEnum('fee_refund_status', ['pending', 'approved', 'processed', 'rejected']);
+export const leaveTypeEnum = pgEnum('leave_type', [
+  'casual',
+  'sick',
+  'earned',
+  'maternity_paternity',
+  'unpaid',
+]);
+export const leaveStatusEnum = pgEnum('leave_status', [
+  'pending',
+  'approved',
+  'rejected',
+]);
+export const certificateTypeEnum = pgEnum('certificate_type', [
+  'transfer_certificate',
+  'bonafide',
+  'character_conduct',
+]);
+export const certificateStatusEnum = pgEnum('certificate_status', [
+  'valid',
+  'revoked',
+]);
+export const calendarEventTypeEnum = pgEnum('calendar_event_type', [
+  'holiday',
+  'exam',
+  'sports',
+  'cultural',
+  'ptm',
+  'meeting',
+  'other',
+]);
+export const ptmStatusEnum = pgEnum('ptm_status', [
+  'scheduled',
+  'in_progress',
+  'completed',
+  'cancelled',
+]);
+export const ptmSlotStatusEnum = pgEnum('ptm_slot_status', [
+  'available',
+  'booked',
+  'completed',
+  'cancelled',
+]);
 
 
 const timestamps = {
@@ -552,6 +594,8 @@ export const admissionApplications = pgTable(
     decisionDate: date('decision_date'),
     enrolledStudentId: uuid('enrolled_student_id').references(() => students.id, { onDelete: 'set null' }),
     notes: text('notes'),
+    quotaCategory: text('quota_category').default('general').notNull(), // 'general', 'rte', 'sibling', 'staff_child', 'management'
+    casteCategory: text('caste_category').default('general').notNull(), // 'general', 'obc', 'sc', 'st', 'ews'
     ...timestamps,
   },
   (table) => [
@@ -847,6 +891,250 @@ export const feeRefunds = pgTable(
     index('fee_refunds_alloc_idx').on(table.schoolId, table.allocationId),
     index('fee_refunds_student_idx').on(table.schoolId, table.studentId),
     index('fee_refunds_status_idx').on(table.schoolId, table.status),
+  ],
+);
+
+export const studentLeaves = pgTable(
+  'student_leaves',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+    startDate: date('start_date').notNull(),
+    endDate: date('end_date').notNull(),
+    reason: text('reason').notNull(),
+    documentUrl: text('document_url'),
+    status: leaveStatusEnum('status').default('pending').notNull(),
+    reviewedByStaffId: uuid('reviewed_by_staff_id').references(() => staff.id, { onDelete: 'set null' }),
+    reviewerNotes: text('reviewer_notes'),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index('student_leaves_student_idx').on(table.schoolId, table.studentId),
+    index('student_leaves_status_idx').on(table.schoolId, table.status),
+  ],
+);
+
+export const staffLeaves = pgTable(
+  'staff_leaves',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    staffId: uuid('staff_id').notNull().references(() => staff.id, { onDelete: 'cascade' }),
+    leaveType: leaveTypeEnum('leave_type').default('casual').notNull(),
+    startDate: date('start_date').notNull(),
+    endDate: date('end_date').notNull(),
+    reason: text('reason').notNull(),
+    status: leaveStatusEnum('status').default('pending').notNull(),
+    reviewedByUserId: uuid('reviewed_by_user_id').references(() => appUsers.id, { onDelete: 'set null' }),
+    reviewerNotes: text('reviewer_notes'),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index('staff_leaves_staff_idx').on(table.schoolId, table.staffId),
+    index('staff_leaves_status_idx').on(table.schoolId, table.status),
+  ],
+);
+
+export const transportVehicles = pgTable(
+  'transport_vehicles',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    vehicleNumber: text('vehicle_number').notNull(),
+    model: text('model').notNull(),
+    capacity: integer('capacity').notNull(),
+    insuranceExpiry: date('insurance_expiry'),
+    pollutionExpiry: date('pollution_expiry'),
+    status: text('status').default('active').notNull(), // 'active', 'maintenance', 'retired'
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.schoolId, table.vehicleNumber),
+    index('transport_vehicles_status_idx').on(table.schoolId, table.status),
+  ],
+);
+
+export const transportDrivers = pgTable(
+  'transport_drivers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    fullName: text('full_name').notNull(),
+    phone: text('phone').notNull(),
+    licenseNumber: text('license_number').notNull(),
+    licenseExpiry: date('license_expiry'),
+    status: text('status').default('active').notNull(), // 'active', 'on_leave', 'inactive'
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.schoolId, table.licenseNumber),
+    index('transport_drivers_status_idx').on(table.schoolId, table.status),
+  ],
+);
+
+export const transportRoutes = pgTable(
+  'transport_routes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    routeNumber: text('route_number').notNull(),
+    routeName: text('route_name').notNull(),
+    startPoint: text('start_point').notNull(),
+    endPoint: text('end_point').notNull(),
+    vehicleId: uuid('vehicle_id').references(() => transportVehicles.id, { onDelete: 'set null' }),
+    driverId: uuid('driver_id').references(() => transportDrivers.id, { onDelete: 'set null' }),
+    status: text('status').default('active').notNull(), // 'active', 'inactive'
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.schoolId, table.routeNumber),
+    index('transport_routes_status_idx').on(table.schoolId, table.status),
+  ],
+);
+
+export const transportStops = pgTable(
+  'transport_stops',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    routeId: uuid('route_id').notNull().references(() => transportRoutes.id, { onDelete: 'cascade' }),
+    stopName: text('stop_name').notNull(),
+    pickupTime: text('pickup_time').notNull(),
+    dropTime: text('drop_time').notNull(),
+    stopOrder: integer('stop_order').default(1).notNull(),
+    monthlyFeeAmount: integer('monthly_fee_amount').default(0).notNull(),
+    latitude: text('latitude'),
+    longitude: text('longitude'),
+    ...timestamps,
+  },
+  (table) => [
+    index('transport_stops_route_idx').on(table.schoolId, table.routeId, table.stopOrder),
+  ],
+);
+
+export const studentTransportAllocations = pgTable(
+  'student_transport_allocations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+    routeId: uuid('route_id').notNull().references(() => transportRoutes.id, { onDelete: 'cascade' }),
+    stopId: uuid('stop_id').notNull().references(() => transportStops.id, { onDelete: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull().references(() => academicYears.id, { onDelete: 'cascade' }),
+    status: text('status').default('active').notNull(), // 'active', 'inactive'
+    startDate: date('start_date').notNull(),
+    endDate: date('end_date'),
+    ...timestamps,
+  },
+  (table) => [
+    index('transport_alloc_student_idx').on(table.schoolId, table.studentId),
+    index('transport_alloc_route_idx').on(table.schoolId, table.routeId),
+  ],
+);
+
+export const transportLogs = pgTable(
+  'transport_logs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    routeId: uuid('route_id').notNull().references(() => transportRoutes.id, { onDelete: 'cascade' }),
+    date: date('date').notNull(),
+    tripType: text('trip_type').notNull(), // 'pickup', 'drop'
+    status: text('status').default('scheduled').notNull(), // 'scheduled', 'in_transit', 'completed', 'delayed'
+    currentStopId: uuid('current_stop_id').references(() => transportStops.id, { onDelete: 'set null' }),
+    notes: text('notes'),
+    ...timestamps,
+  },
+  (table) => [
+    index('transport_logs_route_date_idx').on(table.schoolId, table.routeId, table.date),
+  ],
+);
+
+export const issuedCertificates = pgTable(
+  'issued_certificates',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+    certificateType: certificateTypeEnum('certificate_type').notNull(),
+    certificateNumber: text('certificate_number').notNull(),
+    academicYearId: uuid('academic_year_id').references(() => academicYears.id, { onDelete: 'set null' }),
+    issueDate: date('issue_date').notNull(),
+    verificationCode: text('verification_code').notNull(),
+    metadata: jsonb('metadata'),
+    issuedByStaffId: uuid('issued_by_staff_id').references(() => staff.id, { onDelete: 'set null' }),
+    status: certificateStatusEnum('status').default('valid').notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.schoolId, table.certificateNumber),
+    unique().on(table.verificationCode),
+    index('issued_cert_student_idx').on(table.schoolId, table.studentId),
+    index('issued_cert_type_idx').on(table.schoolId, table.certificateType),
+  ],
+);
+
+export const calendarEvents = pgTable(
+  'calendar_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    academicYearId: uuid('academic_year_id').references(() => academicYears.id, { onDelete: 'set null' }),
+    title: text('title').notNull(),
+    description: text('description'),
+    eventType: calendarEventTypeEnum('event_type').default('holiday').notNull(),
+    startDate: date('start_date').notNull(),
+    endDate: date('end_date').notNull(),
+    isAllDay: boolean('is_all_day').default(true).notNull(),
+    targetAudience: text('target_audience').default('all').notNull(), // 'all', 'teachers', 'students', 'parents'
+    ...timestamps,
+  },
+  (table) => [
+    index('calendar_events_date_idx').on(table.schoolId, table.startDate, table.endDate),
+    index('calendar_events_type_idx').on(table.schoolId, table.eventType),
+  ],
+);
+
+export const ptmSchedules = pgTable(
+  'ptm_schedules',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    academicYearId: uuid('academic_year_id').references(() => academicYears.id, { onDelete: 'set null' }),
+    title: text('title').notNull(),
+    eventDate: date('event_date').notNull(),
+    startTime: text('start_time').notNull(),
+    endTime: text('end_time').notNull(),
+    slotDurationMinutes: integer('slot_duration_minutes').default(15).notNull(),
+    status: ptmStatusEnum('status').default('scheduled').notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index('ptm_schedules_date_idx').on(table.schoolId, table.eventDate),
+  ],
+);
+
+export const ptmSlots = pgTable(
+  'ptm_slots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    scheduleId: uuid('schedule_id').notNull().references(() => ptmSchedules.id, { onDelete: 'cascade' }),
+    teacherStaffId: uuid('teacher_staff_id').notNull().references(() => staff.id, { onDelete: 'cascade' }),
+    startTime: text('start_time').notNull(),
+    endTime: text('end_time').notNull(),
+    status: ptmSlotStatusEnum('status').default('available').notNull(),
+    bookedByStudentId: uuid('booked_by_student_id').references(() => students.id, { onDelete: 'set null' }),
+    parentNotes: text('parent_notes'),
+    teacherNotes: text('teacher_notes'),
+    ...timestamps,
+  },
+  (table) => [
+    index('ptm_slots_sched_teacher_idx').on(table.schoolId, table.scheduleId, table.teacherStaffId),
+    index('ptm_slots_student_idx').on(table.schoolId, table.bookedByStudentId),
   ],
 );
 
