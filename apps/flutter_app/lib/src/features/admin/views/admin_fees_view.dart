@@ -43,6 +43,8 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
   List<Map<String, Object?>> _structures = const [];
   List<Map<String, Object?>> _allocations = const [];
   List<Map<String, Object?>> _payments = const [];
+  List<Map<String, Object?>> _concessions = const [];
+  List<Map<String, Object?>> _refunds = const [];
 
   String? _filterClassId;
   String? _filterSectionId;
@@ -81,6 +83,8 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
       final structures = await api.getList('/api/v1/admin/fees/structures', session: session);
       final allocations = await api.getList('/api/v1/admin/fees/allocations', session: session);
       final payments = await api.getList('/api/v1/admin/fees/payments', session: session);
+      final concessions = await api.listFeeConcessions(session: session);
+      final refunds = await api.listFeeRefunds(session: session);
 
       if (!mounted) return;
       setState(() {
@@ -88,6 +92,8 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
         _structures = structures;
         _allocations = allocations;
         _payments = payments;
+        _concessions = concessions;
+        _refunds = refunds;
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -171,8 +177,12 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
           _buildAllocationsTab()
         else if (_activeTab == 'structures')
           _buildStructuresTab()
+        else if (_activeTab == 'payments')
+          _buildPaymentsTab()
+        else if (_activeTab == 'concessions')
+          _buildConcessionsTab()
         else
-          _buildPaymentsTab(),
+          _buildRefundsTab(),
       ],
     );
   }
@@ -223,6 +233,10 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
             _navTab('structures', 'Fee Structures (${_structures.length})'),
             const SizedBox(width: 24),
             _navTab('payments', 'Receipts Ledger (${_payments.length})'),
+            const SizedBox(width: 24),
+            _navTab('concessions', 'Concessions & Waivers (${_concessions.length})'),
+            const SizedBox(width: 24),
+            _navTab('refunds', 'Refunds (${_refunds.length})'),
           ],
         ),
       ),
@@ -610,6 +624,316 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
           _loadFeeData();
           setState(() => _notice = 'Payment recorded. Receipt ${receipt['receiptNumber']} issued.');
         },
+      ),
+    );
+  }
+
+  Widget _buildConcessionsTab() {
+    if (_concessions.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildSubHeader('Fee Concessions & Scholarships', _openAddConcessionDialog),
+          const SizedBox(height: 24),
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Text(
+                'No fee concessions configured yet.',
+                style: TextStyle(color: AppColors.secondaryText),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildSubHeader('Fee Concessions & Scholarships', _openAddConcessionDialog),
+        const SizedBox(height: 16),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.secondaryBackground,
+            borderRadius: AppRadii.rMd,
+            border: Border.all(color: AppColors.primaryBorder),
+          ),
+          child: DataTable(
+            columns: const [
+              DataColumn(label: Text('Concession Name')),
+              DataColumn(label: Text('Code')),
+              DataColumn(label: Text('Category')),
+              DataColumn(label: Text('Discount Value')),
+              DataColumn(label: Text('Status')),
+            ],
+            rows: _concessions.map((c) {
+              final type = c['type'] as String? ?? 'flat';
+              final val = (c['value'] as num?)?.toInt() ?? 0;
+              final displayVal = type == 'percentage' ? '$val%' : _currencyFormat.format(val);
+
+              return DataRow(
+                cells: [
+                  DataCell(Text(c['name'] as String? ?? '—', style: const TextStyle(fontWeight: FontWeight.w600))),
+                  DataCell(Text(c['code'] as String? ?? '—', style: const TextStyle(fontFamily: 'monospace'))),
+                  DataCell(Text((c['category'] as String? ?? 'merit').toUpperCase())),
+                  DataCell(Text(displayVal, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.statusSuccess))),
+                  const DataCell(StatusBadge(label: 'ACTIVE', tone: BadgeTone.success)),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRefundsTab() {
+    if (_refunds.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildSubHeader('Fee Refunds Ledger', _openAddRefundDialog),
+          const SizedBox(height: 24),
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Text(
+                'No payment refunds issued yet.',
+                style: TextStyle(color: AppColors.secondaryText),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildSubHeader('Fee Refunds Ledger', _openAddRefundDialog),
+        const SizedBox(height: 16),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.secondaryBackground,
+            borderRadius: AppRadii.rMd,
+            border: Border.all(color: AppColors.primaryBorder),
+          ),
+          child: DataTable(
+            columns: const [
+              DataColumn(label: Text('Refund #')),
+              DataColumn(label: Text('Student')),
+              DataColumn(label: Text('Amount')),
+              DataColumn(label: Text('Mode')),
+              DataColumn(label: Text('Reason')),
+              DataColumn(label: Text('Status')),
+            ],
+            rows: _refunds.map((r) {
+              final amount = (r['amount'] as num?)?.toInt() ?? 0;
+              final status = (r['status'] as String? ?? 'pending').toLowerCase();
+
+              return DataRow(
+                cells: [
+                  DataCell(Text(r['refundNumber'] as String? ?? '—', style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w600))),
+                  DataCell(Text(r['studentName'] as String? ?? 'Student')),
+                  DataCell(Text(_currencyFormat.format(amount), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.accent))),
+                  DataCell(Text((r['mode'] as String? ?? 'bank_transfer').toUpperCase())),
+                  DataCell(Text(r['reason'] as String? ?? '—')),
+                  DataCell(StatusBadge(
+                    label: status.toUpperCase(),
+                    tone: status == 'processed' || status == 'approved' ? BadgeTone.success : BadgeTone.neutral,
+                  )),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubHeader(String title, VoidCallback onAdd) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        FilledButton.icon(
+          onPressed: onAdd,
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('Add Record'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openAddConcessionDialog() async {
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+
+    final nameController = TextEditingController();
+    final codeController = TextEditingController();
+    final valueController = TextEditingController();
+    String type = 'percentage';
+    String category = 'merit';
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          title: const Text('Create Fee Concession Policy'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Concession Name *')),
+              const SizedBox(height: 12),
+              TextField(controller: codeController, decoration: const InputDecoration(labelText: 'Policy Code * (e.g. SIBLING15)')),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: type,
+                decoration: const InputDecoration(labelText: 'Discount Type'),
+                items: const [
+                  DropdownMenuItem(value: 'percentage', child: Text('Percentage (%)')),
+                  DropdownMenuItem(value: 'flat', child: Text('Flat Amount (₹)')),
+                ],
+                onChanged: (val) => setDialogState(() => type = val ?? 'percentage'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: valueController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(labelText: type == 'percentage' ? 'Percentage (e.g. 15)' : 'Amount in ₹'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: category,
+                decoration: const InputDecoration(labelText: 'Category'),
+                items: const [
+                  DropdownMenuItem(value: 'merit', child: Text('Merit Scholarship')),
+                  DropdownMenuItem(value: 'sibling', child: Text('Sibling Discount')),
+                  DropdownMenuItem(value: 'staff_ward', child: Text('Staff Ward')),
+                  DropdownMenuItem(value: 'financial_aid', child: Text('Financial Aid / EWS')),
+                  DropdownMenuItem(value: 'sports', child: Text('Sports Quota')),
+                ],
+                onChanged: (val) => setDialogState(() => category = val ?? 'merit'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () async {
+                final val = int.tryParse(valueController.text.trim()) ?? 0;
+                if (nameController.text.trim().isEmpty || codeController.text.trim().isEmpty || val <= 0) {
+                  return;
+                }
+                Navigator.pop(ctx);
+                try {
+                  await ref.read(apiClientProvider).createFeeConcession(
+                    session: session,
+                    name: nameController.text.trim(),
+                    code: codeController.text.trim(),
+                    type: type,
+                    value: val,
+                    category: category,
+                  );
+                  setState(() => _notice = 'Concession policy created.');
+                  await _loadFeeData();
+                } catch (e) {
+                  setState(() => _error = 'Failed to create concession: $e');
+                }
+              },
+              child: const Text('Create Policy'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openAddRefundDialog() async {
+    final session = ref.read(authControllerProvider).session;
+    if (session == null || _allocations.isEmpty) return;
+
+    String? selectedAllocationId = _allocations.first['id'] as String?;
+    final amountController = TextEditingController();
+    final reasonController = TextEditingController();
+    String mode = 'bank_transfer';
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          title: const Text('Issue Fee Refund'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: selectedAllocationId,
+                decoration: const InputDecoration(labelText: 'Select Student Allocation *'),
+                items: _allocations
+                    .map((a) => DropdownMenuItem(
+                          value: a['id'] as String?,
+                          child: Text('${a['studentName']} — ${a['feeStructureName']}'),
+                        ))
+                    .toList(),
+                onChanged: (val) => setDialogState(() => selectedAllocationId = val),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: amountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Refund Amount (₹) *'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(labelText: 'Reason for Refund *'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: mode,
+                decoration: const InputDecoration(labelText: 'Payment Mode'),
+                items: const [
+                  DropdownMenuItem(value: 'bank_transfer', child: Text('Bank Transfer (NEFT/RTGS)')),
+                  DropdownMenuItem(value: 'cash', child: Text('Cash Counter')),
+                  DropdownMenuItem(value: 'cheque', child: Text('Cheque')),
+                  DropdownMenuItem(value: 'gateway_refund', child: Text('Payment Gateway (Cashfree)')),
+                ],
+                onChanged: (val) => setDialogState(() => mode = val ?? 'bank_transfer'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () async {
+                final amt = int.tryParse(amountController.text.trim()) ?? 0;
+                if (selectedAllocationId == null || amt <= 0 || reasonController.text.trim().isEmpty) {
+                  return;
+                }
+                final alloc = _allocations.firstWhere((a) => a['id'] == selectedAllocationId);
+                final studentId = alloc['studentId'] as String;
+
+                Navigator.pop(ctx);
+                try {
+                  await ref.read(apiClientProvider).createFeeRefund(
+                    session: session,
+                    allocationId: selectedAllocationId!,
+                    studentId: studentId,
+                    amount: amt,
+                    reason: reasonController.text.trim(),
+                    mode: mode,
+                  );
+                  setState(() => _notice = 'Refund request recorded successfully.');
+                  await _loadFeeData();
+                } catch (e) {
+                  setState(() => _error = 'Failed to record refund: $e');
+                }
+              },
+              child: const Text('Submit Refund'),
+            ),
+          ],
+        ),
       ),
     );
   }

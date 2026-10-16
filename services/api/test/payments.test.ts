@@ -98,6 +98,48 @@ describe('Payment Validation & Gateway Tests', () => {
     expect(tampered).toBe(false);
   });
 
+  it('rejects replayed webhooks when timestamp skew exceeds maximum tolerance', async () => {
+    const secret = 'test_secret_key_12345';
+    const currentTimeMs = 1728900000000;
+    const freshTimestamp = String(Math.floor(currentTimeMs / 1000));
+    const rawBody = JSON.stringify({ type: 'PAYMENT_SUCCESS_WEBHOOK', order: { order_id: 'SCH_123' } });
+
+    // Compute valid signature
+    const data = `${freshTimestamp}${rawBody}`;
+    const encoder = new TextEncoder();
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    );
+    const signatureBytes = await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(data));
+    const validSignature = btoa(String.fromCharCode(...new Uint8Array(signatureBytes)));
+
+    // Fresh timestamp passes
+    const freshVerified = await CashfreeClient.verifyWebhookSignature({
+      rawBody,
+      signature: validSignature,
+      timestamp: freshTimestamp,
+      secretKey: secret,
+      maxSkewMs: 5 * 60 * 1000,
+      currentTimeMs,
+    });
+    expect(freshVerified).toBe(true);
+
+    // Replay attack: 10 minutes later (600,000 ms skew > 300,000 ms limit)
+    const replayedVerified = await CashfreeClient.verifyWebhookSignature({
+      rawBody,
+      signature: validSignature,
+      timestamp: freshTimestamp,
+      secretKey: secret,
+      maxSkewMs: 5 * 60 * 1000,
+      currentTimeMs: currentTimeMs + 10 * 60 * 1000,
+    });
+    expect(replayedVerified).toBe(false);
+  });
+
   it.runIf(Boolean(process.env.CASHFREE_SECRET_KEY))(
     'interacts directly with live Cashfree Sandbox using provided sandbox credentials',
     async () => {

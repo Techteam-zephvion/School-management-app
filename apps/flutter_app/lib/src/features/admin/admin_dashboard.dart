@@ -32,6 +32,8 @@ import 'views/admin_settings_view.dart';
 import 'views/admin_staff_view.dart';
 import 'views/admin_students_view.dart';
 import 'views/admin_timetable_view.dart';
+import 'views/admin_communications_view.dart';
+import 'views/admin_compliance_view.dart';
 
 enum AdminNavSection {
   overview,
@@ -47,6 +49,8 @@ enum AdminNavSection {
   timetable,
   exams,
   fees,
+  communications,
+  compliance,
   reports,
   settings,
 }
@@ -528,6 +532,18 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
                     isDrawer: isDrawer,
                   ),
                   _sidebarItem(
+                    AdminNavSection.communications,
+                    Icons.campaign_outlined,
+                    'Communications & Import',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
+                    AdminNavSection.compliance,
+                    Icons.verified_user_outlined,
+                    'DPDP & Compliance',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
                     AdminNavSection.reports,
                     Icons.analytics_outlined,
                     'Reports',
@@ -910,6 +926,10 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
         return 'Exams & Marks';
       case AdminNavSection.fees:
         return 'Fees & Finance';
+      case AdminNavSection.communications:
+        return 'Communications & Import';
+      case AdminNavSection.compliance:
+        return 'DPDP & Compliance';
       case AdminNavSection.reports:
         return 'Reports & Export';
       case AdminNavSection.settings:
@@ -1052,6 +1072,17 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
           classes: _classes,
           sections: _sections,
           reload: _load,
+        );
+      case AdminNavSection.communications:
+        return AdminCommunicationsView(
+          years: _years,
+          classes: _classes,
+          sections: _sections,
+          reload: _load,
+        );
+      case AdminNavSection.compliance:
+        return AdminComplianceView(
+          students: _students,
         );
       case AdminNavSection.reports:
         return AdminReportsView(

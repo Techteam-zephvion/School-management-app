@@ -32,8 +32,15 @@ export interface CashfreePaymentRecord {
   bankReference?: string | undefined;
 }
 
+export type CashfreeEnv = Partial<Env> & {
+  CASHFREE_APP_ID?: string;
+  CASHFREE_SECRET_KEY?: string;
+  CASHFREE_ENV?: 'sandbox' | 'production';
+  CASHFREE_API_VERSION?: string;
+};
+
 export class CashfreeClient {
-  constructor(private readonly env: Env) {}
+  constructor(private readonly env: CashfreeEnv) {}
 
   private get isConfigured(): boolean {
     return Boolean(this.env.CASHFREE_APP_ID && this.env.CASHFREE_SECRET_KEY);
@@ -239,8 +246,34 @@ export class CashfreeClient {
     signature: string;
     timestamp: string;
     secretKey: string;
+    maxSkewMs?: number;
+    currentTimeMs?: number;
   }): Promise<boolean> {
     if (!params.secretKey) return false;
+
+    // Webhook Replay Protection: validate timestamp skew if maxSkewMs is specified
+    if (params.maxSkewMs !== undefined && params.maxSkewMs > 0) {
+      let tsMs = Number(params.timestamp);
+      if (isNaN(tsMs)) {
+        tsMs = Date.parse(params.timestamp);
+      } else if (tsMs < 10_000_000_000) {
+        // Timestamp is in epoch seconds
+        tsMs = tsMs * 1000;
+      }
+
+      if (isNaN(tsMs)) {
+        console.warn('Invalid webhook timestamp header:', params.timestamp);
+        return false;
+      }
+
+      const now = params.currentTimeMs ?? Date.now();
+      const skew = Math.abs(now - tsMs);
+      if (skew > params.maxSkewMs) {
+        console.warn(`Webhook timestamp skew exceeded (${skew}ms > ${params.maxSkewMs}ms). Potential replay attack rejected.`);
+        return false;
+      }
+    }
+
     try {
       const data = `${params.timestamp}${params.rawBody}`;
       const encoder = new TextEncoder();

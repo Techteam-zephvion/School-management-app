@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { createDb } from '../db/client';
 import { appUsers, schools, userRoles } from '../db/schema';
 import { ApiError } from '../http/errors';
+import { rateLimiter } from '../http/rate-limiter';
 import type { AppBindings } from '../types';
 
 const bootstrapSchema = z.object({
@@ -28,6 +29,8 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 export const bootstrapRoutes = new Hono<AppBindings>();
+
+bootstrapRoutes.use('*', rateLimiter({ maxRequests: 10, windowSeconds: 60, keyPrefix: 'rl:bootstrap' }));
 
 bootstrapRoutes.post('/school', zValidator('json', bootstrapSchema), async (c) => {
   const token = c.req.header('x-bootstrap-token');

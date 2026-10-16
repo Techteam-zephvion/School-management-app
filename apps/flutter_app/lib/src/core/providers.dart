@@ -105,12 +105,18 @@ class AuthController extends ChangeNotifier {
 
     final devEmail = switch (role) {
       AppRole.admin => 'admin@schoolic.local',
+      AppRole.principal => 'principal@schoolic.local',
+      AppRole.accountant => 'accountant@schoolic.local',
+      AppRole.admissionsOfficer => 'admissions@schoolic.local',
       AppRole.teacher => 'teacher@schoolic.local',
       AppRole.student => 'student@schoolic.local',
       AppRole.parent => 'parent@schoolic.local',
     };
     final devNeonUserId = switch (role) {
       AppRole.admin => 'dev-admin',
+      AppRole.principal => 'dev-principal',
+      AppRole.accountant => 'dev-accountant',
+      AppRole.admissionsOfficer => 'dev-admissions',
       AppRole.teacher => 'dev-teacher',
       AppRole.student => 'dev-student',
       AppRole.parent => 'dev-parent',

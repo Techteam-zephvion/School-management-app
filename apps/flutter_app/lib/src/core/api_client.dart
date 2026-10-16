@@ -203,12 +203,20 @@ class ApiClient {
     }
   }
 
-  Future<List<Map<String, Object?>>> getList(String path, {required AuthSession session}) async {
+  Future<List<Map<String, Object?>>> getList(
+    String path, {
+    required AuthSession session,
+    Map<String, String>? queryParameters,
+  }) async {
     try {
+      final baseUri = Uri.parse('$apiBaseUrl$path');
+      final uri = queryParameters != null && queryParameters.isNotEmpty
+          ? baseUri.replace(queryParameters: {...baseUri.queryParameters, ...queryParameters})
+          : baseUri;
       final response = await _sendWithRetry(
         bearerToken: session.bearerToken,
         request: (token) => _httpClient.get(
-          Uri.parse('$apiBaseUrl$path'),
+          uri,
           headers: _headers(bearerToken: token, devSession: session),
         ),
       );
@@ -274,6 +282,73 @@ class ApiClient {
       {'orderId': orderId},
       session: session,
     );
+  }
+
+  Future<Map<String, Object?>> uploadAdmissionDocument({
+    required AuthSession session,
+    required String applicationId,
+    required String documentId,
+    required List<int> bytes,
+    required String fileName,
+    String? contentType,
+  }) async {
+    try {
+      final uri = Uri.parse('$apiBaseUrl/api/v1/admin/admissions/applications/$applicationId/documents/$documentId/upload');
+      final request = http.MultipartRequest('POST', uri);
+      final headers = _headers(bearerToken: session.bearerToken, devSession: session);
+      headers.remove('content-type');
+      request.headers.addAll(headers);
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: fileName,
+        ),
+      );
+
+      final streamedResponse = await _httpClient.send(request);
+      final response = await http.Response.fromStream(streamedResponse);
+      _ensureSuccess(response);
+      return _decode(response);
+    } on ApiException {
+      rethrow;
+    } on http.ClientException catch (exception) {
+      throw ApiException('Network connection error: ${exception.message}', 503);
+    } catch (exception) {
+      throw ApiException('Failed to upload document file.', 500);
+    }
+  }
+
+  Future<List<int>> downloadAdmissionDocument({
+    required AuthSession session,
+    required String applicationId,
+    required String documentId,
+  }) async {
+    try {
+      final uri = Uri.parse('$apiBaseUrl/api/v1/admin/admissions/applications/$applicationId/documents/$documentId/download');
+      final response = await _sendWithRetry(
+        bearerToken: session.bearerToken,
+        request: (token) => _httpClient.get(
+          uri,
+          headers: _headers(bearerToken: token, devSession: session),
+        ),
+      );
+      _ensureSuccess(response);
+      return response.bodyBytes;
+    } on ApiException {
+      rethrow;
+    } on http.ClientException catch (exception) {
+      throw ApiException('Network connection error: ${exception.message}', 503);
+    } catch (exception) {
+      throw ApiException('Failed to download document file.', 500);
+    }
+  }
+
+  Future<Map<String, Object?>> deleteAdmissionDocumentFile({
+    required AuthSession session,
+    required String documentId,
+  }) async {
+    return deleteJson('/api/v1/admin/admissions/documents/$documentId/file', session: session);
   }
 
   Future<Map<String, Object?>> putJson(
@@ -344,6 +419,469 @@ class ApiClient {
     } catch (exception) {
       throw ApiException('Failed to communicate with Schoolic API.', 500);
     }
+  }
+
+  // Phase 10: Bulk Import
+  Future<Map<String, Object?>> previewBulkImport({
+    required AuthSession session,
+    required String entity,
+    required String csv,
+  }) async {
+    return postJson(
+      '/api/v1/admin/imports/preview',
+      {'entity': entity, 'csv': csv},
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> commitBulkImport({
+    required AuthSession session,
+    required String entity,
+    required List<Map<String, Object?>> records,
+    String? academicYearId,
+    String? defaultClassId,
+    String? defaultSectionId,
+  }) async {
+    return postJson(
+      '/api/v1/admin/imports/commit',
+      {
+        'entity': entity,
+        'records': records,
+        'academicYearId': ?academicYearId,
+        'defaultClassId': ?defaultClassId,
+        'defaultSectionId': ?defaultSectionId,
+      },
+      session: session,
+    );
+  }
+
+  // Phase 10: Onboarding Wizard
+  Future<Map<String, Object?>> getOnboardingStatus({
+    required AuthSession session,
+  }) async {
+    return getJson('/api/v1/admin/onboarding/status', session: session);
+  }
+
+  Future<Map<String, Object?>> runOnboardingWizard({
+    required AuthSession session,
+    required String schoolName,
+    required String academicYearName,
+    required String startDate,
+    required String endDate,
+    required List<Map<String, Object?>> classes,
+  }) async {
+    return postJson(
+      '/api/v1/admin/onboarding/wizard',
+      {
+        'schoolName': schoolName,
+        'academicYearName': academicYearName,
+        'startDate': startDate,
+        'endDate': endDate,
+        'classes': classes,
+      },
+      session: session,
+    );
+  }
+
+  // Phase 10: Notifications
+  Future<List<Map<String, Object?>>> listNotifications({
+    required AuthSession session,
+    String? channel,
+    String? status,
+  }) async {
+    final params = <String, String>{
+      'channel': ?channel,
+      'status': ?status,
+    };
+    return getList(
+      '/api/v1/admin/notifications',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> sendNotification({
+    required AuthSession session,
+    required String channel,
+    required String title,
+    required String body,
+    String? recipientPhone,
+    String? recipientEmail,
+    String? recipientUserId,
+    Map<String, Object?>? data,
+  }) async {
+    return postJson(
+      '/api/v1/admin/notifications/send',
+      {
+        'channel': channel,
+        'title': title,
+        'body': body,
+        'recipientPhone': ?recipientPhone,
+        'recipientEmail': ?recipientEmail,
+        'recipientUserId': ?recipientUserId,
+        'data': ?data,
+      },
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> triggerFeeReminders({
+    required AuthSession session,
+    int days = 7,
+  }) async {
+    return postJson(
+      '/api/v1/admin/notifications/trigger-fee-reminders?days=$days',
+      {},
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getPortalNotifications({
+    required AuthSession session,
+  }) async {
+    return getList('/api/v1/portal/notifications', session: session);
+  }
+
+  // Phase 10: Teacher Availability & Messaging
+  Future<Map<String, Object?>> getTeacherAvailability({
+    required AuthSession session,
+  }) async {
+    return getJson('/api/v1/teacher/availability', session: session);
+  }
+
+  Future<Map<String, Object?>> updateTeacherAvailability({
+    required AuthSession session,
+    required String startTime,
+    required String endTime,
+    required String availableDays,
+    required String autoReplyMessage,
+    required bool isEnabled,
+  }) async {
+    return putJson(
+      '/api/v1/teacher/availability',
+      {
+        'startTime': startTime,
+        'endTime': endTime,
+        'availableDays': availableDays,
+        'autoReplyMessage': autoReplyMessage,
+        'isEnabled': isEnabled,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> listChatConversations({
+    required AuthSession session,
+    bool isPortal = false,
+  }) async {
+    final prefix = isPortal ? '/api/v1/portal' : '/api/v1/teacher';
+    return getList('$prefix/chat/conversations', session: session);
+  }
+
+  Future<Map<String, Object?>> createChatConversation({
+    required AuthSession session,
+    required String studentId,
+    required String teacherStaffId,
+    required String subject,
+    String? initialMessage,
+  }) async {
+    return postJson(
+      '/api/v1/portal/chat/conversations',
+      {
+        'studentId': studentId,
+        'teacherStaffId': teacherStaffId,
+        'subject': subject,
+        'initialMessage': ?initialMessage,
+      },
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> listChatMessages({
+    required AuthSession session,
+    required String conversationId,
+    bool isPortal = false,
+  }) async {
+    final prefix = isPortal ? '/api/v1/portal' : '/api/v1/teacher';
+    return getJson('$prefix/chat/conversations/$conversationId/messages', session: session);
+  }
+
+  Future<Map<String, Object?>> sendChatMessage({
+    required AuthSession session,
+    required String conversationId,
+    required String content,
+    bool isPortal = false,
+  }) async {
+    final prefix = isPortal ? '/api/v1/portal' : '/api/v1/teacher';
+    return postJson(
+      '$prefix/chat/conversations/$conversationId/messages',
+      {'content': content},
+      session: session,
+    );
+  }
+
+  // Phase 11: Enterprise RBAC & DPDP Compliance
+  Future<List<Map<String, Object?>>> listAuditLogs({
+    required AuthSession session,
+    String? action,
+    String? resourceType,
+    int limit = 50,
+  }) async {
+    final params = <String, String>{
+      'action': ?action,
+      'resourceType': ?resourceType,
+      'limit': limit.toString(),
+    };
+    return getList(
+      '/api/v1/admin/audit-logs',
+      session: session,
+      queryParameters: params,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> listDpdpConsents({
+    required AuthSession session,
+    String? studentId,
+    String? status,
+  }) async {
+    final params = <String, String>{
+      'studentId': ?studentId,
+      'status': ?status,
+    };
+    return getList(
+      '/api/v1/admin/dpdp/consents',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> recordDpdpConsent({
+    required AuthSession session,
+    required String studentId,
+    required String parentGuardianName,
+    required String parentGuardianPhone,
+    required String consentType,
+    String verifiedVia = 'portal_submission',
+    String? validUntil,
+  }) async {
+    return postJson(
+      '/api/v1/admin/dpdp/consents',
+      {
+        'studentId': studentId,
+        'parentGuardianName': parentGuardianName,
+        'parentGuardianPhone': parentGuardianPhone,
+        'consentType': consentType,
+        'verifiedVia': verifiedVia,
+        'validUntil': ?validUntil,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> listDsrRequests({
+    required AuthSession session,
+    String? status,
+  }) async {
+    final params = <String, String>{
+      'status': ?status,
+    };
+    return getList(
+      '/api/v1/admin/dpdp/dsr',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> resolveDsrRequest({
+    required AuthSession session,
+    required String requestId,
+    required String status,
+    required String resolutionNotes,
+    bool? anonymizeStudent,
+  }) async {
+    return putJson(
+      '/api/v1/admin/dpdp/dsr/$requestId',
+      {
+        'status': status,
+        'resolutionNotes': resolutionNotes,
+        'anonymizeStudent': ?anonymizeStudent,
+      },
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> submitPortalDsrRequest({
+    required AuthSession session,
+    String? studentId,
+    required String requestType,
+    required String reason,
+  }) async {
+    return postJson(
+      '/api/v1/portal/dpdp/dsr',
+      {
+        'studentId': ?studentId,
+        'requestType': requestType,
+        'reason': reason,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> listPortalDsrRequests({
+    required AuthSession session,
+  }) async {
+    return getList('/api/v1/portal/dpdp/dsr', session: session);
+  }
+
+  Future<Map<String, Object?>> assignSectionClassTeacher({
+    required AuthSession session,
+    required String sectionId,
+    String? classTeacherStaffId,
+  }) async {
+    return putJson(
+      '/api/v1/admin/sections/$sectionId/class-teacher',
+      {'classTeacherStaffId': classTeacherStaffId},
+      session: session,
+    );
+  }
+
+  // Phase 11: Financial Depth (Concessions, Refunds, Heads)
+  Future<List<Map<String, Object?>>> listFeeConcessions({
+    required AuthSession session,
+  }) async {
+    return getList('/api/v1/admin/fees/concessions', session: session);
+  }
+
+  Future<Map<String, Object?>> createFeeConcession({
+    required AuthSession session,
+    required String name,
+    required String code,
+    required String type,
+    required int value,
+    required String category,
+  }) async {
+    return postJson(
+      '/api/v1/admin/fees/concessions',
+      {
+        'name': name,
+        'code': code,
+        'type': type,
+        'value': value,
+        'category': category,
+      },
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> applyStudentConcession({
+    required AuthSession session,
+    required String studentId,
+    required String allocationId,
+    required String concessionId,
+    String? reason,
+  }) async {
+    return postJson(
+      '/api/v1/admin/fees/concessions/apply',
+      {
+        'studentId': studentId,
+        'allocationId': allocationId,
+        'concessionId': concessionId,
+        'reason': ?reason,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> listStudentConcessions({
+    required AuthSession session,
+    String? studentId,
+    String? allocationId,
+  }) async {
+    final params = <String, String>{
+      'studentId': ?studentId,
+      'allocationId': ?allocationId,
+    };
+    return getList(
+      '/api/v1/admin/fees/concessions/applied',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> listFeeRefunds({
+    required AuthSession session,
+    String? status,
+  }) async {
+    final params = <String, String>{
+      'status': ?status,
+    };
+    return getList(
+      '/api/v1/admin/fees/refunds',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> createFeeRefund({
+    required AuthSession session,
+    required String allocationId,
+    required String studentId,
+    String? paymentId,
+    required int amount,
+    required String reason,
+    String mode = 'bank_transfer',
+    String? referenceNumber,
+  }) async {
+    return postJson(
+      '/api/v1/admin/fees/refunds',
+      {
+        'allocationId': allocationId,
+        'studentId': studentId,
+        'paymentId': ?paymentId,
+        'amount': amount,
+        'reason': reason,
+        'mode': mode,
+        'referenceNumber': ?referenceNumber,
+      },
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> updateFeeRefundStatus({
+    required AuthSession session,
+    required String refundId,
+    required String status,
+  }) async {
+    return putJson(
+      '/api/v1/admin/fees/refunds/$refundId/status',
+      {'status': status},
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> listFeeStructureHeads({
+    required AuthSession session,
+    required String feeStructureId,
+  }) async {
+    return getList('/api/v1/admin/fees/structures/$feeStructureId/heads', session: session);
+  }
+
+  Future<Map<String, Object?>> createFeeStructureHead({
+    required AuthSession session,
+    required String feeStructureId,
+    required String headName,
+    required int amount,
+    bool isOptional = false,
+  }) async {
+    return postJson(
+      '/api/v1/admin/fees/structures/$feeStructureId/heads',
+      {
+        'headName': headName,
+        'amount': amount,
+        'isOptional': isOptional,
+      },
+      session: session,
+    );
   }
 
   Map<String, String> _headers({String? bearerToken, AuthSession? devSession}) {

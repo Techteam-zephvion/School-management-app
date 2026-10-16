@@ -19,6 +19,8 @@ import {
   updateTeacherMaterialSchema,
   updateHomeworkAssignmentSchema,
   gradeHomeworkSubmissionSchema,
+  sendChatMessageSchema,
+  updateTeacherAvailabilitySchema,
 } from '../http/validation';
 import type { AppBindings } from '../types';
 
@@ -284,3 +286,41 @@ function errorCategory(error: unknown) {
   if (error instanceof Error && error.message.toLowerCase().includes('rate')) return 'rate_limited';
   return 'provider_error';
 }
+
+teacherRoutes.get('/availability', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.getTeacherAvailability(c.get('authUser')));
+});
+
+teacherRoutes.put('/availability', zValidator('json', updateTeacherAvailabilitySchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.updateTeacherAvailability(c.get('authUser'), c.req.valid('json')));
+});
+
+teacherRoutes.get('/chat/conversations', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.listChatConversations(c.get('authUser')));
+});
+
+teacherRoutes.get(
+  '/chat/conversations/:id/messages',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listChatMessages(c.get('authUser'), c.req.valid('param').id));
+  },
+);
+
+teacherRoutes.post(
+  '/chat/conversations/:id/messages',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('json', sendChatMessageSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.sendChatMessage(c.get('authUser'), c.req.valid('param').id, c.req.valid('json')),
+      201,
+    );
+  },
+);
+

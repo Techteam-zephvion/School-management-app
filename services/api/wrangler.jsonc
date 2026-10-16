@@ -12,10 +12,22 @@
     "CASHFREE_ENV": "sandbox",
     "CASHFREE_API_VERSION": "2023-08-01"
   },
+  "r2_buckets": [
+    {
+      "binding": "DOCUMENTS_BUCKET",
+      "bucket_name": "schoolic-documents-dev"
+    }
+  ],
   "env": {
     "staging": {
       "name": "schoolic-api-staging",
       "workers_dev": true,
+      "r2_buckets": [
+        {
+          "binding": "DOCUMENTS_BUCKET",
+          "bucket_name": "schoolic-documents-staging"
+        }
+      ],
       "vars": {
         "APP_ENV": "staging",
         "CORS_ORIGIN": "https://schoolic-staging.pages.dev",
@@ -36,6 +48,12 @@
     "production": {
       "name": "schoolic-api",
       "workers_dev": true,
+      "r2_buckets": [
+        {
+          "binding": "DOCUMENTS_BUCKET",
+          "bucket_name": "schoolic-documents"
+        }
+      ],
       "vars": {
         "APP_ENV": "production",
         "CORS_ORIGIN": "https://schoolic.pages.dev",

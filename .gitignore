@@ -10,3 +10,4 @@ apps/flutter_app/build/
 .neon
 .dev.vars
 *.zip
+.ignore/

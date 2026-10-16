@@ -389,10 +389,23 @@ export const addAdmissionDocumentSchema = z.object({
   title: z.string().trim().min(2).max(120),
   status: z.enum(['pending', 'submitted', 'verified', 'rejected']).default('pending'),
   documentNumber: z.string().trim().max(60).nullable().optional(),
+  fileKey: z.string().trim().nullable().optional(),
+  fileUrl: z.string().trim().nullable().optional(),
+  fileName: z.string().trim().nullable().optional(),
+  fileSize: z.number().int().nonnegative().nullable().optional(),
+  mimeType: z.string().trim().nullable().optional(),
   notes: z.string().trim().max(200).nullable().optional(),
 });
 
 export const updateAdmissionDocumentSchema = addAdmissionDocumentSchema.partial();
+
+export const attachAdmissionDocumentFileSchema = z.object({
+  fileKey: z.string().trim().min(5).max(500),
+  fileUrl: z.string().trim().min(1).max(500),
+  fileName: z.string().trim().min(1).max(255),
+  fileSize: z.number().int().nonnegative(),
+  mimeType: z.string().trim().min(1).max(100),
+});
 
 export const createPaymentOrderSchema = z.object({
   allocationId: z.uuid(),
@@ -404,5 +417,137 @@ export const verifyPaymentOrderSchema = z.object({
   orderId: z.string().trim().min(1).max(100),
 });
 
+export const bulkImportPreviewSchema = z.object({
+  entity: z.enum(['students', 'staff', 'classes_sections']),
+  csv: z.string().min(1, 'CSV content is required'),
+});
 
+export const bulkImportCommitSchema = z.object({
+  entity: z.enum(['students', 'staff', 'classes_sections']),
+  academicYearId: z.string().uuid().optional(),
+  defaultClassId: z.string().uuid().optional(),
+  defaultSectionId: z.string().uuid().optional(),
+  records: z.array(z.record(z.string(), z.unknown())).min(1, 'At least one record is required to commit'),
+});
+
+export const onboardingWizardSchema = z.object({
+  schoolName: z.string().trim().min(2).max(120),
+  academicYearName: z.string().trim().min(2).max(60),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid startDate (YYYY-MM-DD)'),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid endDate (YYYY-MM-DD)'),
+  classes: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(60),
+        sections: z.array(z.string().trim().min(1).max(30)).min(1),
+      }),
+    )
+    .min(1, 'At least one class is required'),
+});
+
+export const sendNotificationSchema = z.object({
+  recipientUserId: z.string().uuid().optional().nullable(),
+  recipientPhone: z.string().trim().optional().nullable(),
+  recipientEmail: z.string().trim().email().optional().nullable(),
+  channel: z.enum(['whatsapp', 'sms', 'push', 'in_app']),
+  templateId: z.string().trim().optional().nullable(),
+  title: z.string().trim().min(1).max(200),
+  body: z.string().trim().min(1).max(2000),
+  data: z.record(z.string(), z.unknown()).optional().nullable(),
+});
+
+export const notificationQuerySchema = z.object({
+  channel: z.enum(['whatsapp', 'sms', 'push', 'in_app']).optional(),
+  status: z.enum(['queued', 'sent', 'delivered', 'failed']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
+export const createChatConversationSchema = z.object({
+  studentId: z.string().uuid(),
+  teacherStaffId: z.string().uuid(),
+  subject: z.string().trim().min(2).max(160),
+  initialMessage: z.string().trim().min(1).max(2000).optional(),
+});
+
+export const sendChatMessageSchema = z.object({
+  content: z.string().trim().min(1).max(2000),
+});
+
+export const updateTeacherAvailabilitySchema = z.object({
+  startTime: z.string().trim().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Invalid time format HH:MM'),
+  endTime: z.string().trim().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Invalid time format HH:MM'),
+  availableDays: z.string().trim().min(1).max(20),
+  autoReplyMessage: z.string().trim().min(1).max(500),
+  isEnabled: z.boolean(),
+});
+
+// Phase 11: Enterprise Roles & Class Teacher Assignment
+export const assignSectionClassTeacherSchema = z.object({
+  classTeacherStaffId: z.string().uuid().nullable(),
+});
+
+// Phase 11: DPDP Act 2023 Compliance
+export const recordConsentSchema = z.object({
+  studentId: z.string().uuid(),
+  parentGuardianName: z.string().trim().min(2).max(120),
+  parentGuardianPhone: z.string().trim().min(10).max(20),
+  consentType: z.string().trim().min(2).max(80),
+  verifiedVia: z.enum(['portal_submission', 'signed_form', 'sms_otp']).default('portal_submission'),
+  validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional(),
+});
+
+export const createDsrRequestSchema = z.object({
+  studentId: z.string().uuid().optional().nullable(),
+  requestType: z.enum(['data_access', 'data_rectification', 'data_erasure_anonymization']),
+  reason: z.string().trim().min(5).max(1000),
+});
+
+export const resolveDsrRequestSchema = z.object({
+  status: z.enum(['fulfilled', 'rejected', 'in_review']),
+  resolutionNotes: z.string().trim().min(2).max(1000),
+  anonymizeStudent: z.boolean().optional(),
+});
+
+export const auditLogQuerySchema = z.object({
+  action: z.string().trim().optional(),
+  resourceType: z.string().trim().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
+// Phase 11: Financial Depth (Concessions, Refunds, Heads)
+export const createFeeConcessionSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  code: z.string().trim().min(2).max(40),
+  type: z.enum(['percentage', 'flat']),
+  value: z.number().int().min(1),
+  category: z.enum(['merit', 'sibling', 'staff_ward', 'financial_aid', 'sports']).default('merit'),
+});
+
+export const applyStudentConcessionSchema = z.object({
+  studentId: z.string().uuid(),
+  allocationId: z.string().uuid(),
+  concessionId: z.string().uuid(),
+  reason: z.string().trim().max(300).optional(),
+});
+
+export const createFeeRefundSchema = z.object({
+  allocationId: z.string().uuid(),
+  studentId: z.string().uuid(),
+  paymentId: z.string().uuid().optional().nullable(),
+  amount: z.number().int().min(1),
+  reason: z.string().trim().min(3).max(500),
+  mode: z.enum(['bank_transfer', 'cash', 'cheque', 'gateway_refund']).default('bank_transfer'),
+  referenceNumber: z.string().trim().max(100).optional().nullable(),
+});
+
+export const updateRefundStatusSchema = z.object({
+  status: z.enum(['approved', 'processed', 'rejected']),
+});
+
+export const createFeeStructureHeadSchema = z.object({
+  feeStructureId: z.string().uuid(),
+  headName: z.string().trim().min(2).max(80),
+  amount: z.number().int().min(0),
+  isOptional: z.boolean().default(false),
+});
 

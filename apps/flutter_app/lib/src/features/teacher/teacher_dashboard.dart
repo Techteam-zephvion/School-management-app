@@ -19,6 +19,7 @@ import 'views/teacher_homework_view.dart';
 import 'views/teacher_marks_view.dart';
 import 'views/teacher_my_day_view.dart';
 import 'views/teacher_timetable_view.dart';
+import 'views/teacher_messages_view.dart';
 
 class TeacherDashboard extends ConsumerStatefulWidget {
   const TeacherDashboard({super.key});
@@ -288,6 +289,12 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
                         'Announcements',
                         Icons.campaign_outlined,
                       ),
+                      const SizedBox(width: 4),
+                      _buildTabButton(
+                        8,
+                        'Messages',
+                        Icons.chat_bubble_outline,
+                      ),
                     ],
 
                     const Spacer(),
@@ -447,6 +454,7 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
                   _drawerTabItem(5, 'Homework', Icons.assignment_outlined),
                   _drawerTabItem(6, 'Marks', Icons.fact_check_outlined),
                   _drawerTabItem(7, 'Announcements', Icons.campaign_outlined),
+                  _drawerTabItem(8, 'Messages & Hours', Icons.chat_bubble_outline),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Divider(height: 1, color: AppColors.primaryBorder),
@@ -707,6 +715,8 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
           endpoint: '/api/v1/teacher/announcements',
           assignments: _assignments,
         );
+      case 8:
+        return const TeacherMessagesView();
       default:
         return const SizedBox.shrink();
     }

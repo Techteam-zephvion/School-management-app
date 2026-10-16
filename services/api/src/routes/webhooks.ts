@@ -20,9 +20,10 @@ webhookRoutes.post('/cashfree', async (c) => {
       rawBody,
       timestamp,
       secretKey: c.env.CASHFREE_SECRET_KEY,
+      maxSkewMs: 5 * 60 * 1000,
     });
     if (!isValid) {
-      return c.json({ error: 'Invalid webhook signature' }, 401);
+      return c.json({ error: 'Invalid webhook signature or expired timestamp' }, 401);
     }
   }
 

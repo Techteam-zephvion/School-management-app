@@ -1,4 +1,84 @@
-# Last Update (October 14, 2026)
+# Last Update (October 16, 2026)
+
+## Phase 11: Enterprise Roles, DPDP Compliance & Financial Depth
+
+### Summary
+- **Granular Institutional RBAC:**
+  - Expanded `roleEnum` and Flutter `AppRole` to include `accountant`, `admissions_officer`, and `principal`.
+  - Enforced role isolation middleware on `/api/v1/admin/*`:
+    - `Accountant`: restricted to fee allocations, concessions, refunds, payments, and receipts.
+    - `Admissions Officer`: restricted to admissions applications, document verification, enrollment, and onboarding.
+    - `Principal`: granted global read-only visibility across institutional analytics, attendance, academics, and finances.
+  - Designated `classTeacherStaffId` on `sections` table with endpoint `PUT /api/v1/admin/sections/:id/class-teacher`.
+- **DPDP Act 2023 Compliance:**
+  - Database schema & migration `0013_talented_husk.sql`:
+    - `dpdp_consents`: Verifiable parental consent tracking for minors with digital (`portal_submission`) and offline (`signed_form`, `sms_otp`) verification records.
+    - `audit_logs`: Immutable institutional trail capturing actor, role, action, target resource, and IP address across sensitive modifications.
+    - `data_subject_requests`: Data Subject Rights (DSR) lifecycle (`data_access`, `data_rectification`, `data_erasure_anonymization`).
+  - Automated Student PII Anonymization: non-destructive erasure stripping student full name, guardian name, and phone while preserving academic, attendance, and fee aggregate totals for regulatory compliance.
+  - Endpoints:
+    - Admin: `GET/POST /api/v1/admin/dpdp/consents`, `GET/PUT /api/v1/admin/dpdp/dsr`, `GET /api/v1/admin/audit-logs`.
+    - Portal: `GET /api/v1/portal/dpdp/consents`, `GET/POST /api/v1/portal/dpdp/dsr`.
+- **Advanced Institutional Financial Management:**
+  - Concessions & Scholarships (`fee_concessions`, `student_fee_concessions`): supports percentage or flat discounts linked to fee structures.
+  - Late fee calculation engine (`calculateLateFee`): automated calculation of grace period and daily/flat penalties.
+  - Official Fee Refunds Ledger (`fee_refunds`): tracks refund number, reason, payment mode (`bank_transfer`, `cash`, `gateway_refund`), and status approval workflow (`pending`, `approved`, `processed`, `rejected`).
+  - Head-wise fee breakdown (`fee_structure_heads`): Tuition, Transport, Lab, Examination, Sports.
+  - Endpoints:
+    - `GET/POST /api/v1/admin/fees/concessions`, `POST /api/v1/admin/fees/concessions/apply`, `GET /api/v1/admin/fees/concessions/applied`.
+    - `GET/POST /api/v1/admin/fees/refunds`, `PUT /api/v1/admin/fees/refunds/:id/status`.
+    - `GET/POST /api/v1/admin/fees/structures/:id/heads`.
+- **Frontend (Flutter):**
+  - Built `AdminComplianceView` with 3 dedicated tabs: Parental Consents, Data Subject Rights, and Audit Log Trail.
+  - Modal workflows: `Record Parental Consent` and `Resolve Data Subject Request` with automated PII anonymization toggle.
+  - Updated `AdminFeesView` with `Concessions & Waivers` tab and `Refunds Ledger` tab, including policy creation and refund issuance modals.
+  - Wired `AdminNavSection.compliance` into Admin Dashboard with role-aware navigation and badge.
+  - Dev sign-in switches in `providers.dart` supporting all enterprise roles.
+- **Verification:**
+  - Backend: 10/10 Vitest test suites passing (95 passed, 1 skipped, 0 failed).
+  - TypeScript: 0 typecheck errors (`pnpm api:typecheck`).
+  - Frontend: 71/71 Flutter unit, widget, and integration tests passing (`flutter test`).
+  - Lint: 0 analyzer warnings (`flutter analyze apps/flutter_app`).
+
+---
+
+## Phase 10: Institutional Onboarding, Automated Notifications & Moderated Chat
+
+### Summary
+- **Bulk CSV Importer & Academic Setup Wizard:**
+  - CSV parsing and validation engine (`BulkImporter`) supporting students, staff, and timetable imports with row-level error reporting.
+  - Academic setup wizard (`runOnboardingWizard` / `POST /api/v1/admin/onboarding/wizard`) creating academic years, grades, sections, and subjects in a single atomic transaction.
+- **Multi-Channel Notification Dispatcher:**
+  - Pluggable notification service (`NotificationService`) with simulated and provider-ready adapters for SMS, WhatsApp, and Email.
+  - Automated absence notifications on attendance finalization and fee reminder scheduler (`POST /api/v1/admin/notifications/trigger-fee-reminders`).
+  - Institutional notification log table (`notifications`) and portal notification feed.
+- **Teacher Working Hours & Moderated Parent Chat:**
+  - Teacher availability preferences (`teacher_availability`): configurable active hours, days, auto-reply messages, and vacation toggles.
+  - Moderated parent-teacher chat (`chat_conversations`, `chat_messages`) with automatic out-of-hours replies.
+- **Frontend:**
+  - `AdminCommunicationsView` with Bulk CSV Import, Automated Fee Alerts, and Notification History tabs.
+  - `TeacherMessagesView` for direct parent-teacher communications with out-of-hours auto-reply indicators.
+
+---
+
+## Phase 9: Cloudflare R2 Document Storage & Production Hardening
+
+### Summary
+- Configured Cloudflare R2 object storage binding (`DOCUMENTS_BUCKET`) in `wrangler.jsonc` across dev, staging (`schoolic-documents-staging`), and production (`schoolic-documents`).
+- Implemented `DocumentStorage` service with isolated tenant keys: `schools/{schoolId}/admissions/{applicationId}/{documentId}-{filename}` and test memory fallback.
+- Added database migration `0011_bright_slyde.sql` extending `admission_documents` with `file_key`, `file_url`, `file_name`, `file_size`, and `mime_type`.
+- Added REST endpoints in `admin.ts`:
+  - `POST /api/v1/admin/admissions/applications/:id/documents/:docId/upload`
+  - `GET /api/v1/admin/admissions/applications/:id/documents/:docId/download`
+  - `DELETE /api/v1/admin/admissions/documents/:id/file`
+- Added Cashfree webhook replay protection with timestamp skew validation (< 5 minutes) and timing-safe HMAC-SHA256 verification.
+- Added rate limiter middleware (`rateLimiter`) protecting `/api/v1/bootstrap/*`, `/api/v1/webhooks/*`, and `/api/v1/portal/fees/*`.
+- Integrated cross-platform `file_picker` in `AdminAdmissionsView` for single-click file uploads with file info, download/view, and delete controls.
+- Test Verification:
+  - Vitest: 7/7 test suites passing (65 passed, 1 skipped).
+  - Flutter: 57/57 tests passing.
+
+---
 
 ## Phase 8.6: Cashfree Payment Gateway & Full Production Deployment
 
@@ -976,7 +1056,7 @@ Implemented the full institutional roadmap scope across backend schema, API rout
 - **8.2 Student & Parent Portal**: Dedicated portal shell and views for attendance, timetables, homework, report cards, fees, and announcements with role-based route guard.
 - **8.3 Exams, Marks & Report Cards**: Institutional exam creation, grading schedules, subject marks entry, and report card generation.
 - **8.4 Fees & Finance Management**: Dynamic fee structures, student fee allocations, payment receipts, collection metrics, overdue tracking, and student portal fee statements.
-- **8.5 Admissions & School Operations**: Admissions pipeline (Inquiry, Applied, Under Review, Interview, Offered, Accepted, Rejected), document tracking, and direct student conversion.
+- **8.5 Admissions & School Operations**: Admissions pipeline (Inquiry, Applied, Under Review, Approved, Enrolled, Rejected), document verification checklist, and direct student enrollment.
 
 ---
 
@@ -1023,7 +1103,7 @@ Implemented the full institutional roadmap scope across backend schema, API rout
   - Artifact: `deployed_admin_exams_1791899368179.png`.
 
 - **Teacher Homework & Assignments (Phase 8.0)**:
-  - Authenticated as `teacher-login@portfolio.schoolic.test` / `Schoolic@2026`.
+  - Authenticated as `teacher-login@portfolio.schoolic.test` / `[REDACTED]`.
   - Verified live at `/#/teacher` -> Homework navigation tab.
   - Assignment form with class selector (`=Stage Class A • Mathematics`), due date, estimated minutes, status, title, instructions, and list container.
   - Artifact: `deployed_teacher_homework_1791899976451.png`.

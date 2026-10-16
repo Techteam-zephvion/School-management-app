@@ -1,4 +1,43 @@
-enum AppRole { admin, teacher, student, parent }
+enum AppRole {
+  admin,
+  teacher,
+  student,
+  parent,
+  accountant,
+  admissionsOfficer,
+  principal;
+
+  static AppRole fromString(String raw) {
+    switch (raw) {
+      case 'admin':
+        return AppRole.admin;
+      case 'teacher':
+        return AppRole.teacher;
+      case 'student':
+        return AppRole.student;
+      case 'parent':
+        return AppRole.parent;
+      case 'accountant':
+        return AppRole.accountant;
+      case 'admissions_officer':
+      case 'admissionsOfficer':
+        return AppRole.admissionsOfficer;
+      case 'principal':
+        return AppRole.principal;
+      default:
+        return AppRole.values.byName(raw);
+    }
+  }
+
+  String toRoleString() {
+    switch (this) {
+      case AppRole.admissionsOfficer:
+        return 'admissions_officer';
+      default:
+        return name;
+    }
+  }
+}
 
 enum AttendanceKind { daily, period }
 
@@ -23,12 +62,18 @@ class AuthSession {
 
   bool get isAdmin => roles.contains(AppRole.admin);
   bool get isTeacher => roles.contains(AppRole.teacher);
-  bool get isPortalUser => roles.contains(AppRole.student) || roles.contains(AppRole.parent);
+  bool get isAccountant => roles.contains(AppRole.accountant);
+  bool get isAdmissionsOfficer => roles.contains(AppRole.admissionsOfficer);
+  bool get isPrincipal => roles.contains(AppRole.principal);
+  bool get isInstitutionalStaff =>
+      isAdmin || isAccountant || isAdmissionsOfficer || isPrincipal;
+  bool get isPortalUser =>
+      roles.contains(AppRole.student) || roles.contains(AppRole.parent);
 
   Map<String, Object?> toJson() => {
         'email': email,
         'displayName': displayName,
-        'roles': roles.map((role) => role.name).toList(),
+        'roles': roles.map((role) => role.toRoleString()).toList(),
         'schoolId': schoolId,
         'bearerToken': bearerToken,
         'devNeonUserId': devNeonUserId,
@@ -55,7 +100,7 @@ class AuthSession {
         email: json['email'] as String,
         displayName: json['displayName'] as String?,
         roles: ((json['roles'] as List?) ?? const [])
-            .map((role) => AppRole.values.byName(role as String))
+            .map((role) => AppRole.fromString(role as String))
             .toList(),
         schoolId: json['schoolId'] as String,
         bearerToken: json['bearerToken'] as String?,

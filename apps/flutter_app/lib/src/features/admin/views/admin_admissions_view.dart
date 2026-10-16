@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/providers.dart';
@@ -1253,6 +1256,95 @@ class _ApplicationDetailDialogState extends ConsumerState<_ApplicationDetailDial
     }
   }
 
+  Future<void> _pickAndUploadDocFile(String docId) async {
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+
+    try {
+      final file = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'doc', 'docx'],
+      );
+
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
+        setState(() => _error = 'Selected file is empty.');
+        return;
+      }
+
+      setState(() {
+        _notice = 'Uploading ${file.name}...';
+        _error = null;
+      });
+
+      final api = ref.read(apiClientProvider);
+      await api.uploadAdmissionDocument(
+        session: session,
+        applicationId: widget.applicationId,
+        documentId: docId,
+        bytes: bytes,
+        fileName: file.name,
+      );
+
+      setState(() => _notice = 'Uploaded ${file.name} successfully.');
+      await _loadApplication();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Failed to upload document file: $e');
+    }
+  }
+
+  Future<void> _downloadDocFile(String docId, String fileName) async {
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+
+    try {
+      setState(() {
+        _notice = 'Downloading $fileName...';
+        _error = null;
+      });
+
+      final api = ref.read(apiClientProvider);
+      final bytes = await api.downloadAdmissionDocument(
+        session: session,
+        applicationId: widget.applicationId,
+        documentId: docId,
+      );
+
+      await Printing.sharePdf(bytes: Uint8List.fromList(bytes), filename: fileName);
+      if (!mounted) return;
+      setState(() => _notice = 'Opened $fileName');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Failed to open file: $e');
+    }
+  }
+
+  Future<void> _removeDocFile(String docId) async {
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.deleteAdmissionDocumentFile(
+        session: session,
+        documentId: docId,
+      );
+      setState(() => _notice = 'Removed attached file.');
+      await _loadApplication();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading || _application == null) {
@@ -1366,6 +1458,8 @@ class _ApplicationDetailDialogState extends ConsumerState<_ApplicationDetailDial
                       final docStatus = d['status'] as String? ?? 'pending';
                       final docNum = d['documentNumber'] as String?;
                       final verifiedBy = d['verifiedByStaffName'] as String?;
+                      final fileName = d['fileName'] as String?;
+                      final fileSize = d['fileSize'] as int?;
 
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1383,6 +1477,57 @@ class _ApplicationDetailDialogState extends ConsumerState<_ApplicationDetailDial
                                     Text('Doc ID: $docNum', style: const TextStyle(fontSize: 11, color: AppColors.secondaryText)),
                                   if (verifiedBy != null)
                                     Text('Verified by $verifiedBy', style: const TextStyle(fontSize: 11, color: AppColors.statusSuccess)),
+                                  if (fileName != null && fileName.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.description_outlined, size: 12, color: AppColors.primaryText),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            '$fileName${fileSize != null ? ' (${(fileSize / 1024).toStringAsFixed(1)} KB)' : ''}',
+                                            style: const TextStyle(fontSize: 11, color: AppColors.primaryText, fontWeight: FontWeight.w500),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        InkWell(
+                                          onTap: () => _downloadDocFile(docId, fileName),
+                                          child: const Padding(
+                                            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                            child: Icon(Icons.download_rounded, size: 14, color: AppColors.primaryText),
+                                          ),
+                                        ),
+                                        InkWell(
+                                          onTap: () => _removeDocFile(docId),
+                                          child: const Padding(
+                                            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                            child: Icon(Icons.close, size: 14, color: AppColors.secondaryText),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ] else ...[
+                                    const SizedBox(height: 4),
+                                    InkWell(
+                                      onTap: () => _pickAndUploadDocFile(docId),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: const [
+                                          Icon(Icons.upload_file_outlined, size: 12, color: AppColors.primaryText),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'Upload Document (PDF/Image)',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: AppColors.primaryText,
+                                              decoration: TextDecoration.underline,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),

@@ -18,9 +18,17 @@ export type Env = {
   CASHFREE_SECRET_KEY?: string;
   CASHFREE_ENV?: 'sandbox' | 'production';
   CASHFREE_API_VERSION?: string;
+  DOCUMENTS_BUCKET?: R2Bucket;
 };
 
-export type Role = 'admin' | 'teacher' | 'student' | 'parent';
+export type Role =
+  | 'admin'
+  | 'teacher'
+  | 'student'
+  | 'parent'
+  | 'accountant'
+  | 'admissions_officer'
+  | 'principal';
 
 export type AuthUser = {
   appUserId: string;

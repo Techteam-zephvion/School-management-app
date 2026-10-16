@@ -30,8 +30,21 @@ import {
   userRoles,
   paymentOrders,
   paymentWebhookEvents,
+  notifications,
+  chatConversations,
+  chatMessages,
+  teacherAvailabilitySettings,
+  dpdpConsents,
+  auditLogs,
+  dataSubjectRequests,
+  feeStructureHeads,
+  feeConcessions,
+  studentFeeConcessions,
+  feeRefunds,
 } from '../db/schema';
 
+import { BulkImporter } from '../importers/bulk-importer';
+import { NotificationService } from '../notifications/notification-service';
 import { ApiError } from '../http/errors';
 import { CashfreeClient } from '../payments/cashfree';
 import type { AuthUser, Env } from '../types';
@@ -72,6 +85,14 @@ import type {
   admissionQuerySchema,
   addAdmissionDocumentSchema,
   updateAdmissionDocumentSchema,
+  bulkImportPreviewSchema,
+  bulkImportCommitSchema,
+  onboardingWizardSchema,
+  sendNotificationSchema,
+  notificationQuerySchema,
+  createChatConversationSchema,
+  sendChatMessageSchema,
+  updateTeacherAvailabilitySchema,
 } from '../http/validation';
 
 import type { z } from 'zod';
@@ -2275,6 +2296,11 @@ export function createSchoolRepository(db: Db) {
           title: input.title,
           status: input.status,
           documentNumber: input.documentNumber ?? null,
+          fileKey: input.fileKey ?? null,
+          fileUrl: input.fileUrl ?? null,
+          fileName: input.fileName ?? null,
+          fileSize: input.fileSize ?? null,
+          mimeType: input.mimeType ?? null,
           verifiedByStaffId: input.status === 'verified' ? (user.staffId ?? null) : null,
           notes: input.notes ?? null,
         })
@@ -2306,6 +2332,11 @@ export function createSchoolRepository(db: Db) {
           title: input.title ?? existing.title,
           status: input.status ?? existing.status,
           documentNumber: input.documentNumber !== undefined ? input.documentNumber : existing.documentNumber,
+          fileKey: input.fileKey !== undefined ? input.fileKey : existing.fileKey,
+          fileUrl: input.fileUrl !== undefined ? input.fileUrl : existing.fileUrl,
+          fileName: input.fileName !== undefined ? input.fileName : existing.fileName,
+          fileSize: input.fileSize !== undefined ? input.fileSize : existing.fileSize,
+          mimeType: input.mimeType !== undefined ? input.mimeType : existing.mimeType,
           verifiedByStaffId,
           notes: input.notes !== undefined ? input.notes : existing.notes,
           updatedAt: new Date(),
@@ -2317,9 +2348,98 @@ export function createSchoolRepository(db: Db) {
       return updated;
     },
 
+    async getAdmissionDocument(user: AuthUser, documentId: string) {
+      const [doc] = await db
+        .select({
+          doc: admissionDocuments,
+          verifiedByStaffName: staff.fullName,
+        })
+        .from(admissionDocuments)
+        .leftJoin(staff, eq(admissionDocuments.verifiedByStaffId, staff.id))
+        .where(and(eq(admissionDocuments.schoolId, user.schoolId), eq(admissionDocuments.id, documentId)))
+        .limit(1);
+
+      if (!doc) throw new ApiError(404, 'Admission document not found');
+      return {
+        ...doc.doc,
+        verifiedByStaffName: doc.verifiedByStaffName ?? null,
+      };
+    },
+
+    async attachAdmissionDocumentFile(
+      user: AuthUser,
+      applicationId: string,
+      documentId: string,
+      fileData: { fileKey: string; fileUrl: string; fileName: string; fileSize: number; mimeType: string },
+    ) {
+      const [existing] = await db
+        .select()
+        .from(admissionDocuments)
+        .where(
+          and(
+            eq(admissionDocuments.schoolId, user.schoolId),
+            eq(admissionDocuments.applicationId, applicationId),
+            eq(admissionDocuments.id, documentId),
+          ),
+        )
+        .limit(1);
+
+      if (!existing) throw new ApiError(404, 'Admission document not found');
+
+      const nextStatus = existing.status === 'pending' ? 'submitted' : existing.status;
+
+      const [updated] = await db
+        .update(admissionDocuments)
+        .set({
+          fileKey: fileData.fileKey,
+          fileUrl: fileData.fileUrl,
+          fileName: fileData.fileName,
+          fileSize: fileData.fileSize,
+          mimeType: fileData.mimeType,
+          status: nextStatus,
+          updatedAt: new Date(),
+        })
+        .where(eq(admissionDocuments.id, documentId))
+        .returning();
+
+      if (!updated) throw new ApiError(500, 'Unable to attach file to document');
+      return updated;
+    },
+
+    async removeAdmissionDocumentFile(user: AuthUser, documentId: string) {
+      const [existing] = await db
+        .select()
+        .from(admissionDocuments)
+        .where(and(eq(admissionDocuments.schoolId, user.schoolId), eq(admissionDocuments.id, documentId)))
+        .limit(1);
+
+      if (!existing) throw new ApiError(404, 'Admission document not found');
+
+      const fileKey = existing.fileKey;
+
+      const [updated] = await db
+        .update(admissionDocuments)
+        .set({
+          fileKey: null,
+          fileUrl: null,
+          fileName: null,
+          fileSize: null,
+          mimeType: null,
+          status: existing.status === 'submitted' ? 'pending' : existing.status,
+          updatedAt: new Date(),
+        })
+        .where(eq(admissionDocuments.id, documentId))
+        .returning();
+
+      return {
+        document: updated,
+        deletedFileKey: fileKey,
+      };
+    },
+
     async deleteAdmissionDocument(user: AuthUser, documentId: string) {
       const [existing] = await db
-        .select({ id: admissionDocuments.id })
+        .select({ id: admissionDocuments.id, fileKey: admissionDocuments.fileKey })
         .from(admissionDocuments)
         .where(and(eq(admissionDocuments.schoolId, user.schoolId), eq(admissionDocuments.id, documentId)))
         .limit(1);
@@ -2327,7 +2447,7 @@ export function createSchoolRepository(db: Db) {
       if (!existing) throw new ApiError(404, 'Admission document not found');
 
       await db.delete(admissionDocuments).where(eq(admissionDocuments.id, documentId));
-      return { success: true, id: documentId };
+      return { success: true, id: documentId, deletedFileKey: existing.fileKey };
     },
 
 
@@ -2883,6 +3003,1430 @@ export function createSchoolRepository(db: Db) {
           sectionName: r.sectionName,
         })),
       };
+    },
+
+    async previewBulkImport(
+      user: AuthUser,
+      entity: 'students' | 'staff' | 'classes_sections',
+      csvText: string,
+    ) {
+      if (entity === 'students') {
+        return BulkImporter.previewStudents(csvText);
+      } else if (entity === 'staff') {
+        return BulkImporter.previewStaff(csvText);
+      } else {
+        return BulkImporter.previewClassesSections(csvText);
+      }
+    },
+
+    async commitBulkImport(
+      user: AuthUser,
+      input: z.infer<typeof bulkImportCommitSchema>,
+    ) {
+      if (input.entity === 'classes_sections') {
+        let createdClasses = 0;
+        let createdSections = 0;
+        for (const item of input.records) {
+          const className = String(item.className || '').trim();
+          const sectionName = String(item.sectionName || '').trim();
+          if (!className || !sectionName) continue;
+
+          let [existingClass] = await db
+            .select()
+            .from(classes)
+            .where(and(eq(classes.schoolId, user.schoolId), eq(classes.name, className)))
+            .limit(1);
+
+          if (!existingClass) {
+            const [newCls] = await db
+              .insert(classes)
+              .values({
+                schoolId: user.schoolId,
+                name: className,
+                sortOrder: item.gradeOrder ? Number(item.gradeOrder) : 0,
+              })
+              .returning();
+            existingClass = newCls;
+            createdClasses++;
+          }
+
+          if (existingClass) {
+            const [existingSection] = await db
+              .select()
+              .from(sections)
+              .where(and(eq(sections.schoolId, user.schoolId), eq(sections.classId, existingClass.id), eq(sections.name, sectionName)))
+              .limit(1);
+
+            if (!existingSection) {
+              await db.insert(sections).values({
+                schoolId: user.schoolId,
+                classId: existingClass.id,
+                name: sectionName,
+              });
+              createdSections++;
+            }
+          }
+        }
+        return {
+          entity: 'classes_sections',
+          success: true,
+          createdClasses,
+          createdSections,
+          totalProcessed: input.records.length,
+        };
+      }
+
+      if (input.entity === 'staff') {
+        let createdStaff = 0;
+        for (const item of input.records) {
+          const fullName = String(item.fullName || '').trim();
+          const email = String(item.email || '').trim().toLowerCase();
+          const role = (String(item.role || 'teacher').toLowerCase() === 'admin' ? 'admin' : 'teacher') as 'admin' | 'teacher';
+          if (!fullName || !email) continue;
+
+          let [existingUser] = await db
+            .select()
+            .from(appUsers)
+            .where(and(eq(appUsers.schoolId, user.schoolId), eq(appUsers.email, email)))
+            .limit(1);
+
+          if (!existingUser) {
+            const [newUser] = await db
+              .insert(appUsers)
+              .values({
+                schoolId: user.schoolId,
+                neonUserId: `usr_${Math.random().toString(36).substring(2, 10)}`,
+                email,
+                displayName: fullName,
+              })
+              .returning();
+            existingUser = newUser;
+
+            if (existingUser) {
+              await db.insert(userRoles).values({
+                userId: existingUser.id,
+                role,
+              });
+            }
+          }
+
+          if (existingUser) {
+            const [existingStaff] = await db
+              .select()
+              .from(staff)
+              .where(and(eq(staff.schoolId, user.schoolId), eq(staff.userId, existingUser.id)))
+              .limit(1);
+
+            if (!existingStaff) {
+              const staffCode = item.employeeId
+                ? String(item.employeeId).trim()
+                : `STF-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+              await db.insert(staff).values({
+                schoolId: user.schoolId,
+                userId: existingUser.id,
+                staffCode,
+                fullName,
+                email,
+                phone: item.phone ? String(item.phone).trim() : null,
+                isTeacher: role === 'teacher',
+              });
+              createdStaff++;
+            }
+          }
+        }
+        return {
+          entity: 'staff',
+          success: true,
+          createdStaff,
+          totalProcessed: input.records.length,
+        };
+      }
+
+      if (input.entity === 'students') {
+        let createdStudents = 0;
+        let enrolledStudents = 0;
+        for (const item of input.records) {
+          const fullName = String(item.fullName || '').trim();
+          const rollNumber = String(item.rollNumber || '').trim();
+          if (!fullName || !rollNumber) continue;
+
+          const admissionNumber = String(item.admissionNumber || rollNumber).trim();
+          const [createdStudent] = await db
+            .insert(students)
+            .values({
+              schoolId: user.schoolId,
+              fullName,
+              admissionNumber,
+              guardianName: item.parentName ? String(item.parentName).trim() : null,
+              guardianPhone: item.parentPhone ? String(item.parentPhone).trim() : null,
+            })
+            .returning();
+          if (!createdStudent) continue;
+          createdStudents++;
+
+          let targetClassId = input.defaultClassId;
+          let targetSectionId = input.defaultSectionId;
+
+          if (item.className && item.sectionName) {
+            const [cls] = await db
+              .select({ id: classes.id })
+              .from(classes)
+              .where(and(eq(classes.schoolId, user.schoolId), eq(classes.name, String(item.className).trim())))
+              .limit(1);
+            if (cls) {
+              const [sec] = await db
+                .select({ id: sections.id })
+                .from(sections)
+                .where(and(eq(sections.schoolId, user.schoolId), eq(sections.classId, cls.id), eq(sections.name, String(item.sectionName).trim())))
+                .limit(1);
+              if (sec) {
+                targetClassId = cls.id;
+                targetSectionId = sec.id;
+              }
+            }
+          }
+
+          if (input.academicYearId && targetClassId && targetSectionId) {
+            await db.insert(studentEnrollments).values({
+              schoolId: user.schoolId,
+              studentId: createdStudent.id,
+              academicYearId: input.academicYearId,
+              classId: targetClassId,
+              sectionId: targetSectionId,
+              rollNumber,
+            });
+            enrolledStudents++;
+          }
+
+          if (item.parentEmail) {
+            const parentEmailStr = String(item.parentEmail).toLowerCase().trim();
+            let [pUser] = await db
+              .select({ id: appUsers.id })
+              .from(appUsers)
+              .where(and(eq(appUsers.schoolId, user.schoolId), eq(appUsers.email, parentEmailStr)))
+              .limit(1);
+            if (!pUser) {
+              const [newPUser] = await db
+                .insert(appUsers)
+                .values({
+                  schoolId: user.schoolId,
+                  neonUserId: `parent_${Math.random().toString(36).substring(2, 10)}`,
+                  email: parentEmailStr,
+                  displayName: item.parentName ? String(item.parentName).trim() : 'Parent',
+                })
+                .returning();
+              if (newPUser) {
+                pUser = { id: newPUser.id };
+                await db.insert(userRoles).values({
+                  userId: newPUser.id,
+                  role: 'parent',
+                });
+              }
+            }
+
+            if (pUser) {
+              await db
+                .insert(studentGuardians)
+                .values({
+                  schoolId: user.schoolId,
+                  studentId: createdStudent.id,
+                  appUserId: pUser.id,
+                  relationship: 'guardian',
+                })
+                .onConflictDoNothing();
+            }
+          }
+        }
+
+        return {
+          entity: 'students',
+          success: true,
+          createdStudents,
+          enrolledStudents,
+          totalProcessed: input.records.length,
+        };
+      }
+
+      throw new ApiError(400, 'Unsupported entity for bulk import');
+    },
+
+    async getOnboardingStatus(user: AuthUser) {
+      const [school] = await db
+        .select()
+        .from(schools)
+        .where(eq(schools.id, user.schoolId))
+        .limit(1);
+
+      if (!school) throw new ApiError(404, 'School not found');
+
+      const [academicYear] = await db
+        .select({ id: academicYears.id, name: academicYears.name })
+        .from(academicYears)
+        .where(and(eq(academicYears.schoolId, user.schoolId), eq(academicYears.isActive, true)))
+        .limit(1);
+
+      const classRows = await db
+        .select({ id: classes.id })
+        .from(classes)
+        .where(eq(classes.schoolId, user.schoolId));
+
+      const staffRows = await db
+        .select({ id: staff.id })
+        .from(staff)
+        .where(eq(staff.schoolId, user.schoolId));
+
+      const studentRows = await db
+        .select({ id: students.id })
+        .from(students)
+        .where(eq(students.schoolId, user.schoolId));
+
+      const isCompleted = !!academicYear && classRows.length > 0 && (staffRows.length > 0 || studentRows.length > 0);
+
+      return {
+        isCompleted,
+        school: {
+          id: school.id,
+          name: school.name,
+          code: school.code,
+        },
+        hasAcademicYear: !!academicYear,
+        activeAcademicYear: academicYear ?? null,
+        classCount: classRows.length,
+        staffCount: staffRows.length,
+        studentCount: studentRows.length,
+      };
+    },
+
+    async runOnboardingWizard(user: AuthUser, input: z.infer<typeof onboardingWizardSchema>) {
+      await db
+        .update(schools)
+        .set({ name: input.schoolName, updatedAt: new Date() })
+        .where(eq(schools.id, user.schoolId));
+
+      const [year] = await db
+        .insert(academicYears)
+        .values({
+          schoolId: user.schoolId,
+          name: input.academicYearName,
+          startsOn: input.startDate,
+          endsOn: input.endDate,
+          isActive: true,
+        })
+        .returning();
+
+      if (!year) throw new ApiError(500, 'Failed to create academic year');
+
+      const createdClassesList: { id: string; name: string; sections: { id: string; name: string }[] }[] = [];
+      let sortOrder = 1;
+
+      for (const cls of input.classes) {
+        const [insertedClass] = await db
+          .insert(classes)
+          .values({
+            schoolId: user.schoolId,
+            name: cls.name,
+            sortOrder: sortOrder++,
+          })
+          .returning();
+
+        if (!insertedClass) continue;
+
+        const createdSectionsList: { id: string; name: string }[] = [];
+        for (const secName of cls.sections) {
+          const [insertedSection] = await db
+            .insert(sections)
+            .values({
+              schoolId: user.schoolId,
+              classId: insertedClass.id,
+              name: secName,
+            })
+            .returning();
+          if (insertedSection) {
+            createdSectionsList.push({ id: insertedSection.id, name: insertedSection.name });
+          }
+        }
+
+        createdClassesList.push({
+          id: insertedClass.id,
+          name: insertedClass.name,
+          sections: createdSectionsList,
+        });
+      }
+
+      return {
+        success: true,
+        schoolName: input.schoolName,
+        academicYear: year,
+        classes: createdClassesList,
+      };
+    },
+
+    async listNotifications(user: AuthUser, filters: z.infer<typeof notificationQuerySchema>) {
+      const conditions = [eq(notifications.schoolId, user.schoolId)];
+      if (filters.channel) conditions.push(eq(notifications.channel, filters.channel));
+      if (filters.status) conditions.push(eq(notifications.status, filters.status));
+
+      return db
+        .select()
+        .from(notifications)
+        .where(and(...conditions))
+        .orderBy(desc(notifications.createdAt))
+        .limit(filters.limit ?? 50);
+    },
+
+    async sendNotification(
+      user: AuthUser,
+      input: z.infer<typeof sendNotificationSchema>,
+      env?: Partial<Env>,
+    ) {
+      const service = new NotificationService(env);
+      const result = await service.dispatch({
+        schoolId: user.schoolId,
+        recipientUserId: input.recipientUserId,
+        recipientPhone: input.recipientPhone,
+        recipientEmail: input.recipientEmail,
+        channel: input.channel,
+        templateId: input.templateId,
+        title: input.title,
+        body: input.body,
+        data: input.data,
+      });
+
+      const [record] = await db
+        .insert(notifications)
+        .values({
+          schoolId: user.schoolId,
+          recipientUserId: input.recipientUserId ?? null,
+          recipientPhone: input.recipientPhone ?? null,
+          recipientEmail: input.recipientEmail ?? null,
+          channel: input.channel,
+          templateId: input.templateId ?? null,
+          title: input.title,
+          body: input.body,
+          data: input.data ?? null,
+          status: result.status,
+          failureReason: result.failureReason ?? null,
+          sentAt: result.sentAt,
+          deliveredAt: result.deliveredAt ?? null,
+        })
+        .returning();
+
+      return record;
+    },
+
+    async triggerAbsenceAlertsForSession(user: AuthUser, sessionId: string, env?: Partial<Env>) {
+      const [session] = await db
+        .select()
+        .from(attendanceSessions)
+        .where(and(eq(attendanceSessions.schoolId, user.schoolId), eq(attendanceSessions.id, sessionId)))
+        .limit(1);
+
+      if (!session) throw new ApiError(404, 'Attendance session not found');
+
+      const absentRecords = await db
+        .select({
+          recordId: attendanceRecords.id,
+          studentId: attendanceRecords.studentId,
+          studentName: students.fullName,
+        })
+        .from(attendanceRecords)
+        .innerJoin(students, eq(attendanceRecords.studentId, students.id))
+        .where(
+          and(
+            eq(attendanceRecords.sessionId, sessionId),
+            eq(attendanceRecords.status, 'absent'),
+          ),
+        );
+
+      if (absentRecords.length === 0) {
+        return { totalAbsent: 0, dispatchedCount: 0 };
+      }
+
+      const [school] = await db
+        .select({ name: schools.name })
+        .from(schools)
+        .where(eq(schools.id, user.schoolId))
+        .limit(1);
+
+      const service = new NotificationService(env);
+      let dispatchedCount = 0;
+
+      for (const rec of absentRecords) {
+        const [studentDetails] = await db
+          .select({
+            guardianPhone: students.guardianPhone,
+            guardianName: students.guardianName,
+            userId: students.userId,
+          })
+          .from(students)
+          .where(and(eq(students.schoolId, user.schoolId), eq(students.id, rec.studentId)))
+          .limit(1);
+
+        const content = NotificationService.formatAbsenceAlert(rec.studentName, session.attendanceDate, school?.name);
+        const result = await service.dispatch({
+          schoolId: user.schoolId,
+          recipientUserId: studentDetails?.userId ?? null,
+          recipientPhone: studentDetails?.guardianPhone ?? null,
+          recipientEmail: null,
+          channel: 'sms',
+          title: content.title,
+          body: content.body,
+        });
+
+        await db.insert(notifications).values({
+          schoolId: user.schoolId,
+          recipientUserId: studentDetails?.userId ?? null,
+          recipientPhone: studentDetails?.guardianPhone ?? null,
+          recipientEmail: null,
+          channel: 'sms',
+          title: content.title,
+          body: content.body,
+          status: result.status,
+          failureReason: result.failureReason ?? null,
+          sentAt: result.sentAt,
+          deliveredAt: result.deliveredAt ?? null,
+        });
+
+        dispatchedCount++;
+      }
+
+      return { totalAbsent: absentRecords.length, dispatchedCount };
+    },
+
+    async triggerPendingFeeReminders(user: AuthUser, daysThreshold: number = 7, env?: Partial<Env>) {
+      const now = new Date();
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() + daysThreshold);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      const todayStr = now.toISOString().slice(0, 10);
+
+      const pendingAllocations = await db
+        .select({
+          allocationId: studentFeeAllocations.id,
+          studentId: studentFeeAllocations.studentId,
+          studentName: students.fullName,
+          feeTitle: feeStructures.name,
+          amountDue: studentFeeAllocations.amount,
+          dueDate: studentFeeAllocations.dueDate,
+          status: studentFeeAllocations.status,
+        })
+        .from(studentFeeAllocations)
+        .innerJoin(students, eq(studentFeeAllocations.studentId, students.id))
+        .innerJoin(feeStructures, eq(studentFeeAllocations.feeStructureId, feeStructures.id))
+        .where(
+          and(
+            eq(studentFeeAllocations.schoolId, user.schoolId),
+            ne(studentFeeAllocations.status, 'paid'),
+            lte(studentFeeAllocations.dueDate, cutoffStr),
+          ),
+        )
+        .limit(100);
+
+      const service = new NotificationService(env);
+      let dispatchedCount = 0;
+
+      for (const alloc of pendingAllocations) {
+        const isOverdue = alloc.dueDate < todayStr;
+        const [studentDetails] = await db
+          .select({
+            guardianPhone: students.guardianPhone,
+            guardianName: students.guardianName,
+            userId: students.userId,
+          })
+          .from(students)
+          .where(and(eq(students.schoolId, user.schoolId), eq(students.id, alloc.studentId)))
+          .limit(1);
+
+        const content = NotificationService.formatFeeReminder(
+          alloc.studentName,
+          alloc.feeTitle,
+          alloc.amountDue,
+          alloc.dueDate,
+          isOverdue,
+        );
+
+        const result = await service.dispatch({
+          schoolId: user.schoolId,
+          recipientUserId: studentDetails?.userId ?? null,
+          recipientPhone: studentDetails?.guardianPhone ?? null,
+          recipientEmail: null,
+          channel: 'whatsapp',
+          title: content.title,
+          body: content.body,
+        });
+
+        await db.insert(notifications).values({
+          schoolId: user.schoolId,
+          recipientUserId: studentDetails?.userId ?? null,
+          recipientPhone: studentDetails?.guardianPhone ?? null,
+          recipientEmail: null,
+          channel: 'whatsapp',
+          title: content.title,
+          body: content.body,
+          status: result.status,
+          failureReason: result.failureReason ?? null,
+          sentAt: result.sentAt,
+          deliveredAt: result.deliveredAt ?? null,
+        });
+
+        dispatchedCount++;
+      }
+
+      return { totalPending: pendingAllocations.length, dispatchedCount };
+    },
+
+    async portalNotifications(user: AuthUser) {
+      return db
+        .select()
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.schoolId, user.schoolId),
+            sql`(${notifications.recipientUserId} = ${user.appUserId} OR ${notifications.recipientUserId} IS NULL)`,
+          ),
+        )
+        .orderBy(desc(notifications.createdAt))
+        .limit(50);
+    },
+
+    async getTeacherAvailability(user: AuthUser, staffId?: string) {
+      const targetStaffId = staffId ?? user.staffId;
+      if (!targetStaffId) throw new ApiError(400, 'Teacher staff ID is required');
+
+      const [existing] = await db
+        .select()
+        .from(teacherAvailabilitySettings)
+        .where(and(eq(teacherAvailabilitySettings.schoolId, user.schoolId), eq(teacherAvailabilitySettings.staffId, targetStaffId)))
+        .limit(1);
+
+      if (existing) return existing;
+
+      return {
+        id: null,
+        schoolId: user.schoolId,
+        staffId: targetStaffId,
+        startTime: '09:00',
+        endTime: '16:30',
+        availableDays: '1,2,3,4,5',
+        autoReplyMessage: 'Thank you for reaching out. I am currently outside my teaching communication hours and will review your message when school resumes.',
+        isEnabled: true,
+      };
+    },
+
+    async updateTeacherAvailability(
+      user: AuthUser,
+      input: z.infer<typeof updateTeacherAvailabilitySchema>,
+      targetStaffId?: string,
+    ) {
+      const staffId = targetStaffId ?? user.staffId;
+      if (!staffId) throw new ApiError(400, 'Teacher staff ID is required');
+
+      const [existing] = await db
+        .select({ id: teacherAvailabilitySettings.id })
+        .from(teacherAvailabilitySettings)
+        .where(and(eq(teacherAvailabilitySettings.schoolId, user.schoolId), eq(teacherAvailabilitySettings.staffId, staffId)))
+        .limit(1);
+
+      if (existing) {
+        const [updated] = await db
+          .update(teacherAvailabilitySettings)
+          .set({
+            startTime: input.startTime,
+            endTime: input.endTime,
+            availableDays: input.availableDays,
+            autoReplyMessage: input.autoReplyMessage,
+            isEnabled: input.isEnabled,
+            updatedAt: new Date(),
+          })
+          .where(eq(teacherAvailabilitySettings.id, existing.id))
+          .returning();
+        return updated;
+      }
+
+      const [created] = await db
+        .insert(teacherAvailabilitySettings)
+        .values({
+          schoolId: user.schoolId,
+          staffId,
+          startTime: input.startTime,
+          endTime: input.endTime,
+          availableDays: input.availableDays,
+          autoReplyMessage: input.autoReplyMessage,
+          isEnabled: input.isEnabled,
+        })
+        .returning();
+
+      return created;
+    },
+
+    async listChatConversations(user: AuthUser) {
+      const conditions = [eq(chatConversations.schoolId, user.schoolId)];
+      if (user.roles.includes('teacher') && user.staffId) {
+        conditions.push(eq(chatConversations.teacherStaffId, user.staffId));
+      } else if (user.roles.includes('parent') && !user.roles.includes('admin')) {
+        conditions.push(eq(chatConversations.parentAppUserId, user.appUserId));
+      }
+
+      const convs = await db
+        .select({
+          id: chatConversations.id,
+          studentId: chatConversations.studentId,
+          studentName: students.fullName,
+          teacherStaffId: chatConversations.teacherStaffId,
+          teacherName: staff.fullName,
+          parentAppUserId: chatConversations.parentAppUserId,
+          parentName: appUsers.displayName,
+          subject: chatConversations.subject,
+          status: chatConversations.status,
+          lastMessageAt: chatConversations.lastMessageAt,
+          createdAt: chatConversations.createdAt,
+        })
+        .from(chatConversations)
+        .innerJoin(students, eq(chatConversations.studentId, students.id))
+        .innerJoin(staff, eq(chatConversations.teacherStaffId, staff.id))
+        .innerJoin(appUsers, eq(chatConversations.parentAppUserId, appUsers.id))
+        .where(and(...conditions))
+        .orderBy(desc(chatConversations.lastMessageAt));
+
+      return convs;
+    },
+
+    async createChatConversation(
+      user: AuthUser,
+      input: z.infer<typeof createChatConversationSchema>,
+    ) {
+      const parentUserId = user.appUserId;
+
+      const [conv] = await db
+        .insert(chatConversations)
+        .values({
+          schoolId: user.schoolId,
+          studentId: input.studentId,
+          teacherStaffId: input.teacherStaffId,
+          parentAppUserId: parentUserId,
+          subject: input.subject,
+          status: 'active',
+          lastMessageAt: new Date(),
+        })
+        .returning();
+
+      if (!conv) throw new ApiError(500, 'Failed to create conversation');
+
+      let initialMsg = null;
+      let autoReplyMsg = null;
+
+      if (input.initialMessage) {
+        const [msg] = await db
+          .insert(chatMessages)
+          .values({
+            conversationId: conv.id,
+            senderAppUserId: user.appUserId,
+            senderRole: user.roles.includes('teacher') ? 'teacher' : 'parent',
+            content: input.initialMessage,
+            isRead: false,
+            isAutoReply: false,
+          })
+          .returning();
+        initialMsg = msg;
+
+        if (!user.roles.includes('teacher')) {
+          const avail = await this.getTeacherAvailability(user, input.teacherStaffId);
+          if (avail && !isTeacherAvailableNow(avail)) {
+            const [reply] = await db
+              .insert(chatMessages)
+              .values({
+                conversationId: conv.id,
+                senderAppUserId: user.appUserId,
+                senderRole: 'teacher',
+                content: avail.autoReplyMessage,
+                isRead: false,
+                isAutoReply: true,
+              })
+              .returning();
+            autoReplyMsg = reply;
+          }
+        }
+      }
+
+      return {
+        conversation: conv,
+        initialMessage: initialMsg,
+        autoReply: autoReplyMsg,
+      };
+    },
+
+
+    async listChatMessages(user: AuthUser, conversationId: string) {
+      const [conv] = await db
+        .select()
+        .from(chatConversations)
+        .where(and(eq(chatConversations.schoolId, user.schoolId), eq(chatConversations.id, conversationId)))
+        .limit(1);
+
+      if (!conv) throw new ApiError(404, 'Conversation not found');
+
+      const isTeacher = user.staffId && conv.teacherStaffId === user.staffId;
+      const isParent = conv.parentAppUserId === user.appUserId;
+      const isAdmin = user.roles.includes('admin');
+
+      if (!isTeacher && !isParent && !isAdmin) {
+        throw new ApiError(403, 'You do not have access to this conversation');
+      }
+
+      await db
+        .update(chatMessages)
+        .set({ isRead: true })
+        .where(
+          and(
+            eq(chatMessages.conversationId, conversationId),
+            ne(chatMessages.senderAppUserId, user.appUserId),
+            eq(chatMessages.isRead, false),
+          ),
+        );
+
+      const msgs = await db
+        .select()
+        .from(chatMessages)
+        .where(eq(chatMessages.conversationId, conversationId))
+        .orderBy(chatMessages.createdAt);
+
+      return {
+        conversation: conv,
+        messages: msgs,
+      };
+    },
+
+    async sendChatMessage(
+      user: AuthUser,
+      conversationId: string,
+      input: z.infer<typeof sendChatMessageSchema>,
+      now: Date = new Date(),
+    ) {
+      const [conv] = await db
+        .select()
+        .from(chatConversations)
+        .where(and(eq(chatConversations.schoolId, user.schoolId), eq(chatConversations.id, conversationId)))
+        .limit(1);
+
+      if (!conv) throw new ApiError(404, 'Conversation not found');
+
+      const isTeacher = user.staffId && conv.teacherStaffId === user.staffId;
+      const isParent = conv.parentAppUserId === user.appUserId;
+      const isAdmin = user.roles.includes('admin');
+
+      if (!isTeacher && !isParent && !isAdmin) {
+        throw new ApiError(403, 'You do not have access to this conversation');
+      }
+
+      const senderRole = isTeacher ? 'teacher' : 'parent';
+
+      const [msg] = await db
+        .insert(chatMessages)
+        .values({
+          conversationId,
+          senderAppUserId: user.appUserId,
+          senderRole,
+          content: input.content,
+          isRead: false,
+          isAutoReply: false,
+        })
+        .returning();
+
+      await db
+        .update(chatConversations)
+        .set({ lastMessageAt: now, updatedAt: now })
+        .where(eq(chatConversations.id, conversationId));
+
+      let autoReplyMsg = null;
+      if (senderRole === 'parent') {
+        const avail = await this.getTeacherAvailability(user, conv.teacherStaffId);
+        if (avail && !isTeacherAvailableNow(avail, now)) {
+          const [reply] = await db
+            .insert(chatMessages)
+            .values({
+              conversationId,
+              senderAppUserId: user.appUserId,
+              senderRole: 'teacher',
+              content: avail.autoReplyMessage,
+              isRead: false,
+              isAutoReply: true,
+            })
+            .returning();
+          autoReplyMsg = reply;
+        }
+      }
+
+      return {
+        message: msg,
+        autoReply: autoReplyMsg,
+      };
+    },
+
+    // Phase 11: Audit Logging
+    async createAuditLog(params: {
+      schoolId: string;
+      userId?: string | null | undefined;
+      userEmail: string;
+      userRole: string;
+      action: string;
+      resourceType: string;
+      resourceId?: string | null | undefined;
+      ipAddress?: string | null | undefined;
+      details?: Record<string, unknown> | null | undefined;
+    }) {
+      const [log] = await db
+        .insert(auditLogs)
+        .values({
+          schoolId: params.schoolId,
+          userId: params.userId ?? null,
+          userEmail: params.userEmail,
+          userRole: params.userRole,
+          action: params.action,
+          resourceType: params.resourceType,
+          resourceId: params.resourceId ?? null,
+          ipAddress: params.ipAddress ?? null,
+          details: params.details ?? null,
+        })
+        .returning();
+      return log;
+    },
+
+    async listAuditLogs(
+      user: AuthUser,
+      query: { action?: string | undefined; resourceType?: string | undefined; limit?: number | undefined },
+    ) {
+      const conditions = [eq(auditLogs.schoolId, user.schoolId)];
+      if (query.action) conditions.push(eq(auditLogs.action, query.action));
+      if (query.resourceType) conditions.push(eq(auditLogs.resourceType, query.resourceType));
+
+      return db
+        .select()
+        .from(auditLogs)
+        .where(and(...conditions))
+        .orderBy(desc(auditLogs.createdAt))
+        .limit(query.limit ?? 50);
+    },
+
+    // Phase 11: DPDP Consents
+    async recordDpdpConsent(
+      user: AuthUser,
+      input: {
+        studentId: string;
+        parentGuardianName: string;
+        parentGuardianPhone: string;
+        consentType: string;
+        verifiedVia?: ('portal_submission' | 'signed_form' | 'sms_otp') | undefined;
+        ipAddress?: string | null | undefined;
+        validUntil?: string | null | undefined;
+      },
+    ) {
+      const [consent] = await db
+        .insert(dpdpConsents)
+        .values({
+          schoolId: user.schoolId,
+          studentId: input.studentId,
+          parentGuardianName: input.parentGuardianName,
+          parentGuardianPhone: input.parentGuardianPhone,
+          consentType: input.consentType,
+          status: 'granted',
+          verifiedVia: input.verifiedVia ?? 'portal_submission',
+          ipAddress: input.ipAddress ?? null,
+          validUntil: input.validUntil ? new Date(input.validUntil) : null,
+        })
+        .returning();
+
+      await this.createAuditLog({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        userEmail: user.email,
+        userRole: user.roles[0] ?? 'admin',
+        action: 'record_dpdp_consent',
+        resourceType: 'dpdp_consent',
+        resourceId: consent?.id,
+        details: { consentType: input.consentType, studentId: input.studentId },
+      });
+
+      return consent;
+    },
+
+    async listDpdpConsents(
+      user: AuthUser,
+      query?: { studentId?: string | undefined; status?: ('granted' | 'revoked' | 'expired') | undefined } | undefined,
+    ) {
+      const conditions = [eq(dpdpConsents.schoolId, user.schoolId)];
+      if (query?.studentId) conditions.push(eq(dpdpConsents.studentId, query.studentId));
+      if (query?.status) conditions.push(eq(dpdpConsents.status, query.status));
+
+      return db
+        .select({
+          id: dpdpConsents.id,
+          studentId: dpdpConsents.studentId,
+          studentName: students.fullName,
+          parentGuardianName: dpdpConsents.parentGuardianName,
+          parentGuardianPhone: dpdpConsents.parentGuardianPhone,
+          consentType: dpdpConsents.consentType,
+          status: dpdpConsents.status,
+          verifiedVia: dpdpConsents.verifiedVia,
+          validUntil: dpdpConsents.validUntil,
+          createdAt: dpdpConsents.createdAt,
+        })
+        .from(dpdpConsents)
+        .leftJoin(students, eq(students.id, dpdpConsents.studentId))
+        .where(and(...conditions))
+        .orderBy(desc(dpdpConsents.createdAt))
+        .limit(100);
+    },
+
+    // Phase 11: Data Subject Rights (DSR) Requests
+    async createDsrRequest(
+      user: AuthUser,
+      input: {
+        studentId?: string | null | undefined;
+        requestType: 'data_access' | 'data_rectification' | 'data_erasure_anonymization';
+        reason: string;
+      },
+    ) {
+      const [req] = await db
+        .insert(dataSubjectRequests)
+        .values({
+          schoolId: user.schoolId,
+          requesterUserId: user.appUserId,
+          requesterRole: user.roles[0] ?? 'parent',
+          studentId: input.studentId ?? null,
+          requestType: input.requestType,
+          status: 'pending',
+          reason: input.reason,
+        })
+        .returning();
+
+      await this.createAuditLog({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        userEmail: user.email,
+        userRole: user.roles[0] ?? 'parent',
+        action: 'create_dsr_request',
+        resourceType: 'data_subject_request',
+        resourceId: req?.id,
+        details: { requestType: input.requestType },
+      });
+
+      return req;
+    },
+
+    async listDsrRequests(
+      user: AuthUser,
+      status?: ('pending' | 'in_review' | 'fulfilled' | 'rejected') | undefined,
+    ) {
+      const conditions = [eq(dataSubjectRequests.schoolId, user.schoolId)];
+      if (status) conditions.push(eq(dataSubjectRequests.status, status));
+
+      return db
+        .select({
+          id: dataSubjectRequests.id,
+          requesterUserId: dataSubjectRequests.requesterUserId,
+          requesterRole: dataSubjectRequests.requesterRole,
+          studentId: dataSubjectRequests.studentId,
+          studentName: students.fullName,
+          requestType: dataSubjectRequests.requestType,
+          status: dataSubjectRequests.status,
+          reason: dataSubjectRequests.reason,
+          resolutionNotes: dataSubjectRequests.resolutionNotes,
+          resolvedAt: dataSubjectRequests.resolvedAt,
+          createdAt: dataSubjectRequests.createdAt,
+        })
+        .from(dataSubjectRequests)
+        .leftJoin(students, eq(students.id, dataSubjectRequests.studentId))
+        .where(and(...conditions))
+        .orderBy(desc(dataSubjectRequests.createdAt))
+        .limit(100);
+    },
+
+    async resolveDsrRequest(
+      user: AuthUser,
+      id: string,
+      input: {
+        status: 'fulfilled' | 'rejected' | 'in_review';
+        resolutionNotes: string;
+        anonymizeStudent?: boolean | undefined;
+      },
+    ) {
+      const [req] = await db
+        .select()
+        .from(dataSubjectRequests)
+        .where(and(eq(dataSubjectRequests.id, id), eq(dataSubjectRequests.schoolId, user.schoolId)))
+        .limit(1);
+
+      if (!req) throw new ApiError(404, 'Data subject request not found');
+
+      if (input.status === 'fulfilled' && input.anonymizeStudent && req.studentId) {
+        await this.anonymizeStudent(user, req.studentId);
+      }
+
+      const [updated] = await db
+        .update(dataSubjectRequests)
+        .set({
+          status: input.status,
+          resolutionNotes: input.resolutionNotes,
+          resolvedAt: new Date(),
+          resolvedByUserId: user.appUserId,
+          updatedAt: new Date(),
+        })
+        .where(eq(dataSubjectRequests.id, id))
+        .returning();
+
+      await this.createAuditLog({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        userEmail: user.email,
+        userRole: user.roles[0] ?? 'admin',
+        action: 'resolve_dsr_request',
+        resourceType: 'data_subject_request',
+        resourceId: id,
+        details: { status: input.status, anonymized: !!input.anonymizeStudent },
+      });
+
+      return updated;
+    },
+
+    async anonymizeStudent(user: AuthUser, studentId: string) {
+      const [student] = await db
+        .select()
+        .from(students)
+        .where(and(eq(students.id, studentId), eq(students.schoolId, user.schoolId)))
+        .limit(1);
+
+      if (!student) throw new ApiError(404, 'Student not found');
+
+      await db
+        .update(students)
+        .set({
+          fullName: `Anonymized Student (${student.admissionNumber})`,
+          guardianName: 'Redacted (DPDP)',
+          guardianPhone: '0000000000',
+          updatedAt: new Date(),
+        })
+        .where(eq(students.id, studentId));
+
+      await this.createAuditLog({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        userEmail: user.email,
+        userRole: user.roles[0] ?? 'admin',
+        action: 'anonymize_student_record',
+        resourceType: 'student',
+        resourceId: studentId,
+        details: { reason: 'DPDP Right to Erasure / Anonymization fulfilled' },
+      });
+
+      return { success: true, studentId };
+    },
+
+    // Phase 11: Enterprise Roles & Class Teacher Assignment
+    async assignSectionClassTeacher(
+      user: AuthUser,
+      sectionId: string,
+      classTeacherStaffId: string | null | undefined,
+    ) {
+      const [section] = await db
+        .update(sections)
+        .set({
+          classTeacherStaffId: classTeacherStaffId ?? null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(sections.id, sectionId), eq(sections.schoolId, user.schoolId)))
+        .returning();
+
+      if (!section) throw new ApiError(404, 'Section not found');
+
+      await this.createAuditLog({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        userEmail: user.email,
+        userRole: user.roles[0] ?? 'admin',
+        action: 'assign_class_teacher',
+        resourceType: 'section',
+        resourceId: sectionId,
+        details: { classTeacherStaffId: classTeacherStaffId ?? null },
+      });
+
+      return section;
+    },
+
+    // Phase 11: Fee Structure Heads
+    async createFeeStructureHead(
+      user: AuthUser,
+      input: {
+        feeStructureId: string;
+        headName: string;
+        amount: number;
+        isOptional?: boolean | undefined;
+      },
+    ) {
+      const [head] = await db
+        .insert(feeStructureHeads)
+        .values({
+          schoolId: user.schoolId,
+          feeStructureId: input.feeStructureId,
+          headName: input.headName,
+          amount: input.amount,
+          isOptional: input.isOptional ?? false,
+        })
+        .returning();
+      return head;
+    },
+
+    async listFeeStructureHeads(user: AuthUser, feeStructureId: string) {
+      return db
+        .select()
+        .from(feeStructureHeads)
+        .where(and(eq(feeStructureHeads.schoolId, user.schoolId), eq(feeStructureHeads.feeStructureId, feeStructureId)))
+        .orderBy(desc(feeStructureHeads.createdAt));
+    },
+
+    // Phase 11: Fee Concessions
+    async createFeeConcession(
+      user: AuthUser,
+      input: {
+        name: string;
+        code: string;
+        type: 'percentage' | 'flat';
+        value: number;
+        category: 'merit' | 'sibling' | 'staff_ward' | 'financial_aid' | 'sports';
+      },
+    ) {
+      const [concession] = await db
+        .insert(feeConcessions)
+        .values({
+          schoolId: user.schoolId,
+          name: input.name,
+          code: input.code.toUpperCase(),
+          type: input.type,
+          value: input.value,
+          category: input.category,
+        })
+        .returning();
+
+      await this.createAuditLog({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        userEmail: user.email,
+        userRole: user.roles[0] ?? 'accountant',
+        action: 'create_fee_concession',
+        resourceType: 'fee_concession',
+        resourceId: concession?.id,
+        details: { name: input.name, code: input.code, type: input.type, value: input.value },
+      });
+
+      return concession;
+    },
+
+    async listFeeConcessions(user: AuthUser) {
+      return db
+        .select()
+        .from(feeConcessions)
+        .where(eq(feeConcessions.schoolId, user.schoolId))
+        .orderBy(desc(feeConcessions.createdAt));
+    },
+
+    async applyStudentConcession(
+      user: AuthUser,
+      input: {
+        studentId: string;
+        allocationId: string;
+        concessionId: string;
+        reason?: string | undefined;
+      },
+    ) {
+      const [alloc] = await db
+        .select()
+        .from(studentFeeAllocations)
+        .where(and(eq(studentFeeAllocations.id, input.allocationId), eq(studentFeeAllocations.schoolId, user.schoolId)))
+        .limit(1);
+
+      if (!alloc) throw new ApiError(404, 'Fee allocation not found');
+
+      const [concession] = await db
+        .select()
+        .from(feeConcessions)
+        .where(and(eq(feeConcessions.id, input.concessionId), eq(feeConcessions.schoolId, user.schoolId)))
+        .limit(1);
+
+      if (!concession) throw new ApiError(404, 'Concession policy not found');
+
+      let discount = 0;
+      if (concession.type === 'percentage') {
+        discount = Math.round((alloc.amount * concession.value) / 100);
+      } else {
+        discount = Math.min(concession.value, alloc.amount);
+      }
+
+      const [studentConcession] = await db
+        .insert(studentFeeConcessions)
+        .values({
+          schoolId: user.schoolId,
+          studentId: input.studentId,
+          allocationId: input.allocationId,
+          concessionId: input.concessionId,
+          appliedAmount: discount,
+          reason: input.reason ?? null,
+          approvedByUserId: user.appUserId,
+        })
+        .returning();
+
+      const newAmount = Math.max(0, alloc.amount - discount);
+      await db
+        .update(studentFeeAllocations)
+        .set({
+          amount: newAmount,
+          status: newAmount === 0 ? 'paid' : alloc.status,
+          updatedAt: new Date(),
+        })
+        .where(eq(studentFeeAllocations.id, alloc.id));
+
+      await this.createAuditLog({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        userEmail: user.email,
+        userRole: user.roles[0] ?? 'accountant',
+        action: 'apply_student_concession',
+        resourceType: 'student_fee_concession',
+        resourceId: studentConcession?.id,
+        details: { allocationId: alloc.id, originalAmount: alloc.amount, discount, newAmount },
+      });
+
+      return {
+        concession: studentConcession,
+        newAllocationAmount: newAmount,
+      };
+    },
+
+    async listStudentConcessions(
+      user: AuthUser,
+      query?: { studentId?: string | undefined; allocationId?: string | undefined } | undefined,
+    ) {
+      const conditions = [eq(studentFeeConcessions.schoolId, user.schoolId)];
+      if (query?.studentId) conditions.push(eq(studentFeeConcessions.studentId, query.studentId));
+      if (query?.allocationId) conditions.push(eq(studentFeeConcessions.allocationId, query.allocationId));
+
+      return db
+        .select({
+          id: studentFeeConcessions.id,
+          studentId: studentFeeConcessions.studentId,
+          studentName: students.fullName,
+          allocationId: studentFeeConcessions.allocationId,
+          concessionName: feeConcessions.name,
+          concessionCode: feeConcessions.code,
+          appliedAmount: studentFeeConcessions.appliedAmount,
+          reason: studentFeeConcessions.reason,
+          createdAt: studentFeeConcessions.createdAt,
+        })
+        .from(studentFeeConcessions)
+        .leftJoin(students, eq(students.id, studentFeeConcessions.studentId))
+        .leftJoin(feeConcessions, eq(feeConcessions.id, studentFeeConcessions.concessionId))
+        .where(and(...conditions))
+        .orderBy(desc(studentFeeConcessions.createdAt));
+    },
+
+    // Phase 11: Fee Refunds
+    async createFeeRefund(
+      user: AuthUser,
+      input: {
+        allocationId: string;
+        studentId: string;
+        paymentId?: string | null | undefined;
+        amount: number;
+        reason: string;
+        mode?: ('bank_transfer' | 'cash' | 'cheque' | 'gateway_refund') | undefined;
+        referenceNumber?: string | null | undefined;
+      },
+    ) {
+      const refundNumber = `REF-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1000)}`;
+
+      const [refund] = await db
+        .insert(feeRefunds)
+        .values({
+          schoolId: user.schoolId,
+          allocationId: input.allocationId,
+          studentId: input.studentId,
+          paymentId: input.paymentId ?? null,
+          refundNumber,
+          amount: input.amount,
+          reason: input.reason,
+          mode: input.mode ?? 'bank_transfer',
+          referenceNumber: input.referenceNumber ?? null,
+          status: 'pending',
+          approvedByUserId: user.appUserId,
+        })
+        .returning();
+
+      await this.createAuditLog({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        userEmail: user.email,
+        userRole: user.roles[0] ?? 'accountant',
+        action: 'create_fee_refund',
+        resourceType: 'fee_refund',
+        resourceId: refund?.id,
+        details: { refundNumber, amount: input.amount, reason: input.reason },
+      });
+
+      return refund;
+    },
+
+    async listFeeRefunds(
+      user: AuthUser,
+      status?: ('pending' | 'approved' | 'processed' | 'rejected') | undefined,
+    ) {
+      const conditions = [eq(feeRefunds.schoolId, user.schoolId)];
+      if (status) conditions.push(eq(feeRefunds.status, status));
+
+      return db
+        .select({
+          id: feeRefunds.id,
+          refundNumber: feeRefunds.refundNumber,
+          studentId: feeRefunds.studentId,
+          studentName: students.fullName,
+          allocationId: feeRefunds.allocationId,
+          amount: feeRefunds.amount,
+          reason: feeRefunds.reason,
+          mode: feeRefunds.mode,
+          referenceNumber: feeRefunds.referenceNumber,
+          status: feeRefunds.status,
+          processedAt: feeRefunds.processedAt,
+          createdAt: feeRefunds.createdAt,
+        })
+        .from(feeRefunds)
+        .leftJoin(students, eq(students.id, feeRefunds.studentId))
+        .where(and(...conditions))
+        .orderBy(desc(feeRefunds.createdAt));
+    },
+
+    async updateFeeRefundStatus(user: AuthUser, refundId: string, status: 'approved' | 'processed' | 'rejected') {
+      const [refund] = await db
+        .update(feeRefunds)
+        .set({
+          status,
+          processedAt: status === 'processed' ? new Date() : null,
+          approvedByUserId: user.appUserId,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(feeRefunds.id, refundId), eq(feeRefunds.schoolId, user.schoolId)))
+        .returning();
+
+      if (!refund) throw new ApiError(404, 'Refund not found');
+
+      await this.createAuditLog({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        userEmail: user.email,
+        userRole: user.roles[0] ?? 'accountant',
+        action: `refund_${status}`,
+        resourceType: 'fee_refund',
+        resourceId: refundId,
+        details: { status, amount: refund.amount },
+      });
+
+      return refund;
     },
   };
 }
@@ -3679,3 +5223,71 @@ function toMinutes(value: string) {
   const [hour, minute] = value.split(':').map(Number);
   return (hour ?? 0) * 60 + (minute ?? 0);
 }
+
+function isTeacherAvailableNow(
+  settings: {
+    startTime: string;
+    endTime: string;
+    availableDays: string;
+    isEnabled: boolean;
+  },
+  now: Date = new Date(),
+): boolean {
+  if (!settings.isEnabled) return true;
+
+  const currentDay = now.getDay() === 0 ? 7 : now.getDay();
+  const allowedDays = settings.availableDays.split(',').map((s) => Number(s.trim()));
+  if (!allowedDays.includes(currentDay)) {
+    return false;
+  }
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const [startH, startM] = settings.startTime.split(':').map(Number);
+  const [endH, endM] = settings.endTime.split(':').map(Number);
+  const startMinutes = (startH ?? 0) * 60 + (startM ?? 0);
+  const endMinutes = (endH ?? 0) * 60 + (endM ?? 0);
+
+  return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+}
+
+export function calculateLateFee(
+  dueDateStr: string,
+  baseAmount: number,
+  policy: {
+    lateFeeGracePeriodDays: number;
+    lateFeeType: string; // 'none' | 'flat' | 'daily'
+    lateFeeAmount: number;
+  },
+  now: Date = new Date(),
+): { isOverdue: boolean; lateFee: number; totalDue: number; daysLate: number } {
+  const dueDate = new Date(dueDateStr);
+  const graceDate = new Date(dueDate);
+  graceDate.setDate(graceDate.getDate() + (policy.lateFeeGracePeriodDays || 0));
+
+  if (now <= graceDate || policy.lateFeeType === 'none' || policy.lateFeeAmount <= 0) {
+    return {
+      isOverdue: now > dueDate,
+      lateFee: 0,
+      totalDue: baseAmount,
+      daysLate: 0,
+    };
+  }
+
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const daysLate = Math.max(1, Math.floor((now.getTime() - graceDate.getTime()) / msPerDay));
+
+  let lateFee = 0;
+  if (policy.lateFeeType === 'flat') {
+    lateFee = policy.lateFeeAmount;
+  } else if (policy.lateFeeType === 'daily') {
+    lateFee = policy.lateFeeAmount * daysLate;
+  }
+
+  return {
+    isOverdue: true,
+    lateFee,
+    totalDue: baseAmount + lateFee,
+    daysLate,
+  };
+}
+

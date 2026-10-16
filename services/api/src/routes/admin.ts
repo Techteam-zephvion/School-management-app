@@ -6,6 +6,7 @@ import { createDb } from '../db/client';
 import { requireRole } from '../http/auth';
 import { ApiError } from '../http/errors';
 import { createSchoolRepository } from '../repositories/school-repository';
+import { DocumentStorage } from '../storage/r2-storage';
 import type { AppBindings } from '../types';
 import {
   aiAttendanceInsightsSchema,
@@ -37,13 +38,73 @@ import {
   admissionQuerySchema,
   addAdmissionDocumentSchema,
   updateAdmissionDocumentSchema,
+  bulkImportPreviewSchema,
+  bulkImportCommitSchema,
+  onboardingWizardSchema,
+  sendNotificationSchema,
+  notificationQuerySchema,
+  recordConsentSchema,
+  createDsrRequestSchema,
+  resolveDsrRequestSchema,
+  auditLogQuerySchema,
+  createFeeConcessionSchema,
+  applyStudentConcessionSchema,
+  createFeeRefundSchema,
+  updateRefundStatusSchema,
+  createFeeStructureHeadSchema,
+  assignSectionClassTeacherSchema,
 } from '../http/validation';
 
 
 export const adminRoutes = new Hono<AppBindings>();
 
 adminRoutes.use('*', async (c, next) => {
-  requireRole(c.get('authUser'), ['admin']);
+  const user = c.get('authUser');
+  requireRole(user, ['admin', 'principal', 'accountant', 'admissions_officer']);
+
+  const path = c.req.path;
+  const method = c.req.method;
+
+  // Principal has read-only institutional oversight
+  if (user.roles.includes('principal') && !user.roles.includes('admin')) {
+    if (method !== 'GET') {
+      throw new ApiError(403, 'Principal role has read-only institutional access');
+    }
+  }
+
+  // Accountant is restricted to finance, fee, concession, and refund endpoints
+  if (
+    user.roles.includes('accountant') &&
+    !user.roles.includes('admin') &&
+    !user.roles.includes('principal')
+  ) {
+    const isFeeOrFinance =
+      path.includes('/fees') ||
+      path.includes('/concessions') ||
+      path.includes('/refunds') ||
+      path.includes('/overview');
+    if (!isFeeOrFinance) {
+      throw new ApiError(403, 'Accountant role is restricted to financial operations');
+    }
+  }
+
+  // Admissions Officer is restricted to admissions, student records, and onboarding
+  if (
+    user.roles.includes('admissions_officer') &&
+    !user.roles.includes('admin') &&
+    !user.roles.includes('principal')
+  ) {
+    const isAdmissions =
+      path.includes('/admissions') ||
+      path.includes('/students') ||
+      path.includes('/onboarding') ||
+      path.includes('/overview') ||
+      path.includes('/dpdp');
+    if (!isAdmissions) {
+      throw new ApiError(403, 'Admissions Officer role is restricted to admissions and enrollment');
+    }
+  }
+
   await next();
 });
 
@@ -396,7 +457,104 @@ adminRoutes
     zValidator('param', idSchema),
     async (c) => {
       const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
-      return c.json(await repo.deleteAdmissionDocument(c.get('authUser'), c.req.valid('param').id));
+      const res = await repo.deleteAdmissionDocument(c.get('authUser'), c.req.valid('param').id);
+      if (res.deletedFileKey) {
+        const storage = new DocumentStorage(c.env.DOCUMENTS_BUCKET);
+        await storage.deleteFile(res.deletedFileKey);
+      }
+      return c.json(res);
+    },
+  );
+
+adminRoutes
+  .post(
+    '/admissions/applications/:id/documents/:docId/upload',
+    zValidator('param', z.object({ id: z.string().uuid(), docId: z.string().uuid() })),
+    async (c) => {
+      const { id: applicationId, docId } = c.req.valid('param');
+      const authUser = c.get('authUser');
+      const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+
+      const body = await c.req.parseBody();
+      const file = body['file'];
+
+      let fileName = 'document.pdf';
+      let contentType = 'application/octet-stream';
+      let bytes: Uint8Array;
+
+      if (file && typeof file === 'object' && 'arrayBuffer' in file) {
+        const f = file as File;
+        fileName = f.name || fileName;
+        contentType = f.type || contentType;
+        bytes = new Uint8Array(await f.arrayBuffer());
+      } else if (typeof file === 'string') {
+        bytes = new TextEncoder().encode(file);
+      } else {
+        const raw = await c.req.arrayBuffer();
+        if (raw.byteLength === 0) {
+          throw new ApiError(400, 'No file uploaded');
+        }
+        bytes = new Uint8Array(raw);
+        contentType = c.req.header('content-type') || contentType;
+        const headerName = c.req.header('x-filename');
+        if (headerName) fileName = headerName;
+      }
+
+      const storage = new DocumentStorage(c.env.DOCUMENTS_BUCKET);
+      const stored = await storage.uploadFile({
+        schoolId: authUser.schoolId,
+        applicationId,
+        documentId: docId,
+        fileName,
+        contentType,
+        data: bytes,
+      });
+
+      const updated = await repo.attachAdmissionDocumentFile(authUser, applicationId, docId, stored);
+      return c.json(updated, 201);
+    },
+  )
+  .get(
+    '/admissions/applications/:id/documents/:docId/download',
+    zValidator('param', z.object({ id: z.string().uuid(), docId: z.string().uuid() })),
+    async (c) => {
+      const { id: applicationId, docId } = c.req.valid('param');
+      const authUser = c.get('authUser');
+      const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+
+      const doc = await repo.getAdmissionDocument(authUser, docId);
+      if (!doc.fileKey) {
+        throw new ApiError(404, 'No file is attached to this document');
+      }
+
+      const storage = new DocumentStorage(c.env.DOCUMENTS_BUCKET);
+      const file = await storage.getFile(doc.fileKey);
+      if (!file) {
+        throw new ApiError(404, 'Attached file was not found in storage');
+      }
+
+      c.header('Content-Type', file.contentType);
+      c.header('Content-Length', String(file.contentLength));
+      c.header('Content-Disposition', `inline; filename="${doc.fileName || file.fileName}"`);
+      c.header('Cache-Control', 'private, max-age=3600');
+
+      return c.body(file.body as any);
+    },
+  )
+  .delete(
+    '/admissions/documents/:id/file',
+    zValidator('param', idSchema),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      const authUser = c.get('authUser');
+      const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+
+      const res = await repo.removeAdmissionDocumentFile(authUser, id);
+      if (res.deletedFileKey) {
+        const storage = new DocumentStorage(c.env.DOCUMENTS_BUCKET);
+        await storage.deleteFile(res.deletedFileKey);
+      }
+      return c.json({ success: true, document: res.document });
     },
   );
 
@@ -526,3 +684,235 @@ adminRoutes.get(
     return c.json(await repo.studentAttendanceSummary(c.get('authUser'), param.id));
   },
 );
+
+adminRoutes.post('/imports/preview', zValidator('json', bulkImportPreviewSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const body = c.req.valid('json');
+  return c.json(await repo.previewBulkImport(c.get('authUser'), body.entity, body.csv));
+});
+
+adminRoutes.post('/imports/commit', zValidator('json', bulkImportCommitSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const body = c.req.valid('json');
+  return c.json(await repo.commitBulkImport(c.get('authUser'), body), 201);
+});
+
+adminRoutes.get('/onboarding/status', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.getOnboardingStatus(c.get('authUser')));
+});
+
+adminRoutes.post('/onboarding/wizard', zValidator('json', onboardingWizardSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const body = c.req.valid('json');
+  return c.json(await repo.runOnboardingWizard(c.get('authUser'), body), 201);
+});
+
+adminRoutes.get('/notifications', zValidator('query', notificationQuerySchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.listNotifications(c.get('authUser'), c.req.valid('query')));
+});
+
+adminRoutes.post('/notifications/send', zValidator('json', sendNotificationSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const body = c.req.valid('json');
+  return c.json(await repo.sendNotification(c.get('authUser'), body, c.env), 201);
+});
+
+adminRoutes.post(
+  '/notifications/trigger-absence-alerts',
+  zValidator('json', z.object({ sessionId: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    const body = c.req.valid('json');
+    return c.json(await repo.triggerAbsenceAlertsForSession(c.get('authUser'), body.sessionId, c.env));
+  },
+);
+
+adminRoutes.post(
+  '/notifications/trigger-fee-reminders',
+  zValidator('query', z.object({ days: z.coerce.number().optional() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    const query = c.req.valid('query');
+    return c.json(await repo.triggerPendingFeeReminders(c.get('authUser'), query.days ?? 7, c.env));
+  },
+);
+
+// Phase 11: Audit Logs
+adminRoutes.get('/audit-logs', zValidator('query', auditLogQuerySchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.valid('query');
+  return c.json(await repo.listAuditLogs(c.get('authUser'), query));
+});
+
+// Phase 11: DPDP Consents
+adminRoutes.get(
+  '/dpdp/consents',
+  zValidator(
+    'query',
+    z.object({
+      studentId: z.string().uuid().optional(),
+      status: z.enum(['granted', 'revoked', 'expired']).optional(),
+    }),
+  ),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listDpdpConsents(c.get('authUser'), c.req.valid('query')));
+  },
+);
+
+adminRoutes.post('/dpdp/consents', zValidator('json', recordConsentSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.recordDpdpConsent(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+// Phase 11: Data Subject Rights (DSR) Requests
+adminRoutes.get(
+  '/dpdp/dsr',
+  zValidator(
+    'query',
+    z.object({
+      status: z.enum(['pending', 'in_review', 'fulfilled', 'rejected']).optional(),
+    }),
+  ),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listDsrRequests(c.get('authUser'), c.req.valid('query').status));
+  },
+);
+
+adminRoutes.put(
+  '/dpdp/dsr/:id',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('json', resolveDsrRequestSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.resolveDsrRequest(c.get('authUser'), c.req.valid('param').id, c.req.valid('json')),
+    );
+  },
+);
+
+// Phase 11: Class Teacher Designation on Section
+adminRoutes.put(
+  '/sections/:id/class-teacher',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('json', assignSectionClassTeacherSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.assignSectionClassTeacher(
+        c.get('authUser'),
+        c.req.valid('param').id,
+        c.req.valid('json').classTeacherStaffId,
+      ),
+    );
+  },
+);
+
+// Phase 11: Fee Concessions
+adminRoutes.get('/fees/concessions', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.listFeeConcessions(c.get('authUser')));
+});
+
+adminRoutes.post('/fees/concessions', zValidator('json', createFeeConcessionSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createFeeConcession(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+adminRoutes.post(
+  '/fees/concessions/apply',
+  zValidator('json', applyStudentConcessionSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.applyStudentConcession(c.get('authUser'), c.req.valid('json')), 201);
+  },
+);
+
+adminRoutes.get(
+  '/fees/concessions/applied',
+  zValidator(
+    'query',
+    z.object({
+      studentId: z.string().uuid().optional(),
+      allocationId: z.string().uuid().optional(),
+    }),
+  ),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listStudentConcessions(c.get('authUser'), c.req.valid('query')));
+  },
+);
+
+// Phase 11: Fee Refunds
+adminRoutes.get(
+  '/fees/refunds',
+  zValidator(
+    'query',
+    z.object({
+      status: z.enum(['pending', 'approved', 'processed', 'rejected']).optional(),
+    }),
+  ),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listFeeRefunds(c.get('authUser'), c.req.valid('query').status));
+  },
+);
+
+adminRoutes.post('/fees/refunds', zValidator('json', createFeeRefundSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createFeeRefund(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+adminRoutes.put(
+  '/fees/refunds/:id/status',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('json', updateRefundStatusSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.updateFeeRefundStatus(
+        c.get('authUser'),
+        c.req.valid('param').id,
+        c.req.valid('json').status,
+      ),
+    );
+  },
+);
+
+// Phase 11: Fee Structure Heads
+adminRoutes.get(
+  '/fees/structures/:id/heads',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.listFeeStructureHeads(c.get('authUser'), c.req.valid('param').id));
+  },
+);
+
+adminRoutes.post(
+  '/fees/structures/:id/heads',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator(
+    'json',
+    z.object({
+      headName: z.string().trim().min(2).max(80),
+      amount: z.number().int().min(0),
+      isOptional: z.boolean().default(false),
+    }),
+  ),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.createFeeStructureHead(c.get('authUser'), {
+        ...c.req.valid('json'),
+        feeStructureId: c.req.valid('param').id,
+      }),
+      201,
+    );
+  },
+);
+
+

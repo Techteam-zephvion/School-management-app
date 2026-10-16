@@ -14,7 +14,15 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
-export const roleEnum = pgEnum('role', ['admin', 'teacher', 'student', 'parent']);
+export const roleEnum = pgEnum('role', [
+  'admin',
+  'teacher',
+  'student',
+  'parent',
+  'accountant',
+  'admissions_officer',
+  'principal',
+]);
 export const attendanceKindEnum = pgEnum('attendance_kind', ['daily', 'period']);
 export const attendanceStatusEnum = pgEnum('attendance_status', [
   'present',
@@ -50,6 +58,13 @@ export const documentStatusEnum = pgEnum('document_status', [
   'verified',
   'rejected',
 ]);
+export const notificationChannelEnum = pgEnum('notification_channel', ['whatsapp', 'sms', 'push', 'in_app']);
+export const notificationStatusEnum = pgEnum('notification_status', ['queued', 'sent', 'delivered', 'failed']);
+export const chatConversationStatusEnum = pgEnum('chat_conversation_status', ['active', 'closed', 'archived']);
+export const consentStatusEnum = pgEnum('consent_status', ['granted', 'revoked', 'expired']);
+export const dsrStatusEnum = pgEnum('dsr_status', ['pending', 'in_review', 'fulfilled', 'rejected']);
+export const concessionTypeEnum = pgEnum('concession_type', ['percentage', 'flat']);
+export const feeRefundStatusEnum = pgEnum('fee_refund_status', ['pending', 'approved', 'processed', 'rejected']);
 
 
 const timestamps = {
@@ -130,6 +145,7 @@ export const sections = pgTable(
     schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
     classId: uuid('class_id').notNull().references(() => classes.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
+    classTeacherStaffId: uuid('class_teacher_staff_id').references(() => staff.id, { onDelete: 'set null' }),
     ...timestamps,
   },
   (table) => [unique().on(table.classId, table.name)],
@@ -462,6 +478,9 @@ export const feeStructures = pgTable(
     amount: integer('amount').notNull(),
     frequency: feeFrequencyEnum('frequency').default('term').notNull(),
     dueDate: date('due_date'),
+    lateFeeGracePeriodDays: integer('late_fee_grace_period_days').default(0).notNull(),
+    lateFeeType: text('late_fee_type').default('none').notNull(),
+    lateFeeAmount: integer('late_fee_amount').default(0).notNull(),
     ...timestamps,
   },
   (table) => [
@@ -551,6 +570,11 @@ export const admissionDocuments = pgTable(
     title: text('title').notNull(),
     status: documentStatusEnum('status').default('pending').notNull(),
     documentNumber: text('document_number'),
+    fileKey: text('file_key'),
+    fileUrl: text('file_url'),
+    fileName: text('file_name'),
+    fileSize: integer('file_size'),
+    mimeType: text('mime_type'),
     verifiedByStaffId: uuid('verified_by_staff_id').references(() => staff.id, { onDelete: 'set null' }),
     notes: text('notes'),
     ...timestamps,
@@ -597,6 +621,232 @@ export const paymentWebhookEvents = pgTable(
   },
   (table) => [
     unique().on(table.eventId),
+  ],
+);
+
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    recipientUserId: uuid('recipient_user_id').references(() => appUsers.id, { onDelete: 'set null' }),
+    recipientPhone: text('recipient_phone'),
+    recipientEmail: text('recipient_email'),
+    channel: notificationChannelEnum('channel').notNull(),
+    templateId: text('template_id'),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    data: jsonb('data'),
+    status: notificationStatusEnum('status').default('queued').notNull(),
+    failureReason: text('failure_reason'),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index('notifications_school_status_idx').on(table.schoolId, table.status),
+    index('notifications_recipient_idx').on(table.recipientUserId),
+  ],
+);
+
+export const chatConversations = pgTable(
+  'chat_conversations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+    teacherStaffId: uuid('teacher_staff_id').notNull().references(() => staff.id, { onDelete: 'cascade' }),
+    parentAppUserId: uuid('parent_app_user_id').notNull().references(() => appUsers.id, { onDelete: 'cascade' }),
+    subject: text('subject').notNull(),
+    status: chatConversationStatusEnum('status').default('active').notNull(),
+    lastMessageAt: timestamp('last_message_at', { withTimezone: true }).defaultNow().notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index('chat_conv_school_teacher_idx').on(table.schoolId, table.teacherStaffId),
+    index('chat_conv_parent_idx').on(table.parentAppUserId),
+    index('chat_conv_student_idx').on(table.studentId),
+  ],
+);
+
+export const chatMessages = pgTable(
+  'chat_messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    conversationId: uuid('conversation_id').notNull().references(() => chatConversations.id, { onDelete: 'cascade' }),
+    senderAppUserId: uuid('sender_app_user_id').notNull().references(() => appUsers.id, { onDelete: 'cascade' }),
+    senderRole: text('sender_role').notNull(), // 'teacher' | 'parent'
+    content: text('content').notNull(),
+    isRead: boolean('is_read').default(false).notNull(),
+    isAutoReply: boolean('is_auto_reply').default(false).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index('chat_msg_conv_idx').on(table.conversationId, table.createdAt),
+  ],
+);
+
+export const teacherAvailabilitySettings = pgTable(
+  'teacher_availability_settings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    staffId: uuid('staff_id').notNull().references(() => staff.id, { onDelete: 'cascade' }),
+    startTime: text('start_time').default('09:00').notNull(),
+    endTime: text('end_time').default('16:30').notNull(),
+    availableDays: text('available_days').default('1,2,3,4,5').notNull(),
+    autoReplyMessage: text('auto_reply_message').default('Thank you for reaching out. I am currently outside my teaching communication hours and will review your message when school resumes.').notNull(),
+    isEnabled: boolean('is_enabled').default(true).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.staffId),
+    index('teacher_avail_school_idx').on(table.schoolId),
+  ],
+);
+
+export const dpdpConsents = pgTable(
+  'dpdp_consents',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+    parentGuardianName: text('parent_guardian_name').notNull(),
+    parentGuardianPhone: text('parent_guardian_phone').notNull(),
+    consentType: text('consent_type').notNull(), // 'enrollment_data_processing' | 'biometric_attendance' | 'media_publication'
+    status: consentStatusEnum('status').default('granted').notNull(),
+    verifiedVia: text('verified_via').default('portal_submission').notNull(),
+    ipAddress: text('ip_address'),
+    validUntil: timestamp('valid_until', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index('dpdp_consent_student_idx').on(table.schoolId, table.studentId),
+    index('dpdp_consent_status_idx').on(table.schoolId, table.status),
+  ],
+);
+
+export const auditLogs = pgTable(
+  'audit_logs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id'),
+    userEmail: text('user_email').notNull(),
+    userRole: text('user_role').notNull(),
+    action: text('action').notNull(),
+    resourceType: text('resource_type').notNull(),
+    resourceId: text('resource_id'),
+    ipAddress: text('ip_address'),
+    details: jsonb('details'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('audit_logs_school_created_idx').on(table.schoolId, table.createdAt),
+    index('audit_logs_school_resource_idx').on(table.schoolId, table.resourceType),
+    index('audit_logs_user_idx').on(table.schoolId, table.userId),
+  ],
+);
+
+export const dataSubjectRequests = pgTable(
+  'data_subject_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    requesterUserId: uuid('requester_user_id').references(() => appUsers.id, { onDelete: 'set null' }),
+    requesterRole: text('requester_role').notNull(),
+    studentId: uuid('student_id').references(() => students.id, { onDelete: 'set null' }),
+    requestType: text('request_type').notNull(), // 'data_access' | 'data_rectification' | 'data_erasure_anonymization'
+    status: dsrStatusEnum('status').default('pending').notNull(),
+    reason: text('reason').notNull(),
+    resolutionNotes: text('resolution_notes'),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    resolvedByUserId: uuid('resolved_by_user_id').references(() => appUsers.id, { onDelete: 'set null' }),
+    ...timestamps,
+  },
+  (table) => [
+    index('dsr_school_status_idx').on(table.schoolId, table.status),
+    index('dsr_requester_idx').on(table.schoolId, table.requesterUserId),
+  ],
+);
+
+export const feeStructureHeads = pgTable(
+  'fee_structure_heads',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    feeStructureId: uuid('fee_structure_id').notNull().references(() => feeStructures.id, { onDelete: 'cascade' }),
+    headName: text('head_name').notNull(), // 'tuition', 'transport', 'examination', 'library', 'sports', 'lab', 'uniform'
+    amount: integer('amount').notNull(),
+    isOptional: boolean('is_optional').default(false).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index('fee_heads_structure_idx').on(table.schoolId, table.feeStructureId),
+  ],
+);
+
+export const feeConcessions = pgTable(
+  'fee_concessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    code: text('code').notNull(),
+    type: concessionTypeEnum('type').default('flat').notNull(),
+    value: integer('value').notNull(), // percentage or flat amount
+    category: text('category').default('merit').notNull(), // 'merit', 'sibling', 'staff_ward', 'financial_aid', 'sports'
+    isActive: boolean('is_active').default(true).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.schoolId, table.code),
+    index('fee_concessions_active_idx').on(table.schoolId, table.isActive),
+  ],
+);
+
+export const studentFeeConcessions = pgTable(
+  'student_fee_concessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+    allocationId: uuid('allocation_id').notNull().references(() => studentFeeAllocations.id, { onDelete: 'cascade' }),
+    concessionId: uuid('concession_id').notNull().references(() => feeConcessions.id, { onDelete: 'cascade' }),
+    appliedAmount: integer('applied_amount').notNull(),
+    reason: text('reason'),
+    approvedByUserId: uuid('approved_by_user_id').references(() => appUsers.id, { onDelete: 'set null' }),
+    ...timestamps,
+  },
+  (table) => [
+    index('student_concessions_student_idx').on(table.schoolId, table.studentId),
+    index('student_concessions_alloc_idx').on(table.schoolId, table.allocationId),
+  ],
+);
+
+export const feeRefunds = pgTable(
+  'fee_refunds',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    allocationId: uuid('allocation_id').notNull().references(() => studentFeeAllocations.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+    paymentId: uuid('payment_id').references(() => feePayments.id, { onDelete: 'set null' }),
+    refundNumber: text('refund_number').notNull(),
+    amount: integer('amount').notNull(),
+    reason: text('reason').notNull(),
+    mode: text('mode').default('bank_transfer').notNull(), // 'bank_transfer', 'cash', 'cheque', 'gateway_refund'
+    referenceNumber: text('reference_number'),
+    status: feeRefundStatusEnum('status').default('pending').notNull(),
+    approvedByUserId: uuid('approved_by_user_id').references(() => appUsers.id, { onDelete: 'set null' }),
+    processedAt: timestamp('processed_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.schoolId, table.refundNumber),
+    index('fee_refunds_alloc_idx').on(table.schoolId, table.allocationId),
+    index('fee_refunds_student_idx').on(table.schoolId, table.studentId),
+    index('fee_refunds_status_idx').on(table.schoolId, table.status),
   ],
 );
 
