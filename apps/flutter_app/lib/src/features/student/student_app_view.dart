@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
+import '../../core/localization/app_localizations.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
+import '../admin/utils/report_card_pdf.dart';
 import '../shared/components/empty_state_view.dart';
 import '../shared/components/feedback_banner.dart';
 import '../shared/components/status_badge.dart';
@@ -36,6 +38,7 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
   Map<String, Object?>? _fees;
   Map<String, Object?>? _idCard;
   List<Map<String, Object?>> _announcements = const [];
+  List<Map<String, Object?>> _boardReportCards = const [];
 
   int _timetableSelectedDay = DateTime.now().weekday; // 1 = Mon .. 7 = Sun
   String _homeworkFilter = 'all'; // all, pending, submitted
@@ -149,6 +152,7 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
         api.getJson('/api/v1/portal/fees$query', session: session),
         api.getJson('/api/v1/portal/id-card$query', session: session),
         api.getList('/api/v1/portal/announcements$query', session: session),
+        api.getList('/api/v1/portal/board-report-cards$query', session: session),
       ]);
 
       if (!mounted) return;
@@ -162,6 +166,7 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
         _fees = responses[4] as Map<String, Object?>;
         _idCard = responses[5] as Map<String, Object?>;
         _announcements = responses[6] as List<Map<String, Object?>>;
+        _boardReportCards = responses[7] as List<Map<String, Object?>>;
         _loading = false;
       });
     } catch (e) {
@@ -325,6 +330,7 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
         ],
       ),
       actions: [
+        const LanguagePickerDropdown(isCompact: true),
         if (_students.length > 1)
           IconButton(
             tooltip: 'Switch Child / Student Profile',
@@ -1468,7 +1474,20 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
             ],
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 18),
+        if (_boardReportCards.isNotEmpty) ...[
+          const Text(
+            'Official Board Report Cards',
+            style: TextStyle(
+              fontFamily: 'Switzer',
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ..._boardReportCards.map(_buildBoardReportCardCard),
+          const SizedBox(height: 18),
+        ],
 
         const Text(
           'Published Exam Results',
@@ -1499,6 +1518,126 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
           ...results.map(_buildExamResultCard),
       ],
     );
+  }
+
+  Widget _buildBoardReportCardCard(Map<String, Object?> rc) {
+    final term = (rc['term'] as String? ?? 'Annual').toUpperCase();
+    final board = (rc['board'] as String? ?? 'CBSE').toUpperCase();
+    final pct = rc['overallPercentage'] as String? ?? '0%';
+    final grade = rc['overallGrade'] as String? ?? 'A';
+    final resultStatus =
+        (rc['resultStatus'] as String? ?? 'Promoted').toUpperCase();
+    final attendanceRate = rc['attendancePercentage'] as String? ?? '100%';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.secondaryBackground,
+        border: Border.all(color: AppColors.primaryBorder),
+        borderRadius: AppRadii.rLg,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  board,
+                  style: const TextStyle(
+                    fontFamily: 'Switzer',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.accent,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Official Report Card — $term',
+                  style: const TextStyle(
+                    fontFamily: 'Switzer',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              StatusBadge(
+                label: resultStatus,
+                tone: resultStatus.contains('FAIL')
+                    ? BadgeTone.error
+                    : BadgeTone.success,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Aggregate Score: $pct | Grade: $grade | Attendance: $attendanceRate',
+            style: AppTypography.bodySecondary,
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.tonalIcon(
+              onPressed: () => _printPortalReportCard(rc),
+              icon: const Icon(Icons.print, size: 16),
+              label: const Text('Download Official PDF'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _printPortalReportCard(Map<String, Object?> rc) async {
+    final scholasticData = (rc['scholasticParsed'] as List<dynamic>?)
+            ?.cast<Map<String, Object?>>() ??
+        const [];
+    final coScholasticData = (rc['coScholasticParsed'] as List<dynamic>?)
+            ?.cast<Map<String, Object?>>() ??
+        const [];
+
+    final pdfData = ReportCardPdfData(
+      schoolName: 'Schoolic Model International School',
+      schoolAffiliation: 'CBSE Affiliation No. 1930482',
+      schoolAddress: '100ft Road, Indiranagar, Bengaluru, Karnataka - 560038',
+      studentName: rc['studentName'] as String? ??
+          _activeStudent?['fullName'] as String? ??
+          'Student',
+      admissionNumber: rc['admissionNumber'] as String? ??
+          _activeStudent?['admissionNumber'] as String? ??
+          '—',
+      rollNumber: rc['rollNumber'] as String? ??
+          _activeStudent?['rollNumber'] as String?,
+      className: rc['className'] as String? ??
+          _activeStudent?['className'] as String? ??
+          'Class',
+      sectionName: rc['sectionName'] as String? ??
+          _activeStudent?['sectionName'] as String? ??
+          'Section',
+      termName: rc['term'] as String? ?? 'Annual',
+      schemeName: rc['schemeName'] as String? ?? 'Standard Board Scheme',
+      board: rc['board'] as String? ?? 'CBSE',
+      overallPercentage: rc['overallPercentage'] as String? ?? '0%',
+      overallGrade: rc['overallGrade'] as String? ?? '—',
+      overallGradePoint: rc['overallGradePoint'] as String?,
+      attendanceRate: rc['attendancePercentage'] as String? ?? '100%',
+      resultStatus: rc['resultStatus'] as String? ?? 'Promoted',
+      scholasticRows: scholasticData,
+      coScholasticRows: coScholasticData,
+      teacherRemarks: rc['teacherRemarks'] as String?,
+      principalRemarks: rc['principalRemarks'] as String?,
+      issueDate: DateTime.now().toString().split(' ')[0],
+    );
+
+    await printOrShareReportCard(pdfData);
   }
 
   Widget _buildExamResultCard(Map<String, Object?> item) {

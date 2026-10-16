@@ -1327,6 +1327,226 @@ class ApiClient {
     );
   }
 
+  // =========================================================================
+  // Phase 13: Academic Depth & Board-Specific Grading Schemes
+  // =========================================================================
+
+  Future<List<Map<String, Object?>>> getGradingSchemes({
+    required AuthSession session,
+    String? academicYearId,
+  }) async {
+    final params = <String, String>{
+      'academicYearId': ?academicYearId,
+    };
+    return getList(
+      '/api/v1/admin/academics/grading-schemes',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> createGradingScheme({
+    required AuthSession session,
+    required String name,
+    required String board,
+    String? academicYearId,
+    String? description,
+    int? passingPercentage,
+    bool? isDefault,
+  }) async {
+    return postJson(
+      '/api/v1/admin/academics/grading-schemes',
+      {
+        'name': name,
+        'board': board,
+        'academicYearId': ?academicYearId,
+        'description': ?description,
+        'passingPercentage': ?passingPercentage,
+        'isDefault': ?isDefault,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> seedDefaultBoardSchemes({
+    required AuthSession session,
+    String? academicYearId,
+  }) async {
+    final qs = academicYearId != null ? '?academicYearId=$academicYearId' : '';
+    await postJson(
+      '/api/v1/admin/academics/grading-schemes/seed-defaults$qs',
+      {},
+      session: session,
+    );
+    return getGradingSchemes(session: session, academicYearId: academicYearId);
+  }
+
+  Future<Map<String, Object?>> createGradingScale({
+    required AuthSession session,
+    required String schemeId,
+    required String grade,
+    required int minScore,
+    required int maxScore,
+    required String gradePoint,
+    String? remarks,
+    int? orderIndex,
+  }) async {
+    return postJson(
+      '/api/v1/admin/academics/grading-schemes/scales',
+      {
+        'schemeId': schemeId,
+        'grade': grade,
+        'minScore': minScore,
+        'maxScore': maxScore,
+        'gradePoint': gradePoint,
+        'remarks': ?remarks,
+        'orderIndex': ?orderIndex,
+      },
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> createEvaluationComponent({
+    required AuthSession session,
+    required String schemeId,
+    required String name,
+    required String componentType,
+    required int weightagePercentage,
+    required int maxMarks,
+    String? term,
+    int? orderIndex,
+  }) async {
+    return postJson(
+      '/api/v1/admin/academics/grading-schemes/components',
+      {
+        'schemeId': schemeId,
+        'name': name,
+        'componentType': componentType,
+        'weightagePercentage': weightagePercentage,
+        'maxMarks': maxMarks,
+        'term': ?term,
+        'orderIndex': ?orderIndex,
+      },
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> generateReportCards({
+    required AuthSession session,
+    required String academicYearId,
+    required String classId,
+    required String sectionId,
+    required String schemeId,
+    String? term,
+    List<String>? studentIds,
+    String? teacherRemarks,
+  }) async {
+    return postJson(
+      '/api/v1/admin/academics/report-cards/generate',
+      {
+        'academicYearId': academicYearId,
+        'classId': classId,
+        'sectionId': sectionId,
+        'schemeId': schemeId,
+        'term': ?term,
+        'studentIds': ?studentIds,
+        'teacherRemarks': ?teacherRemarks,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getReportCards({
+    required AuthSession session,
+    String? classId,
+    String? sectionId,
+    String? academicYearId,
+    String? studentId,
+    String? term,
+  }) async {
+    final params = <String, String>{
+      'classId': ?classId,
+      'sectionId': ?sectionId,
+      'academicYearId': ?academicYearId,
+      'studentId': ?studentId,
+      'term': ?term,
+    };
+    return getList(
+      '/api/v1/admin/academics/report-cards',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> getReportCard({
+    required AuthSession session,
+    required String reportCardId,
+  }) async {
+    return getJson(
+      '/api/v1/admin/academics/report-cards/$reportCardId',
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> publishReportCard({
+    required AuthSession session,
+    required String reportCardId,
+    required bool isPublished,
+  }) async {
+    return putJson(
+      '/api/v1/admin/academics/report-cards/$reportCardId/publish',
+      {
+        'isPublished': isPublished,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getPortalBoardReportCards({
+    required AuthSession session,
+    String? studentId,
+  }) async {
+    final params = <String, String>{
+      'studentId': ?studentId,
+    };
+    return getList(
+      '/api/v1/portal/board-report-cards',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  // =========================================================================
+  // Phase 13: Offline-First Attendance Synchronization
+  // =========================================================================
+
+  Future<Map<String, Object?>> syncOfflineAttendance(
+    List<Map<String, Object?>> batches, {
+    required AuthSession session,
+  }) async {
+    return postJson(
+      '/api/v1/teacher/attendance/sync',
+      {
+        'batches': batches,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getOfflineSyncLogs({
+    required AuthSession session,
+    String? staffId,
+  }) async {
+    final params = <String, String>{
+      'staffId': ?staffId,
+    };
+    return getList(
+      '/api/v1/admin/academics/offline-sync-logs',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
   Map<String, String> _headers({String? bearerToken, AuthSession? devSession}) {
     return {
       'content-type': 'application/json',

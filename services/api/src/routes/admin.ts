@@ -68,6 +68,11 @@ import {
   createCalendarEventSchema,
   createPtmScheduleSchema,
   updatePtmSlotNotesSchema,
+  createGradingSchemeSchema,
+  createGradingScaleSchema,
+  createEvaluationComponentSchema,
+  generateReportCardsSchema,
+  publishReportCardSchema,
 } from '../http/validation';
 
 
@@ -1152,6 +1157,86 @@ adminRoutes.get('/ptm/slots', async (c) => {
     studentId: query.studentId,
     status: query.status as any,
   }));
+});
+
+// Phase 13: Academic Depth & Board-Specific Grading Schemes
+
+adminRoutes.get('/academics/grading-schemes', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const academicYearId = c.req.query('academicYearId');
+  return c.json(await repo.listGradingSchemes(c.get('authUser'), academicYearId));
+});
+
+adminRoutes.post('/academics/grading-schemes', zValidator('json', createGradingSchemeSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createGradingScheme(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+adminRoutes.get(
+  '/academics/grading-schemes/:id',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.getGradingScheme(c.get('authUser'), c.req.valid('param').id));
+  },
+);
+
+adminRoutes.post('/academics/grading-schemes/seed-defaults', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const academicYearId = c.req.query('academicYearId');
+  return c.json(await repo.seedDefaultBoardGradingSchemes(c.get('authUser'), academicYearId), 201);
+});
+
+adminRoutes.post('/academics/grading-schemes/scales', zValidator('json', createGradingScaleSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createGradingScale(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+adminRoutes.post('/academics/grading-schemes/components', zValidator('json', createEvaluationComponentSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createEvaluationComponent(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+adminRoutes.post('/academics/report-cards/generate', zValidator('json', generateReportCardsSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.generateReportCards(c.get('authUser'), c.req.valid('json')), 201);
+});
+
+adminRoutes.get('/academics/report-cards', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listReportCards(c.get('authUser'), {
+    classId: query.classId,
+    sectionId: query.sectionId,
+    academicYearId: query.academicYearId,
+    studentId: query.studentId,
+    term: query.term,
+  }));
+});
+
+adminRoutes.get(
+  '/academics/report-cards/:id',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.getReportCard(c.get('authUser'), c.req.valid('param').id));
+  },
+);
+
+adminRoutes.put(
+  '/academics/report-cards/:id/publish',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('json', publishReportCardSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.publishReportCard(c.get('authUser'), c.req.valid('param').id, c.req.valid('json').isPublished));
+  },
+);
+
+adminRoutes.get('/academics/offline-sync-logs', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const staffId = c.req.query('staffId');
+  return c.json(await repo.listOfflineAttendanceSyncLogs(c.get('authUser'), staffId));
 });
 
 

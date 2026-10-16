@@ -24,6 +24,8 @@ import {
   createStaffLeaveSchema,
   updateStudentLeaveStatusSchema,
   updatePtmSlotNotesSchema,
+  syncOfflineAttendanceSchema,
+  generateReportCardsSchema,
 } from '../http/validation';
 import type { AppBindings } from '../types';
 
@@ -396,4 +398,28 @@ teacherRoutes.put(
     );
   },
 );
+
+// Phase 13: Offline-First Attendance Synchronization
+teacherRoutes.post('/attendance/sync', zValidator('json', syncOfflineAttendanceSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.syncOfflineAttendance(c.get('authUser'), c.req.valid('json')));
+});
+
+// Phase 13: Teacher Report Cards
+teacherRoutes.get('/report-cards', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listReportCards(c.get('authUser'), {
+    classId: query.classId,
+    sectionId: query.sectionId,
+    academicYearId: query.academicYearId,
+    studentId: query.studentId,
+    term: query.term,
+  }));
+});
+
+teacherRoutes.post('/report-cards/generate', zValidator('json', generateReportCardsSchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.generateReportCards(c.get('authUser'), c.req.valid('json')), 201);
+});
 

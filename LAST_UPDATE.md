@@ -1,5 +1,56 @@
 # Last Update (October 16, 2026)
 
+## Phase 13: Academic Depth, Regional Languages & Offline App
+
+### Summary
+- **Board-Specific Grading Schemes & Aggregation:**
+  - Database schema & migration `0015_demonic_beyonder.sql`:
+    - `gradingSchemes`: Board type (`cbse`, `icse`, `state_board`, `cambridge`, `custom`), name, passing percentage, default flag.
+    - `gradingScales`: Grade boundary mapping (min mark %, max mark %, letter grade `A1`-`E`, grade point `10.0`-`0.0`, description).
+    - `evaluationComponents`: Component definitions (e.g. Periodic Tests, Subject Enrichment, Portfolio, Term Exams, FA1-FA4, SA1-SA2) with weightage percentages and term associations.
+    - `studentReportCards`: Official student report cards with aggregated marks, letter grade, grade point, attendance percentage, result status (`promoted`, `passed`, `compartment`, `failed`), teacher remarks, principal remarks, and publication toggle.
+    - `offlineAttendanceSyncLogs`: Sync logs tracking client batch ID, synced record count, conflict count, and sync status.
+  - Built-in seeder (`seedDefaultBoardGradingSchemes`): One-click initialization of standard CBSE (9-point scale A1-E), ICSE (1-9 scale with 20% internal / 80% board), and State Board CCE (FA1-FA4: 40%, SA1-SA2: 60%).
+  - Aggregation engine (`generateReportCards`): Computes weighted component scores, total marks obtained vs maximum, resolves grade scale and points, calculates term attendance percentage, and generates report cards for entire classes/sections in bulk.
+  - Endpoints:
+    - Admin: `GET/POST /api/v1/admin/academics/grading-schemes`, `POST /api/v1/admin/academics/grading-schemes/seed-defaults`, `GET /api/v1/admin/academics/grading-schemes/:id`, `POST /api/v1/admin/academics/grading-schemes/:id/scales`, `POST /api/v1/admin/academics/grading-schemes/:id/components`, `POST /api/v1/admin/academics/report-cards/generate`, `GET /api/v1/admin/academics/report-cards`, `GET /api/v1/admin/academics/report-cards/:id`, `PUT /api/v1/admin/academics/report-cards/:id/publish`.
+    - Portal: `GET /api/v1/portal/academics/report-cards`.
+- **Regional Language Localization (English, Kannada, Hindi):**
+  - Trilingual localization engine in `apps/flutter_app/lib/src/core/localization/app_localizations.dart`:
+    - `AppLanguage` enum: English (`en`), Kannada (`kn` - ಕನ್ನಡ), Hindi (`hi` - हिन्दी).
+    - `AppLocalizations`: Complete dictionary mapping covering navigation, actions, attendance statuses, academics, fees, exams, and error notifications.
+    - `LanguagePickerDropdown`: Reusable language picker widget supporting both compact popup button and standard dropdown styling.
+    - Wired into root `App` widget (`apps/flutter_app/lib/src/app.dart`) with reactive `Locale` binding.
+- **Offline-First Attendance:**
+  - Local persistent queue manager in `apps/flutter_app/lib/src/core/offline/offline_attendance_manager.dart`:
+    - `OfflineAttendanceRecordItem`: Individual student attendance item serialization.
+    - `OfflineAttendanceBatch`: Class-section-date attendance payload with client timestamp and unique batch UUID.
+    - `OfflineAttendanceNotifier` & `offlineAttendanceProvider`: `SharedPreferences`-backed persistent queue with automatic queueing, batch synchronization, and queue clearing.
+    - Server-side batch sync endpoint (`POST /api/v1/teacher/attendance/sync`): Validates roster, creates/retrieves daily session, upserts attendance records, and audits conflicts.
+    - Seamless fallback integrated into `TeacherAttendanceView` on network timeout or failure.
+- **Printable Official Board Report Card PDF Generator:**
+  - PDF rendering engine in `apps/flutter_app/lib/src/features/admin/utils/report_card_pdf.dart`:
+    - Clean, board-compliant printable report card layout built using `pdf` & `printing`.
+    - School branding, affiliation details, student demographics (name, admission number, roll number, class, section, term).
+    - Scholastic performance table displaying subject-wise periodic tests, subject enrichment, portfolio, term marks, total marks, percentage, letter grade, and grade points.
+    - Co-scholastic activities evaluation table (Work Education, Health & Physical Education, Art, Discipline).
+    - Aggregate score, attendance percentage, result status badge, teacher remarks, and institutional tri-signature footer.
+- **Frontend Views (Flutter):**
+  - Enhanced `AdminExamsView`:
+    - Subtab 1: **Exams Schedule** with exam title, date, max marks, status, and edit/delete actions.
+    - Subtab 2: **Board Schemes & Scales** with board badges, component weightages, grade point scales, and one-click "Seed Board Presets" button.
+    - Subtab 3: **Official Report Cards** with aggregate percentage, grade, grade point, portal publish toggle, printable PDF trigger, and "Bulk Generate Report Cards" modal.
+  - Enhanced `StudentAppView`:
+    - Displays published official board report cards with term, board badge, score, grade, and one-click "Download Official PDF" button.
+  - Added 12 API methods in `apps/flutter_app/lib/src/core/api_client.dart`.
+- **Verification:**
+  - Backend: 12/12 Vitest test suites passing (122 passed, 1 skipped).
+  - TypeScript: 0 typecheck errors (`npm run typecheck --prefix services/api`).
+  - Frontend: 84/84 Flutter unit/widget tests passing (`flutter test apps/flutter_app`).
+  - Lint: 0 analyzer warnings (`flutter analyze apps/flutter_app`).
+
+---
+
 ## Phase 12: School Operations & Daily Differentiators
 
 ### Summary

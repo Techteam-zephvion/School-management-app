@@ -216,3 +216,9 @@ portalRoutes.put(
   },
 );
 
+// Phase 13: Board-Specific Report Cards for Portal
+portalRoutes.get('/board-report-cards', zValidator('query', portalStudentQuerySchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.portalBoardReportCards(c.get('authUser'), c.req.valid('query').studentId));
+});
+

@@ -698,3 +698,83 @@ export const updatePtmSlotNotesSchema = z.object({
   status: z.enum(['available', 'booked', 'completed', 'cancelled']).optional(),
 });
 
+// Phase 13: Academic Depth, Regional Languages & Offline App
+
+export const createGradingSchemeSchema = z.object({
+  academicYearId: z.uuid().optional(),
+  name: z.string().trim().min(2).max(120),
+  board: z.enum(['cbse', 'icse', 'state_board', 'cambridge', 'custom']).default('cbse'),
+  description: z.string().trim().max(500).nullable().optional(),
+  isDefault: z.boolean().default(false),
+  passingPercentage: z.number().int().min(1).max(100).default(33),
+  config: z.string().trim().nullable().optional(),
+});
+
+export const createGradingScaleSchema = z.object({
+  schemeId: z.uuid(),
+  grade: z.string().trim().min(1).max(10),
+  minScore: z.number().int().min(0).max(100),
+  maxScore: z.number().int().min(0).max(100),
+  gradePoint: z.string().trim().min(1).max(10),
+  remarks: z.string().trim().max(100).nullable().optional(),
+  orderIndex: z.number().int().min(0).default(0),
+});
+
+export const createEvaluationComponentSchema = z.object({
+  schemeId: z.uuid(),
+  name: z.string().trim().min(2).max(100),
+  componentType: z.enum([
+    'periodic_test',
+    'multiple_assessment',
+    'portfolio',
+    'subject_enrichment',
+    'term_exam',
+    'internal_assessment',
+    'board_exam',
+    'formative_assessment',
+    'summative_assessment',
+    'practical',
+  ]),
+  term: z.enum(['term_1', 'term_2', 'annual', 'all_terms']).default('annual'),
+  weightagePercentage: z.number().int().min(0).max(100),
+  maxMarks: z.number().int().min(1).max(500),
+  orderIndex: z.number().int().min(0).default(0),
+});
+
+export const generateReportCardsSchema = z.object({
+  academicYearId: z.uuid(),
+  classId: z.uuid(),
+  sectionId: z.uuid(),
+  schemeId: z.uuid(),
+  term: z.enum(['term_1', 'term_2', 'annual', 'all_terms']).default('annual'),
+  studentIds: z.array(z.uuid()).optional(),
+  teacherRemarks: z.string().trim().max(500).optional(),
+});
+
+export const publishReportCardSchema = z.object({
+  isPublished: z.boolean().default(true),
+});
+
+export const syncOfflineAttendanceRecordSchema = z.object({
+  studentId: z.uuid(),
+  status: z.enum(['present', 'absent', 'late', 'excused']),
+  remarks: z.string().trim().max(250).optional(),
+});
+
+export const syncOfflineAttendanceBatchItemSchema = z.object({
+  clientBatchId: z.string().trim().min(1).max(100),
+  academicYearId: z.uuid(),
+  classId: z.uuid(),
+  sectionId: z.uuid(),
+  subjectId: z.uuid().nullable().optional(),
+  kind: z.enum(['daily', 'period']),
+  attendanceDate: z.iso.date(),
+  periodNumber: z.number().int().min(1).max(20).nullable().optional(),
+  clientTimestamp: z.string().datetime().optional(),
+  records: z.array(syncOfflineAttendanceRecordSchema).min(1),
+});
+
+export const syncOfflineAttendanceSchema = z.object({
+  batches: z.array(syncOfflineAttendanceBatchItemSchema).min(1),
+});
+

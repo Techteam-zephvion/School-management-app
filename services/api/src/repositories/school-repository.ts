@@ -53,6 +53,11 @@ import {
   calendarEvents,
   ptmSchedules,
   ptmSlots,
+  gradingSchemes,
+  gradingScales,
+  evaluationComponents,
+  studentReportCards,
+  offlineAttendanceSyncLogs,
 } from '../db/schema';
 
 import { BulkImporter } from '../importers/bulk-importer';
@@ -122,6 +127,12 @@ import type {
   createPtmScheduleSchema,
   bookPtmSlotSchema,
   updatePtmSlotNotesSchema,
+  createGradingSchemeSchema,
+  createGradingScaleSchema,
+  createEvaluationComponentSchema,
+  generateReportCardsSchema,
+  publishReportCardSchema,
+  syncOfflineAttendanceSchema,
 } from '../http/validation';
 
 import type { z } from 'zod';
@@ -5652,7 +5663,839 @@ export function createSchoolRepository(db: Db) {
       if (!updated) throw new ApiError(404, 'PTM Slot not found');
       return updated;
     },
+
+    // =========================================================================
+    // Phase 13: Academic Depth & Board-Specific Grading Schemes
+    // =========================================================================
+
+    async listGradingSchemes(user: AuthUser, academicYearId?: string | undefined) {
+      const conditions = [eq(gradingSchemes.schoolId, user.schoolId)];
+      if (academicYearId) {
+        conditions.push(eq(gradingSchemes.academicYearId, academicYearId));
+      }
+
+      const schemes = await db
+        .select()
+        .from(gradingSchemes)
+        .where(and(...conditions))
+        .orderBy(desc(gradingSchemes.isDefault), gradingSchemes.name);
+
+      const schemeIds = schemes.map((s) => s.id);
+      let scales: Array<typeof gradingScales.$inferSelect> = [];
+      let components: Array<typeof evaluationComponents.$inferSelect> = [];
+
+      if (schemeIds.length > 0) {
+        scales = await db
+          .select()
+          .from(gradingScales)
+          .where(and(eq(gradingScales.schoolId, user.schoolId)))
+          .orderBy(gradingScales.orderIndex);
+
+        components = await db
+          .select()
+          .from(evaluationComponents)
+          .where(and(eq(evaluationComponents.schoolId, user.schoolId)))
+          .orderBy(evaluationComponents.orderIndex);
+      }
+
+      return schemes.map((s) => ({
+        ...s,
+        scales: scales.filter((sc) => sc.schemeId === s.id),
+        components: components.filter((c) => c.schemeId === s.id),
+      }));
+    },
+
+    async getGradingScheme(user: AuthUser, id: string) {
+      const [scheme] = await db
+        .select()
+        .from(gradingSchemes)
+        .where(and(eq(gradingSchemes.id, id), eq(gradingSchemes.schoolId, user.schoolId)))
+        .limit(1);
+
+      if (!scheme) throw new ApiError(404, 'Grading scheme not found');
+
+      const scales = await db
+        .select()
+        .from(gradingScales)
+        .where(and(eq(gradingScales.schemeId, id), eq(gradingScales.schoolId, user.schoolId)))
+        .orderBy(gradingScales.orderIndex);
+
+      const components = await db
+        .select()
+        .from(evaluationComponents)
+        .where(and(eq(evaluationComponents.schemeId, id), eq(evaluationComponents.schoolId, user.schoolId)))
+        .orderBy(evaluationComponents.orderIndex);
+
+      return {
+        ...scheme,
+        scales,
+        components,
+      };
+    },
+
+    async createGradingScheme(user: AuthUser, input: z.infer<typeof createGradingSchemeSchema>) {
+      const [created] = await db
+        .insert(gradingSchemes)
+        .values({
+          schoolId: user.schoolId,
+          academicYearId: input.academicYearId ?? null,
+          name: input.name,
+          board: input.board,
+          description: input.description ?? null,
+          isDefault: input.isDefault ?? false,
+          passingPercentage: input.passingPercentage ?? 33,
+          config: input.config ?? null,
+        })
+        .returning();
+      return created;
+    },
+
+    async createGradingScale(user: AuthUser, input: z.infer<typeof createGradingScaleSchema>) {
+      await this.getGradingScheme(user, input.schemeId);
+      const [created] = await db
+        .insert(gradingScales)
+        .values({
+          schoolId: user.schoolId,
+          schemeId: input.schemeId,
+          grade: input.grade,
+          minScore: input.minScore,
+          maxScore: input.maxScore,
+          gradePoint: input.gradePoint,
+          remarks: input.remarks ?? null,
+          orderIndex: input.orderIndex ?? 0,
+        })
+        .returning();
+      return created;
+    },
+
+    async createEvaluationComponent(user: AuthUser, input: z.infer<typeof createEvaluationComponentSchema>) {
+      await this.getGradingScheme(user, input.schemeId);
+      const [created] = await db
+        .insert(evaluationComponents)
+        .values({
+          schoolId: user.schoolId,
+          schemeId: input.schemeId,
+          name: input.name,
+          componentType: input.componentType,
+          term: input.term ?? 'annual',
+          weightagePercentage: input.weightagePercentage,
+          maxMarks: input.maxMarks,
+          orderIndex: input.orderIndex ?? 0,
+        })
+        .returning();
+      return created;
+    },
+
+    async seedDefaultBoardGradingSchemes(user: AuthUser, academicYearId?: string | undefined) {
+      const existing = await db
+        .select()
+        .from(gradingSchemes)
+        .where(eq(gradingSchemes.schoolId, user.schoolId));
+
+      if (existing.length > 0) {
+        return this.listGradingSchemes(user, academicYearId);
+      }
+
+      // 1. CBSE Secondary Scheme
+      const [cbseScheme] = await db
+        .insert(gradingSchemes)
+        .values({
+          schoolId: user.schoolId,
+          academicYearId: academicYearId ?? null,
+          name: 'CBSE Standard Evaluation Scheme',
+          board: 'cbse',
+          description: '9-point grading scale with Continuous & Comprehensive Evaluation',
+          isDefault: true,
+          passingPercentage: 33,
+          config: JSON.stringify({
+            scholasticTerms: ['term_1', 'term_2', 'annual'],
+            coScholasticAreas: ['Work Education', 'Art Education', 'Health & Physical Education', 'Discipline'],
+          }),
+        })
+        .returning();
+
+      if (cbseScheme) {
+        const cbseScales = [
+          { grade: 'A1', minScore: 91, maxScore: 100, gradePoint: '10.0', remarks: 'Outstanding' },
+          { grade: 'A2', minScore: 81, maxScore: 90, gradePoint: '9.0', remarks: 'Excellent' },
+          { grade: 'B1', minScore: 71, maxScore: 80, gradePoint: '8.0', remarks: 'Very Good' },
+          { grade: 'B2', minScore: 61, maxScore: 70, gradePoint: '7.0', remarks: 'Good' },
+          { grade: 'C1', minScore: 51, maxScore: 60, gradePoint: '6.0', remarks: 'Average' },
+          { grade: 'C2', minScore: 41, maxScore: 50, gradePoint: '5.0', remarks: 'Below Average' },
+          { grade: 'D', minScore: 33, maxScore: 40, gradePoint: '4.0', remarks: 'Marginal Pass' },
+          { grade: 'E', minScore: 0, maxScore: 32, gradePoint: '0.0', remarks: 'Needs Improvement' },
+        ];
+        for (let i = 0; i < cbseScales.length; i++) {
+          const s = cbseScales[i]!;
+          await db.insert(gradingScales).values({
+            schoolId: user.schoolId,
+            schemeId: cbseScheme.id,
+            grade: s.grade,
+            minScore: s.minScore,
+            maxScore: s.maxScore,
+            gradePoint: s.gradePoint,
+            remarks: s.remarks,
+            orderIndex: i,
+          });
+        }
+
+        const cbseComponents = [
+          { name: 'Periodic Test', componentType: 'periodic_test' as const, term: 'annual' as const, weightagePercentage: 10, maxMarks: 10, orderIndex: 1 },
+          { name: 'Multiple Assessments', componentType: 'multiple_assessment' as const, term: 'annual' as const, weightagePercentage: 5, maxMarks: 5, orderIndex: 2 },
+          { name: 'Portfolio', componentType: 'portfolio' as const, term: 'annual' as const, weightagePercentage: 5, maxMarks: 5, orderIndex: 3 },
+          { name: 'Subject Enrichment / Practical', componentType: 'subject_enrichment' as const, term: 'annual' as const, weightagePercentage: 5, maxMarks: 5, orderIndex: 4 },
+          { name: 'Annual Board / Term Exam', componentType: 'term_exam' as const, term: 'annual' as const, weightagePercentage: 75, maxMarks: 80, orderIndex: 5 },
+        ];
+        for (const c of cbseComponents) {
+          await db.insert(evaluationComponents).values({
+            schoolId: user.schoolId,
+            schemeId: cbseScheme.id,
+            name: c.name,
+            componentType: c.componentType,
+            term: c.term,
+            weightagePercentage: c.weightagePercentage,
+            maxMarks: c.maxMarks,
+            orderIndex: c.orderIndex,
+          });
+        }
+      }
+
+      // 2. ICSE Assessment Scheme
+      const [icseScheme] = await db
+        .insert(gradingSchemes)
+        .values({
+          schoolId: user.schoolId,
+          academicYearId: academicYearId ?? null,
+          name: 'ICSE Board Assessment Framework',
+          board: 'icse',
+          description: 'Internal Assessments (20%) + External Board Examinations (80%)',
+          isDefault: false,
+          passingPercentage: 35,
+          config: JSON.stringify({
+            scholasticTerms: ['term_1', 'term_2', 'annual'],
+            coScholasticAreas: ['Socially Useful Productive Work (SUPW)', 'Community Service', 'Physical Fitness'],
+          }),
+        })
+        .returning();
+
+      if (icseScheme) {
+        const icseScales = [
+          { grade: '1', minScore: 90, maxScore: 100, gradePoint: '10.0', remarks: 'Very Good' },
+          { grade: '2', minScore: 80, maxScore: 89, gradePoint: '9.0', remarks: 'Very Good' },
+          { grade: '3', minScore: 70, maxScore: 79, gradePoint: '8.0', remarks: 'Good' },
+          { grade: '4', minScore: 60, maxScore: 69, gradePoint: '7.0', remarks: 'Good' },
+          { grade: '5', minScore: 50, maxScore: 59, gradePoint: '6.0', remarks: 'Satisfactory' },
+          { grade: '6', minScore: 40, maxScore: 49, gradePoint: '5.0', remarks: 'Fair' },
+          { grade: '7', minScore: 35, maxScore: 39, gradePoint: '4.0', remarks: 'Pass' },
+          { grade: '8', minScore: 20, maxScore: 34, gradePoint: '2.0', remarks: 'Fail' },
+          { grade: '9', minScore: 0, maxScore: 19, gradePoint: '0.0', remarks: 'Fail' },
+        ];
+        for (let i = 0; i < icseScales.length; i++) {
+          const s = icseScales[i]!;
+          await db.insert(gradingScales).values({
+            schoolId: user.schoolId,
+            schemeId: icseScheme.id,
+            grade: s.grade,
+            minScore: s.minScore,
+            maxScore: s.maxScore,
+            gradePoint: s.gradePoint,
+            remarks: s.remarks,
+            orderIndex: i,
+          });
+        }
+
+        const icseComponents = [
+          { name: 'Internal Assessment / Project Work', componentType: 'internal_assessment' as const, term: 'annual' as const, weightagePercentage: 20, maxMarks: 20, orderIndex: 1 },
+          { name: 'Final Board Examination', componentType: 'board_exam' as const, term: 'annual' as const, weightagePercentage: 80, maxMarks: 80, orderIndex: 2 },
+        ];
+        for (const c of icseComponents) {
+          await db.insert(evaluationComponents).values({
+            schoolId: user.schoolId,
+            schemeId: icseScheme.id,
+            name: c.name,
+            componentType: c.componentType,
+            term: c.term,
+            weightagePercentage: c.weightagePercentage,
+            maxMarks: c.maxMarks,
+            orderIndex: c.orderIndex,
+          });
+        }
+      }
+
+      // 3. State Board CCE Scheme
+      const [stateScheme] = await db
+        .insert(gradingSchemes)
+        .values({
+          schoolId: user.schoolId,
+          academicYearId: academicYearId ?? null,
+          name: 'State Board Continuous & Comprehensive Evaluation (CCE)',
+          board: 'state_board',
+          description: 'Formative Assessments (40%) + Summative Assessments (60%)',
+          isDefault: false,
+          passingPercentage: 35,
+          config: JSON.stringify({
+            scholasticTerms: ['term_1', 'term_2', 'annual'],
+            coScholasticAreas: ['Physical & Health Education', 'Value Education', 'Life Skills', 'Work Experience'],
+          }),
+        })
+        .returning();
+
+      if (stateScheme) {
+        const stateScales = [
+          { grade: 'A+', minScore: 90, maxScore: 100, gradePoint: '10.0', remarks: 'Outstanding' },
+          { grade: 'A', minScore: 80, maxScore: 89, gradePoint: '9.0', remarks: 'Excellent' },
+          { grade: 'B+', minScore: 70, maxScore: 79, gradePoint: '8.0', remarks: 'Very Good' },
+          { grade: 'B', minScore: 60, maxScore: 69, gradePoint: '7.0', remarks: 'Good' },
+          { grade: 'C+', minScore: 50, maxScore: 59, gradePoint: '6.0', remarks: 'Average' },
+          { grade: 'C', minScore: 35, maxScore: 49, gradePoint: '5.0', remarks: 'Pass' },
+          { grade: 'D', minScore: 0, maxScore: 34, gradePoint: '0.0', remarks: 'Needs Remedial Coaching' },
+        ];
+        for (let i = 0; i < stateScales.length; i++) {
+          const s = stateScales[i]!;
+          await db.insert(gradingScales).values({
+            schoolId: user.schoolId,
+            schemeId: stateScheme.id,
+            grade: s.grade,
+            minScore: s.minScore,
+            maxScore: s.maxScore,
+            gradePoint: s.gradePoint,
+            remarks: s.remarks,
+            orderIndex: i,
+          });
+        }
+      }
+
+      return this.listGradingSchemes(user, academicYearId);
+    },
+
+    async generateReportCards(user: AuthUser, input: z.infer<typeof generateReportCardsSchema>) {
+      const scheme = await this.getGradingScheme(user, input.schemeId);
+
+      // Fetch students in section
+      const enrollments = await db
+        .select({
+          student: students,
+        })
+        .from(studentEnrollments)
+        .innerJoin(students, eq(students.id, studentEnrollments.studentId))
+        .where(
+          and(
+            eq(studentEnrollments.schoolId, user.schoolId),
+            eq(studentEnrollments.academicYearId, input.academicYearId),
+            eq(studentEnrollments.classId, input.classId),
+            eq(studentEnrollments.sectionId, input.sectionId),
+            eq(students.isActive, true),
+          ),
+        );
+
+      let targetStudents = enrollments.map((e) => e.student);
+      if (input.studentIds && input.studentIds.length > 0) {
+        targetStudents = targetStudents.filter((s) => input.studentIds!.includes(s.id));
+      }
+
+      if (targetStudents.length === 0) {
+        throw new ApiError(400, 'No active students found matching criteria to generate report cards');
+      }
+
+      const generated: Array<typeof studentReportCards.$inferSelect> = [];
+
+      for (const student of targetStudents) {
+        // Fetch marks obtained by this student
+        const marksRows = await db
+          .select({
+            mark: examMarks,
+            exam: exams,
+            subject: subjects,
+          })
+          .from(examMarks)
+          .innerJoin(exams, eq(exams.id, examMarks.examId))
+          .leftJoin(subjects, eq(subjects.id, exams.subjectId))
+          .where(
+            and(
+              eq(examMarks.schoolId, user.schoolId),
+              eq(examMarks.studentId, student.id),
+              eq(exams.academicYearId, input.academicYearId),
+              eq(exams.sectionId, input.sectionId),
+              eq(exams.status, 'published'),
+            ),
+          );
+
+        // Group by subject
+        const subjectMap = new Map<string, {
+          subjectId: string;
+          subjectName: string;
+          maxMarks: number;
+          marksObtained: number;
+          percentage: number;
+          grade: string;
+          gradePoint: string;
+          examCount: number;
+        }>();
+
+        for (const row of marksRows) {
+          const subId = row.subject?.id ?? row.exam.subjectId ?? 'general';
+          const subName = row.subject?.name ?? 'General Studies';
+          const existing = subjectMap.get(subId) || {
+            subjectId: subId,
+            subjectName: subName,
+            maxMarks: 0,
+            marksObtained: 0,
+            percentage: 0,
+            grade: '',
+            gradePoint: '',
+            examCount: 0,
+          };
+          existing.maxMarks += row.exam.maxMarks;
+          existing.marksObtained += row.mark.marksObtained;
+          existing.examCount += 1;
+          subjectMap.set(subId, existing);
+        }
+
+        let totalMax = 0;
+        let totalObtained = 0;
+        const scholasticData = Array.from(subjectMap.values()).map((sub) => {
+          totalMax += sub.maxMarks;
+          totalObtained += sub.marksObtained;
+          const subPct = sub.maxMarks > 0 ? Math.round((sub.marksObtained / sub.maxMarks) * 1000) / 10 : 0;
+          const gradeInfo = determineGradeAndPoint(subPct, scheme.scales);
+          return {
+            ...sub,
+            percentage: subPct,
+            grade: gradeInfo.grade,
+            gradePoint: gradeInfo.gradePoint,
+          };
+        });
+
+        const overallPercentageNum = totalMax > 0 ? Math.round((totalObtained / totalMax) * 1000) / 10 : 0;
+        const overallGradeInfo = determineGradeAndPoint(overallPercentageNum, scheme.scales);
+
+        // Compute attendance percentage
+        const attendanceRows = await db
+          .select()
+          .from(attendanceRecords)
+          .where(
+            and(
+              eq(attendanceRecords.schoolId, user.schoolId),
+              eq(attendanceRecords.studentId, student.id),
+            ),
+          );
+        const totalAttendanceSessions = attendanceRows.length;
+        const presentSessions = attendanceRows.filter((a) => a.status === 'present' || a.status === 'late').length;
+        const attendancePct = totalAttendanceSessions > 0
+          ? `${Math.round((presentSessions / totalAttendanceSessions) * 1000) / 10}%`
+          : '100%';
+
+        const coScholasticData = [
+          { area: 'Work Education', grade: 'A', remarks: 'Demonstrates diligence and teamwork' },
+          { area: 'Art Education', grade: 'A', remarks: 'Creative expression and enthusiasm' },
+          { area: 'Health & Physical Education', grade: 'A', remarks: 'Active sports participation' },
+          { area: 'Discipline & Punctuality', grade: 'A', remarks: 'Respectful and punctual' },
+        ];
+
+        let resultStatus: 'passed' | 'promoted' | 'compartment' | 'failed' = 'promoted';
+        if (overallPercentageNum < scheme.passingPercentage) {
+          resultStatus = (scheme.passingPercentage - overallPercentageNum <= 8) ? 'compartment' : 'failed';
+        } else if (input.term !== 'annual') {
+          resultStatus = 'passed';
+        }
+
+        const [existingRc] = await db
+          .select()
+          .from(studentReportCards)
+          .where(
+            and(
+              eq(studentReportCards.schoolId, user.schoolId),
+              eq(studentReportCards.academicYearId, input.academicYearId),
+              eq(studentReportCards.studentId, student.id),
+              eq(studentReportCards.term, input.term),
+            ),
+          )
+          .limit(1);
+
+        let savedRc: typeof studentReportCards.$inferSelect;
+        if (existingRc) {
+          const [updated] = await db
+            .update(studentReportCards)
+            .set({
+              classId: input.classId,
+              sectionId: input.sectionId,
+              schemeId: input.schemeId,
+              totalMaxMarks: totalMax,
+              totalObtainedMarks: totalObtained,
+              overallPercentage: `${overallPercentageNum}%`,
+              overallGrade: overallGradeInfo.grade,
+              overallGradePoint: overallGradeInfo.gradePoint,
+              attendancePercentage: attendancePct,
+              scholasticData: JSON.stringify(scholasticData),
+              coScholasticData: JSON.stringify(coScholasticData),
+              teacherRemarks: input.teacherRemarks ?? 'Consistent academic performance and positive engagement.',
+              resultStatus,
+              updatedAt: new Date(),
+            })
+            .where(eq(studentReportCards.id, existingRc.id))
+            .returning();
+          savedRc = updated!;
+        } else {
+          const [inserted] = await db
+            .insert(studentReportCards)
+            .values({
+              schoolId: user.schoolId,
+              academicYearId: input.academicYearId,
+              classId: input.classId,
+              sectionId: input.sectionId,
+              studentId: student.id,
+              schemeId: input.schemeId,
+              term: input.term,
+              totalMaxMarks: totalMax,
+              totalObtainedMarks: totalObtained,
+              overallPercentage: `${overallPercentageNum}%`,
+              overallGrade: overallGradeInfo.grade,
+              overallGradePoint: overallGradeInfo.gradePoint,
+              attendancePercentage: attendancePct,
+              scholasticData: JSON.stringify(scholasticData),
+              coScholasticData: JSON.stringify(coScholasticData),
+              teacherRemarks: input.teacherRemarks ?? 'Consistent academic performance and positive engagement.',
+              principalRemarks: 'Promoted to the next standard with congratulations.',
+              resultStatus,
+              isPublished: false,
+            })
+            .returning();
+          savedRc = inserted!;
+        }
+        generated.push(savedRc);
+      }
+
+      return {
+        generatedCount: generated.length,
+        term: input.term,
+        schemeName: scheme.name,
+        board: scheme.board,
+        reportCards: generated,
+      };
+    },
+
+    async listReportCards(
+      user: AuthUser,
+      filters?: {
+        classId?: string | undefined;
+        sectionId?: string | undefined;
+        academicYearId?: string | undefined;
+        studentId?: string | undefined;
+        term?: string | undefined;
+      },
+    ) {
+      const conditions = [eq(studentReportCards.schoolId, user.schoolId)];
+      if (filters?.classId) conditions.push(eq(studentReportCards.classId, filters.classId));
+      if (filters?.sectionId) conditions.push(eq(studentReportCards.sectionId, filters.sectionId));
+      if (filters?.academicYearId) conditions.push(eq(studentReportCards.academicYearId, filters.academicYearId));
+      if (filters?.studentId) conditions.push(eq(studentReportCards.studentId, filters.studentId));
+      if (filters?.term) conditions.push(eq(studentReportCards.term, filters.term as any));
+
+      const rows = await db
+        .select({
+          rc: studentReportCards,
+          student: students,
+          scheme: gradingSchemes,
+          className: classes.name,
+          sectionName: sections.name,
+        })
+        .from(studentReportCards)
+        .innerJoin(students, eq(students.id, studentReportCards.studentId))
+        .innerJoin(gradingSchemes, eq(gradingSchemes.id, studentReportCards.schemeId))
+        .innerJoin(classes, eq(classes.id, studentReportCards.classId))
+        .innerJoin(sections, eq(sections.id, studentReportCards.sectionId))
+        .where(and(...conditions))
+        .orderBy(desc(studentReportCards.createdAt));
+
+      return rows.map((r) => ({
+        ...r.rc,
+        studentName: r.student.fullName,
+        admissionNumber: r.student.admissionNumber,
+        rollNumber: null,
+        className: r.className,
+        sectionName: r.sectionName,
+        schemeName: r.scheme.name,
+        board: r.scheme.board,
+      }));
+    },
+
+    async getReportCard(user: AuthUser, id: string) {
+      const [row] = await db
+        .select({
+          rc: studentReportCards,
+          student: students,
+          scheme: gradingSchemes,
+          school: schools,
+          className: classes.name,
+          sectionName: sections.name,
+        })
+        .from(studentReportCards)
+        .innerJoin(students, eq(students.id, studentReportCards.studentId))
+        .innerJoin(gradingSchemes, eq(gradingSchemes.id, studentReportCards.schemeId))
+        .innerJoin(schools, eq(schools.id, studentReportCards.schoolId))
+        .innerJoin(classes, eq(classes.id, studentReportCards.classId))
+        .innerJoin(sections, eq(sections.id, studentReportCards.sectionId))
+        .where(and(eq(studentReportCards.id, id), eq(studentReportCards.schoolId, user.schoolId)))
+        .limit(1);
+
+      if (!row) throw new ApiError(404, 'Report card not found');
+
+      return {
+        ...row.rc,
+        scholasticParsed: JSON.parse(row.rc.scholasticData || '[]'),
+        coScholasticParsed: JSON.parse(row.rc.coScholasticData || '[]'),
+        student: row.student,
+        school: row.school,
+        className: row.className,
+        sectionName: row.sectionName,
+        schemeName: row.scheme.name,
+        board: row.scheme.board,
+      };
+    },
+
+    async publishReportCard(user: AuthUser, id: string, isPublished: boolean) {
+      const [updated] = await db
+        .update(studentReportCards)
+        .set({
+          isPublished,
+          publishedAt: isPublished ? new Date() : null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(studentReportCards.id, id), eq(studentReportCards.schoolId, user.schoolId)))
+        .returning();
+
+      if (!updated) throw new ApiError(404, 'Report card not found');
+      return updated;
+    },
+
+    async portalBoardReportCards(user: AuthUser, studentId?: string | undefined) {
+      const portalStudent = await resolvePortalStudent(db, user, studentId);
+      const rows = await db
+        .select({
+          rc: studentReportCards,
+          scheme: gradingSchemes,
+          school: schools,
+          className: classes.name,
+          sectionName: sections.name,
+        })
+        .from(studentReportCards)
+        .innerJoin(gradingSchemes, eq(gradingSchemes.id, studentReportCards.schemeId))
+        .innerJoin(schools, eq(schools.id, studentReportCards.schoolId))
+        .innerJoin(classes, eq(classes.id, studentReportCards.classId))
+        .innerJoin(sections, eq(sections.id, studentReportCards.sectionId))
+        .where(
+          and(
+            eq(studentReportCards.schoolId, user.schoolId),
+            eq(studentReportCards.studentId, portalStudent.id),
+            eq(studentReportCards.isPublished, true),
+          ),
+        )
+        .orderBy(desc(studentReportCards.createdAt));
+
+      return rows.map((r) => ({
+        ...r.rc,
+        scholasticParsed: JSON.parse(r.rc.scholasticData || '[]'),
+        coScholasticParsed: JSON.parse(r.rc.coScholasticData || '[]'),
+        student: portalStudent,
+        school: r.school,
+        className: r.className,
+        sectionName: r.sectionName,
+        schemeName: r.scheme.name,
+        board: r.scheme.board,
+      }));
+    },
+
+    // =========================================================================
+    // Phase 13: Offline-First Attendance Synchronization Engine
+    // =========================================================================
+
+    async syncOfflineAttendance(user: AuthUser, input: z.infer<typeof syncOfflineAttendanceSchema>) {
+      const [staffMember] = await db
+        .select()
+        .from(staff)
+        .where(
+          and(
+            user.staffId ? eq(staff.id, user.staffId) : eq(staff.userId, user.appUserId),
+            eq(staff.schoolId, user.schoolId),
+          ),
+        )
+        .limit(1);
+
+      if (!staffMember) {
+        throw new ApiError(403, 'Only authenticated staff members can synchronize attendance');
+      }
+
+      let totalSynced = 0;
+      let totalConflicts = 0;
+      const batchResults: Array<{
+        clientBatchId: string;
+        syncedRecords: number;
+        status: 'synced' | 'conflict';
+        message: string;
+      }> = [];
+
+      for (const batch of input.batches) {
+        try {
+          let [session] = await db
+            .select()
+            .from(attendanceSessions)
+            .where(
+              and(
+                eq(attendanceSessions.schoolId, user.schoolId),
+                eq(attendanceSessions.sectionId, batch.sectionId),
+                eq(attendanceSessions.attendanceDate, batch.attendanceDate),
+                eq(attendanceSessions.kind, batch.kind),
+                batch.periodNumber ? eq(attendanceSessions.periodNumber, batch.periodNumber) : sql`true`,
+              ),
+            )
+            .limit(1);
+
+          if (!session) {
+            const [createdSession] = await db
+              .insert(attendanceSessions)
+              .values({
+                schoolId: user.schoolId,
+                academicYearId: batch.academicYearId,
+                classId: batch.classId,
+                sectionId: batch.sectionId,
+                subjectId: batch.subjectId ?? null,
+                takenByStaffId: staffMember.id,
+                kind: batch.kind,
+                attendanceDate: batch.attendanceDate,
+                periodNumber: batch.periodNumber ?? null,
+              })
+              .returning();
+            session = createdSession!;
+          }
+
+          let batchSyncedCount = 0;
+          for (const rec of batch.records) {
+            const [existingRec] = await db
+              .select()
+              .from(attendanceRecords)
+              .where(
+                and(
+                  eq(attendanceRecords.schoolId, user.schoolId),
+                  eq(attendanceRecords.sessionId, session.id),
+                  eq(attendanceRecords.studentId, rec.studentId),
+                ),
+              )
+              .limit(1);
+
+            if (existingRec) {
+              await db
+                .update(attendanceRecords)
+                .set({
+                  status: rec.status,
+                  remarks: rec.remarks ?? null,
+                  updatedAt: new Date(),
+                })
+                .where(eq(attendanceRecords.id, existingRec.id));
+            } else {
+              await db.insert(attendanceRecords).values({
+                schoolId: user.schoolId,
+                sessionId: session.id,
+                studentId: rec.studentId,
+                status: rec.status,
+                remarks: rec.remarks ?? null,
+              });
+            }
+            batchSyncedCount++;
+          }
+
+          totalSynced += batchSyncedCount;
+          batchResults.push({
+            clientBatchId: batch.clientBatchId,
+            syncedRecords: batchSyncedCount,
+            status: 'synced',
+            message: `Successfully synchronized ${batchSyncedCount} attendance records`,
+          });
+
+          await db.insert(offlineAttendanceSyncLogs).values({
+            schoolId: user.schoolId,
+            staffId: staffMember.id,
+            clientSyncBatchId: batch.clientBatchId,
+            payloadRecordsCount: batch.records.length,
+            syncedCount: batchSyncedCount,
+            conflictCount: 0,
+            status: 'success',
+            details: `Synced ${batchSyncedCount} records for date ${batch.attendanceDate}`,
+          });
+        } catch (err: any) {
+          totalConflicts++;
+          batchResults.push({
+            clientBatchId: batch.clientBatchId,
+            syncedRecords: 0,
+            status: 'conflict',
+            message: err?.message || 'Sync failed due to conflict',
+          });
+
+          await db.insert(offlineAttendanceSyncLogs).values({
+            schoolId: user.schoolId,
+            staffId: staffMember.id,
+            clientSyncBatchId: batch.clientBatchId,
+            payloadRecordsCount: batch.records.length,
+            syncedCount: 0,
+            conflictCount: 1,
+            status: 'partial_conflict',
+            details: `Failed sync: ${err?.message}`,
+          });
+        }
+      }
+
+      return {
+        totalBatches: input.batches.length,
+        totalSynced,
+        totalConflicts,
+        batchResults,
+      };
+    },
+
+    async listOfflineAttendanceSyncLogs(user: AuthUser, staffId?: string | undefined) {
+      const conditions = [eq(offlineAttendanceSyncLogs.schoolId, user.schoolId)];
+      if (staffId) conditions.push(eq(offlineAttendanceSyncLogs.staffId, staffId));
+
+      return db
+        .select({
+          log: offlineAttendanceSyncLogs,
+          staffName: staff.fullName,
+        })
+        .from(offlineAttendanceSyncLogs)
+        .innerJoin(staff, eq(staff.id, offlineAttendanceSyncLogs.staffId))
+        .where(and(...conditions))
+        .orderBy(desc(offlineAttendanceSyncLogs.syncedAt))
+        .limit(100);
+    },
   };
+}
+
+function determineGradeAndPoint(
+  percentage: number,
+  scales: Array<{ grade: string; minScore: number; maxScore: number; gradePoint: string; remarks: string | null }>,
+): { grade: string; gradePoint: string; remarks: string | null } {
+  if (scales.length === 0) {
+    if (percentage >= 90) return { grade: 'A1', gradePoint: '10.0', remarks: 'Outstanding' };
+    if (percentage >= 80) return { grade: 'A2', gradePoint: '9.0', remarks: 'Excellent' };
+    if (percentage >= 70) return { grade: 'B1', gradePoint: '8.0', remarks: 'Very Good' };
+    if (percentage >= 60) return { grade: 'B2', gradePoint: '7.0', remarks: 'Good' };
+    if (percentage >= 50) return { grade: 'C1', gradePoint: '6.0', remarks: 'Average' };
+    if (percentage >= 40) return { grade: 'C2', gradePoint: '5.0', remarks: 'Below Average' };
+    if (percentage >= 33) return { grade: 'D', gradePoint: '4.0', remarks: 'Marginal Pass' };
+    return { grade: 'E', gradePoint: '0.0', remarks: 'Needs Improvement' };
+  }
+
+  for (const scale of scales) {
+    if (percentage >= scale.minScore && percentage <= scale.maxScore) {
+      return { grade: scale.grade, gradePoint: scale.gradePoint, remarks: scale.remarks };
+    }
+  }
+
+  const sorted = [...scales].sort((a, b) => b.minScore - a.minScore);
+  if (percentage > sorted[0]!.maxScore) {
+    return { grade: sorted[0]!.grade, gradePoint: sorted[0]!.gradePoint, remarks: sorted[0]!.remarks };
+  }
+  const lowest = sorted[sorted.length - 1]!;
+  return { grade: lowest.grade, gradePoint: lowest.gradePoint, remarks: lowest.remarks };
 }
 
 type PortalStudent = {

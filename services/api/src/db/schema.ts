@@ -108,6 +108,48 @@ export const ptmSlotStatusEnum = pgEnum('ptm_slot_status', [
   'cancelled',
 ]);
 
+export const gradingBoardEnum = pgEnum('grading_board', [
+  'cbse',
+  'icse',
+  'state_board',
+  'cambridge',
+  'custom',
+]);
+
+export const assessmentComponentTypeEnum = pgEnum('assessment_component_type', [
+  'periodic_test',
+  'multiple_assessment',
+  'portfolio',
+  'subject_enrichment',
+  'term_exam',
+  'internal_assessment',
+  'board_exam',
+  'formative_assessment',
+  'summative_assessment',
+  'practical',
+]);
+
+export const gradingTermEnum = pgEnum('grading_term', [
+  'term_1',
+  'term_2',
+  'annual',
+  'all_terms',
+]);
+
+export const reportCardResultStatusEnum = pgEnum('report_card_result_status', [
+  'passed',
+  'promoted',
+  'compartment',
+  'failed',
+  'under_review',
+]);
+
+export const offlineSyncStatusEnum = pgEnum('offline_sync_status', [
+  'success',
+  'partial_conflict',
+  'failed',
+]);
+
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -1135,6 +1177,117 @@ export const ptmSlots = pgTable(
   (table) => [
     index('ptm_slots_sched_teacher_idx').on(table.schoolId, table.scheduleId, table.teacherStaffId),
     index('ptm_slots_student_idx').on(table.schoolId, table.bookedByStudentId),
+  ],
+);
+
+export const gradingSchemes = pgTable(
+  'grading_schemes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    academicYearId: uuid('academic_year_id').references(() => academicYears.id, { onDelete: 'set null' }),
+    name: text('name').notNull(),
+    board: gradingBoardEnum('board').default('cbse').notNull(),
+    description: text('description'),
+    isDefault: boolean('is_default').default(false).notNull(),
+    passingPercentage: integer('passing_percentage').default(33).notNull(),
+    config: text('config'), // JSON configuration for co-scholastic, terms, weights
+    ...timestamps,
+  },
+  (table) => [
+    index('grading_schemes_school_idx').on(table.schoolId, table.academicYearId),
+  ],
+);
+
+export const gradingScales = pgTable(
+  'grading_scales',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    schemeId: uuid('scheme_id').notNull().references(() => gradingSchemes.id, { onDelete: 'cascade' }),
+    grade: text('grade').notNull(),
+    minScore: integer('min_score').notNull(),
+    maxScore: integer('max_score').notNull(),
+    gradePoint: text('grade_point').notNull(),
+    remarks: text('remarks'),
+    orderIndex: integer('order_index').default(0).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index('grading_scales_scheme_idx').on(table.schoolId, table.schemeId, table.orderIndex),
+  ],
+);
+
+export const evaluationComponents = pgTable(
+  'evaluation_components',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    schemeId: uuid('scheme_id').notNull().references(() => gradingSchemes.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    componentType: assessmentComponentTypeEnum('component_type').notNull(),
+    term: gradingTermEnum('term').default('annual').notNull(),
+    weightagePercentage: integer('weightage_percentage').notNull(),
+    maxMarks: integer('max_marks').notNull(),
+    orderIndex: integer('order_index').default(0).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index('eval_components_scheme_idx').on(table.schoolId, table.schemeId, table.term),
+  ],
+);
+
+export const studentReportCards = pgTable(
+  'student_report_cards',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull().references(() => academicYears.id, { onDelete: 'cascade' }),
+    classId: uuid('class_id').notNull().references(() => classes.id, { onDelete: 'cascade' }),
+    sectionId: uuid('section_id').notNull().references(() => sections.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+    schemeId: uuid('scheme_id').notNull().references(() => gradingSchemes.id, { onDelete: 'cascade' }),
+    term: gradingTermEnum('term').default('annual').notNull(),
+    totalMaxMarks: integer('total_max_marks').notNull(),
+    totalObtainedMarks: integer('total_obtained_marks').notNull(),
+    overallPercentage: text('overall_percentage').notNull(),
+    overallGrade: text('overall_grade').notNull(),
+    overallGradePoint: text('overall_grade_point'),
+    attendancePercentage: text('attendance_percentage'),
+    scholasticData: text('scholastic_data').notNull(), // JSON string
+    coScholasticData: text('co_scholastic_data'), // JSON string
+    teacherRemarks: text('teacher_remarks'),
+    principalRemarks: text('principal_remarks'),
+    resultStatus: reportCardResultStatusEnum('result_status').default('promoted').notNull(),
+    isPublished: boolean('is_published').default(false).notNull(),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.schoolId, table.academicYearId, table.studentId, table.term),
+    index('report_cards_section_idx').on(table.schoolId, table.sectionId, table.term),
+    index('report_cards_student_idx').on(table.schoolId, table.studentId),
+  ],
+);
+
+export const offlineAttendanceSyncLogs = pgTable(
+  'offline_attendance_sync_logs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    staffId: uuid('staff_id').notNull().references(() => staff.id, { onDelete: 'cascade' }),
+    clientSyncBatchId: text('client_sync_batch_id').notNull(),
+    payloadRecordsCount: integer('payload_records_count').notNull(),
+    syncedCount: integer('synced_count').notNull(),
+    conflictCount: integer('conflict_count').default(0).notNull(),
+    status: offlineSyncStatusEnum('status').default('success').notNull(),
+    details: text('details'),
+    syncedAt: timestamp('synced_at', { withTimezone: true }).defaultNow().notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index('offline_sync_school_staff_idx').on(table.schoolId, table.staffId, table.syncedAt),
+    index('offline_sync_batch_idx').on(table.schoolId, table.clientSyncBatchId),
   ],
 );
 
