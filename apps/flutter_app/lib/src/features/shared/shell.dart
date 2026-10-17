@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme.dart';
+import 'components/command_palette.dart';
 import 'components/shortcuts_dialog.dart';
 import 'components/tour_dialog.dart';
 
@@ -14,6 +15,10 @@ class AppShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return CallbackShortcuts(
       bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true):
+            () => CommandPaletteDialog.show(context),
+        const SingleActivator(LogicalKeyboardKey.keyK, meta: true):
+            () => CommandPaletteDialog.show(context),
         const SingleActivator(LogicalKeyboardKey.slash, control: true):
             () => ShortcutsDialog.show(context),
         const SingleActivator(LogicalKeyboardKey.slash, meta: true):

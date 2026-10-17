@@ -58,6 +58,8 @@ import {
   evaluationComponents,
   studentReportCards,
   offlineAttendanceSyncLogs,
+  studentRiskAlerts,
+  nlAnalyticsQueries,
 } from '../db/schema';
 
 import { BulkImporter } from '../importers/bulk-importer';
@@ -133,6 +135,11 @@ import type {
   generateReportCardsSchema,
   publishReportCardSchema,
   syncOfflineAttendanceSchema,
+  recordStudentInterventionSchema,
+  evaluateStudentRiskSchema,
+  naturalLanguageQuerySchema,
+  draftReportCardRemarksSchema,
+  draftHomeworkFeedbackSchema,
 } from '../http/validation';
 
 import type { z } from 'zod';
@@ -6465,6 +6472,785 @@ export function createSchoolRepository(db: Db) {
         .where(and(...conditions))
         .orderBy(desc(offlineAttendanceSyncLogs.syncedAt))
         .limit(100);
+    },
+
+    // =========================================================================
+    // Phase 14: Applied AI, Student At-Risk Early Warning & Analytics
+    // =========================================================================
+
+    async evaluateStudentRiskScores(user: AuthUser, input?: z.infer<typeof evaluateStudentRiskSchema>) {
+      let yearId = input?.academicYearId;
+      if (!yearId) {
+        const [currYear] = await db
+          .select()
+          .from(academicYears)
+          .where(eq(academicYears.schoolId, user.schoolId))
+          .orderBy(desc(academicYears.startsOn))
+          .limit(1);
+        yearId = currYear?.id;
+      }
+
+      if (!yearId) {
+        throw new ApiError(400, 'No active academic year found for evaluating student risk');
+      }
+
+      const conditions = [
+        eq(studentEnrollments.schoolId, user.schoolId),
+        eq(students.isActive, true),
+      ];
+      if (yearId) conditions.push(eq(studentEnrollments.academicYearId, yearId));
+      if (input?.classId) conditions.push(eq(studentEnrollments.classId, input.classId));
+      if (input?.sectionId) conditions.push(eq(studentEnrollments.sectionId, input.sectionId));
+
+      const enrolledRows = await db
+        .select({
+          student: students,
+          classId: studentEnrollments.classId,
+          sectionId: studentEnrollments.sectionId,
+          academicYearId: studentEnrollments.academicYearId,
+        })
+        .from(studentEnrollments)
+        .innerJoin(students, eq(students.id, studentEnrollments.studentId))
+        .where(and(...conditions));
+
+      const evaluatedAlerts: Array<typeof studentRiskAlerts.$inferSelect> = [];
+
+      for (const row of enrolledRows) {
+        const student = row.student;
+        const factors: string[] = [];
+
+        // 1. Attendance Analysis
+        const attendanceRows = await db
+          .select()
+          .from(attendanceRecords)
+          .where(
+            and(
+              eq(attendanceRecords.schoolId, user.schoolId),
+              eq(attendanceRecords.studentId, student.id),
+            ),
+          );
+
+        const totalAttendanceSessions = attendanceRows.length;
+        const presentSessions = attendanceRows.filter(
+          (a) => a.status === 'present' || a.status === 'late',
+        ).length;
+        const attendanceRate =
+          totalAttendanceSessions > 0
+            ? (presentSessions / totalAttendanceSessions) * 100
+            : 100;
+
+        let attendanceScore = 0;
+        if (attendanceRate < 60) {
+          attendanceScore = 95;
+          factors.push(`Critically low attendance (${attendanceRate.toFixed(1)}%)`);
+        } else if (attendanceRate < 75) {
+          attendanceScore = 75;
+          factors.push(`Low attendance under mandatory threshold (${attendanceRate.toFixed(1)}%)`);
+        } else if (attendanceRate < 85) {
+          attendanceScore = 40;
+          factors.push(`Sub-optimal attendance (${attendanceRate.toFixed(1)}%)`);
+        } else if (attendanceRate < 90) {
+          attendanceScore = 15;
+        }
+
+        // Consecutive absences check in recent records
+        const recentAbsences = attendanceRows
+          .slice(-5)
+          .filter((a) => a.status === 'absent').length;
+        if (recentAbsences >= 3) {
+          attendanceScore = Math.min(100, attendanceScore + 25);
+          factors.push(`Frequent consecutive absences detected (${recentAbsences} in recent sessions)`);
+        }
+
+        // 2. Academic Performance Analysis
+        const marksRows = await db
+          .select({
+            marksObtained: examMarks.marksObtained,
+            maxMarks: exams.maxMarks,
+            examName: exams.name,
+          })
+          .from(examMarks)
+          .innerJoin(exams, eq(exams.id, examMarks.examId))
+          .where(
+            and(
+              eq(examMarks.schoolId, user.schoolId),
+              eq(examMarks.studentId, student.id),
+            ),
+          );
+
+        let academicScore = 0;
+        if (marksRows.length > 0) {
+          const totalObtained = marksRows.reduce((acc, m) => acc + m.marksObtained, 0);
+          const totalMax = marksRows.reduce((acc, m) => acc + m.maxMarks, 0);
+          const overallPct = totalMax > 0 ? (totalObtained / totalMax) * 100 : 100;
+
+          if (overallPct < 35) {
+            academicScore = 95;
+            factors.push(`Failing aggregate score (${overallPct.toFixed(1)}%)`);
+          } else if (overallPct < 45) {
+            academicScore = 70;
+            factors.push(`Borderline aggregate marks (${overallPct.toFixed(1)}%)`);
+          } else if (overallPct < 60) {
+            academicScore = 35;
+            factors.push(`Below-average academic performance (${overallPct.toFixed(1)}%)`);
+          }
+
+          // Individual subject failures (cutoff 35% of max marks)
+          const failingSubjects = marksRows.filter((m) => {
+            const passCutoff = Math.round(m.maxMarks * 0.35);
+            return m.marksObtained < passCutoff;
+          });
+
+          for (const fail of failingSubjects) {
+            academicScore = Math.min(100, academicScore + 20);
+            factors.push(`Failing in ${fail.examName} (${fail.marksObtained}/${fail.maxMarks})`);
+          }
+        }
+
+        // 3. Financial Stress Analysis
+        const feeAllocations = await db
+          .select()
+          .from(studentFeeAllocations)
+          .where(
+            and(
+              eq(studentFeeAllocations.schoolId, user.schoolId),
+              eq(studentFeeAllocations.studentId, student.id),
+            ),
+          );
+
+        const feeHistory = await db
+          .select({
+            allocationId: feePayments.allocationId,
+            amountPaid: feePayments.amountPaid,
+          })
+          .from(feePayments)
+          .where(
+            and(
+              eq(feePayments.schoolId, user.schoolId),
+              eq(feePayments.studentId, student.id),
+            ),
+          );
+        const paidByAllocation = new Map<string, number>();
+        for (const p of feeHistory) {
+          paidByAllocation.set(p.allocationId, (paidByAllocation.get(p.allocationId) ?? 0) + p.amountPaid);
+        }
+
+        let feeScore = 0;
+        const unpaidAllocations = feeAllocations.filter((a) => a.status !== 'paid');
+        const totalDue = unpaidAllocations.reduce((acc, a) => {
+          const paid = paidByAllocation.get(a.id) ?? 0;
+          return acc + Math.max(0, a.amount - paid);
+        }, 0);
+
+        if (totalDue > 15000) {
+          feeScore = 90;
+          factors.push(`Severe fee arrears (₹${totalDue.toLocaleString('en-IN')} outstanding)`);
+        } else if (totalDue > 5000) {
+          feeScore = 60;
+          factors.push(`Outstanding fee dues of ₹${totalDue.toLocaleString('en-IN')}`);
+        } else if (totalDue > 0) {
+          feeScore = 25;
+          factors.push(`Pending fee dues of ₹${totalDue.toLocaleString('en-IN')}`);
+        }
+
+        // Composite Risk Score: Weighted formula 40% Attendance + 40% Academic + 20% Financial
+        const compositeScore = Math.min(
+          100,
+          Math.round(attendanceScore * 0.4 + academicScore * 0.4 + feeScore * 0.2),
+        );
+
+        let riskLevel: 'low' | 'moderate' | 'high' | 'critical' = 'low';
+        if (compositeScore >= 70) {
+          riskLevel = 'critical';
+        } else if (compositeScore >= 45) {
+          riskLevel = 'high';
+        } else if (compositeScore >= 20) {
+          riskLevel = 'moderate';
+        }
+
+        if (factors.length === 0) {
+          factors.push('Consistent attendance, passing marks, and no overdue fees');
+        }
+
+        // Check if existing record exists
+        const [existing] = await db
+          .select()
+          .from(studentRiskAlerts)
+          .where(
+            and(
+              eq(studentRiskAlerts.schoolId, user.schoolId),
+              eq(studentRiskAlerts.studentId, student.id),
+            ),
+          )
+          .limit(1);
+
+        if (existing) {
+          const [updated] = await db
+            .update(studentRiskAlerts)
+            .set({
+              classId: row.classId,
+              sectionId: row.sectionId,
+              riskLevel,
+              compositeScore,
+              attendanceScore,
+              academicScore,
+              feeScore,
+              factors,
+              lastEvaluatedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(studentRiskAlerts.id, existing.id))
+            .returning();
+          evaluatedAlerts.push(updated!);
+        } else {
+          const [inserted] = await db
+            .insert(studentRiskAlerts)
+            .values({
+              schoolId: user.schoolId,
+              studentId: student.id,
+              academicYearId: row.academicYearId,
+              classId: row.classId,
+              sectionId: row.sectionId,
+              riskLevel,
+              compositeScore,
+              attendanceScore,
+              academicScore,
+              feeScore,
+              factors,
+              status: 'active',
+              interventions: [],
+              lastEvaluatedAt: new Date(),
+            })
+            .returning();
+          evaluatedAlerts.push(inserted!);
+        }
+      }
+
+      return evaluatedAlerts;
+    },
+
+    async listStudentRiskAlerts(
+      user: AuthUser,
+      params: {
+        classId?: string | undefined;
+        sectionId?: string | undefined;
+        riskLevel?: string | undefined;
+        status?: string | undefined;
+      },
+    ) {
+      const conditions = [eq(studentRiskAlerts.schoolId, user.schoolId)];
+      if (params.classId) conditions.push(eq(studentRiskAlerts.classId, params.classId));
+      if (params.sectionId) conditions.push(eq(studentRiskAlerts.sectionId, params.sectionId));
+      if (params.riskLevel && params.riskLevel !== 'all') {
+        conditions.push(eq(studentRiskAlerts.riskLevel, params.riskLevel as any));
+      }
+      if (params.status && params.status !== 'all') {
+        conditions.push(eq(studentRiskAlerts.status, params.status as any));
+      }
+
+      const rows = await db
+        .select({
+          alert: studentRiskAlerts,
+          student: students,
+          classItem: classes,
+          sectionItem: sections,
+          enrollment: studentEnrollments,
+        })
+        .from(studentRiskAlerts)
+        .innerJoin(students, eq(students.id, studentRiskAlerts.studentId))
+        .innerJoin(classes, eq(classes.id, studentRiskAlerts.classId))
+        .innerJoin(sections, eq(sections.id, studentRiskAlerts.sectionId))
+        .leftJoin(
+          studentEnrollments,
+          and(
+            eq(studentEnrollments.studentId, studentRiskAlerts.studentId),
+            eq(studentEnrollments.academicYearId, studentRiskAlerts.academicYearId),
+          ),
+        )
+        .where(and(...conditions))
+        .orderBy(desc(studentRiskAlerts.compositeScore));
+
+      return rows.map((r) => ({
+        ...r.alert,
+        studentName: r.student.fullName,
+        admissionNumber: r.student.admissionNumber,
+        rollNumber: r.enrollment?.rollNumber ?? null,
+        className: r.classItem.name,
+        sectionName: r.sectionItem.name,
+      }));
+    },
+
+    async getStudentRiskAlert(user: AuthUser, studentId: string) {
+      const [record] = await db
+        .select({
+          alert: studentRiskAlerts,
+          student: students,
+          classItem: classes,
+          sectionItem: sections,
+          enrollment: studentEnrollments,
+        })
+        .from(studentRiskAlerts)
+        .innerJoin(students, eq(students.id, studentRiskAlerts.studentId))
+        .innerJoin(classes, eq(classes.id, studentRiskAlerts.classId))
+        .innerJoin(sections, eq(sections.id, studentRiskAlerts.sectionId))
+        .leftJoin(
+          studentEnrollments,
+          and(
+            eq(studentEnrollments.studentId, studentRiskAlerts.studentId),
+            eq(studentEnrollments.academicYearId, studentRiskAlerts.academicYearId),
+          ),
+        )
+        .where(
+          and(
+            eq(studentRiskAlerts.schoolId, user.schoolId),
+            eq(studentRiskAlerts.studentId, studentId),
+          ),
+        )
+        .limit(1);
+
+      if (!record) {
+        throw new ApiError(404, 'No risk alert found for student');
+      }
+
+      return {
+        ...record.alert,
+        studentName: record.student.fullName,
+        admissionNumber: record.student.admissionNumber,
+        rollNumber: record.enrollment?.rollNumber ?? null,
+        className: record.classItem.name,
+        sectionName: record.sectionItem.name,
+      };
+    },
+
+    async recordStudentIntervention(
+      user: AuthUser,
+      studentId: string,
+      input: z.infer<typeof recordStudentInterventionSchema>,
+    ) {
+      const [alert] = await db
+        .select()
+        .from(studentRiskAlerts)
+        .where(
+          and(
+            eq(studentRiskAlerts.schoolId, user.schoolId),
+            eq(studentRiskAlerts.studentId, studentId),
+          ),
+        )
+        .limit(1);
+
+      if (!alert) {
+        throw new ApiError(404, 'Risk alert profile not found for this student. Evaluate first.');
+      }
+
+      const existingInterventions = (alert.interventions as Array<Record<string, unknown>>) ?? [];
+      const newEntry = {
+        id: crypto.randomUUID(),
+        staffId: user.staffId ?? null,
+        staffName: user.displayName ?? user.email ?? 'Faculty Staff',
+        action: input.action,
+        notes: input.notes,
+        date: new Date().toISOString(),
+      };
+
+      const updatedInterventions = [newEntry, ...existingInterventions];
+      const newStatus = input.status ?? alert.status;
+
+      const [updated] = await db
+        .update(studentRiskAlerts)
+        .set({
+          interventions: updatedInterventions,
+          status: newStatus,
+          updatedAt: new Date(),
+        })
+        .where(eq(studentRiskAlerts.id, alert.id))
+        .returning();
+
+      return updated;
+    },
+
+    async executeNaturalLanguageQuery(user: AuthUser, input: z.infer<typeof naturalLanguageQuerySchema>) {
+      const q = input.query.toLowerCase().trim();
+
+      let intent = 'general_cohort';
+      let explanation = 'Analyzed institutional database records.';
+      let columns: string[] = ['Item', 'Details', 'Count'];
+      let data: Array<Record<string, unknown>> = [];
+      let suggestedFollowUps: string[] = [];
+
+      // 1. Fee Defaulter Intent
+      if (q.includes('fee') || q.includes('defaulter') || q.includes('due') || q.includes('unpaid') || q.includes('arrear')) {
+        intent = 'fee_defaulters';
+        const thresholdMatch = q.match(/\b(?:above|>|more than|exceeding)\s*(?:₹|rs\.?|inr)?\s*(\d+)/i);
+        const threshold = thresholdMatch && thresholdMatch[1] ? parseInt(thresholdMatch[1], 10) : 0;
+
+        const feeRows = await db
+          .select({
+            allocationId: studentFeeAllocations.id,
+            studentId: studentFeeAllocations.studentId,
+            studentName: students.fullName,
+            admissionNumber: students.admissionNumber,
+            className: classes.name,
+            sectionName: sections.name,
+            amount: studentFeeAllocations.amount,
+            dueDate: studentFeeAllocations.dueDate,
+            status: studentFeeAllocations.status,
+          })
+          .from(studentFeeAllocations)
+          .innerJoin(students, eq(students.id, studentFeeAllocations.studentId))
+          .innerJoin(
+            studentEnrollments,
+            and(
+              eq(studentEnrollments.studentId, studentFeeAllocations.studentId),
+              eq(studentEnrollments.academicYearId, studentFeeAllocations.academicYearId),
+            ),
+          )
+          .innerJoin(classes, eq(classes.id, studentEnrollments.classId))
+          .innerJoin(sections, eq(sections.id, studentEnrollments.sectionId))
+          .where(
+            and(
+              eq(studentFeeAllocations.schoolId, user.schoolId),
+              ne(studentFeeAllocations.status, 'paid'),
+            ),
+          );
+
+        const allocationPayments = await db
+          .select({
+            allocationId: feePayments.allocationId,
+            amountPaid: feePayments.amountPaid,
+          })
+          .from(feePayments)
+          .where(eq(feePayments.schoolId, user.schoolId));
+        const paidMap = new Map<string, number>();
+        for (const p of allocationPayments) {
+          paidMap.set(p.allocationId, (paidMap.get(p.allocationId) ?? 0) + p.amountPaid);
+        }
+
+        const studentMap = new Map<string, {
+          studentName: string;
+          admissionNumber: string;
+          className: string;
+          sectionName: string;
+          totalDue: number;
+          latestDueDate: string;
+        }>();
+
+        for (const row of feeRows) {
+          const paid = paidMap.get(row.allocationId) ?? 0;
+          const due = Math.max(0, row.amount - paid);
+          if (due <= 0) continue;
+
+          if (!studentMap.has(row.studentId)) {
+            studentMap.set(row.studentId, {
+              studentName: row.studentName,
+              admissionNumber: row.admissionNumber,
+              className: row.className,
+              sectionName: row.sectionName,
+              totalDue: due,
+              latestDueDate: row.dueDate,
+            });
+          } else {
+            const curr = studentMap.get(row.studentId)!;
+            curr.totalDue += due;
+            if (row.dueDate > curr.latestDueDate) curr.latestDueDate = row.dueDate;
+          }
+        }
+
+        const filtered = Array.from(studentMap.values())
+          .filter((s) => s.totalDue >= threshold)
+          .sort((a, b) => b.totalDue - a.totalDue);
+
+        columns = ['Student Name', 'Admission No', 'Class', 'Section', 'Due Amount (₹)', 'Due Date'];
+        data = filtered.map((f) => ({
+          'Student Name': f.studentName,
+          'Admission No': f.admissionNumber,
+          'Class': f.className,
+          'Section': f.sectionName,
+          'Due Amount (₹)': `₹${f.totalDue.toLocaleString('en-IN')}`,
+          'Due Date': f.latestDueDate,
+        }));
+
+        explanation = `Found ${filtered.length} students with outstanding fees ${threshold > 0 ? `exceeding ₹${threshold.toLocaleString('en-IN')}` : 'requiring clearance'}.`;
+        suggestedFollowUps = [
+          'Send automated WhatsApp/SMS fee reminders',
+          'Export fee defaulter list to Excel',
+          'View class-wise fee collection rates',
+        ];
+      }
+      // 2. Attendance Analytics Intent
+      else if (q.includes('attendance') || q.includes('absent') || q.includes('bunk') || q.includes('present')) {
+        intent = 'attendance_analytics';
+        const classesRows = await db
+          .select({
+            classId: classes.id,
+            className: classes.name,
+            sectionId: sections.id,
+            sectionName: sections.name,
+          })
+          .from(sections)
+          .innerJoin(classes, eq(classes.id, sections.classId))
+          .where(eq(classes.schoolId, user.schoolId));
+
+        const attendanceSummary: Array<Record<string, unknown>> = [];
+
+        for (const sec of classesRows) {
+          const att = await db
+            .select({
+              status: attendanceRecords.status,
+            })
+            .from(attendanceRecords)
+            .innerJoin(attendanceSessions, eq(attendanceSessions.id, attendanceRecords.sessionId))
+            .where(
+              and(
+                eq(attendanceRecords.schoolId, user.schoolId),
+                eq(attendanceSessions.sectionId, sec.sectionId),
+              ),
+            );
+
+          const total = att.length;
+          const present = att.filter((a) => a.status === 'present' || a.status === 'late').length;
+          const rate = total > 0 ? Math.round((present / total) * 100) : 92;
+
+          attendanceSummary.push({
+            'Class & Section': `${sec.className} - ${sec.sectionName}`,
+            'Total Recorded': total,
+            'Present Sessions': present,
+            'Attendance Rate': `${rate}%`,
+            'Health Status': rate < 75 ? 'Critical Concern' : rate < 85 ? 'Needs Attention' : 'Healthy',
+          });
+        }
+
+        columns = ['Class & Section', 'Total Recorded', 'Present Sessions', 'Attendance Rate', 'Health Status'];
+        data = attendanceSummary.sort((a, b) => parseInt(a['Attendance Rate'] as string) - parseInt(b['Attendance Rate'] as string));
+        explanation = `Calculated attendance benchmarks across ${classesRows.length} active class sections.`;
+        suggestedFollowUps = [
+          'List students with 3+ consecutive absences',
+          'Send automated absence notification to parents',
+          'Export monthly attendance register',
+        ];
+      }
+      // 3. Academic Toppers & Exam Intent
+      else if (q.includes('top') || q.includes('topper') || q.includes('exam') || q.includes('rank') || q.includes('mark') || q.includes('grade')) {
+        intent = 'academic_performance';
+        const reportCards = await db
+          .select({
+            studentName: students.fullName,
+            admissionNumber: students.admissionNumber,
+            className: classes.name,
+            overallPercentage: studentReportCards.overallPercentage,
+            overallGrade: studentReportCards.overallGrade,
+            resultStatus: studentReportCards.resultStatus,
+          })
+          .from(studentReportCards)
+          .innerJoin(students, eq(students.id, studentReportCards.studentId))
+          .innerJoin(classes, eq(classes.id, studentReportCards.classId))
+          .where(eq(studentReportCards.schoolId, user.schoolId))
+          .orderBy(desc(studentReportCards.overallPercentage))
+          .limit(20);
+
+        columns = ['Rank', 'Student Name', 'Admission No', 'Class', 'Aggregate Score', 'Grade', 'Result'];
+        data = reportCards.map((rc, idx) => ({
+          'Rank': `#${idx + 1}`,
+          'Student Name': rc.studentName,
+          'Admission No': rc.admissionNumber,
+          'Class': rc.className,
+          'Aggregate Score': rc.overallPercentage,
+          'Grade': rc.overallGrade,
+          'Result': rc.resultStatus.toUpperCase(),
+        }));
+
+        explanation = `Ranked top academic performers based on evaluated official board report cards.`;
+        suggestedFollowUps = [
+          'Generate official merit certificates for top 5 students',
+          'View subject-wise distinction breakdown',
+          'Identify students needing remedial exam sessions',
+        ];
+      }
+      // 4. Staff & Substitutes Intent
+      else if (q.includes('teacher') || q.includes('staff') || q.includes('substitute') || q.includes('leave')) {
+        intent = 'staff_substitutes';
+        const leaves = await db
+          .select({
+            staffName: staff.fullName,
+            staffCode: staff.staffCode,
+            leaveType: staffLeaves.leaveType,
+            status: staffLeaves.status,
+            startDate: staffLeaves.startDate,
+            endDate: staffLeaves.endDate,
+            reason: staffLeaves.reason,
+          })
+          .from(staffLeaves)
+          .innerJoin(staff, eq(staff.id, staffLeaves.staffId))
+          .where(eq(staffLeaves.schoolId, user.schoolId))
+          .orderBy(desc(staffLeaves.startDate))
+          .limit(15);
+
+        columns = ['Staff Name', 'Staff Code', 'Leave Type', 'Status', 'Start Date', 'End Date', 'Reason'];
+        data = leaves.map((l) => ({
+          'Staff Name': l.staffName,
+          'Staff Code': l.staffCode,
+          'Leave Type': l.leaveType.toUpperCase(),
+          'Status': l.status.toUpperCase(),
+          'Start Date': l.startDate,
+          'End Date': l.endDate,
+          'Reason': l.reason,
+        }));
+
+        explanation = `Retrieved active and recent staff leaves with substitute management status.`;
+        suggestedFollowUps = [
+          'Suggest timetable substitutes for absent teachers',
+          'Review pending staff leave applications',
+        ];
+      }
+      // 5. General Institutional Strength
+      else {
+        intent = 'general_cohort';
+        const enrolled = await db
+          .select({
+            className: classes.name,
+            studentId: studentEnrollments.studentId,
+          })
+          .from(studentEnrollments)
+          .innerJoin(classes, eq(classes.id, studentEnrollments.classId))
+          .where(eq(studentEnrollments.schoolId, user.schoolId));
+
+        const classCounts = new Map<string, number>();
+        for (const e of enrolled) {
+          classCounts.set(e.className, (classCounts.get(e.className) ?? 0) + 1);
+        }
+
+        columns = ['Class Standard', 'Enrolled Students', 'Status'];
+        data = Array.from(classCounts.entries()).map(([cls, count]) => ({
+          'Class Standard': cls,
+          'Enrolled Students': count,
+          'Status': count > 35 ? 'High Capacity' : 'Optimal Capacity',
+        }));
+
+        explanation = `Aggregated total active student strength across ${classCounts.size} classes.`;
+        suggestedFollowUps = [
+          'View student directory and parent contacts',
+          'Check RTE and quota allocations',
+        ];
+      }
+
+      await db.insert(nlAnalyticsQueries).values({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        query: input.query,
+        intent,
+        explanation,
+        resultCount: data.length,
+      });
+
+      return {
+        query: input.query,
+        intent,
+        explanation,
+        columns,
+        data,
+        totalCount: data.length,
+        suggestedFollowUps,
+      };
+    },
+
+    draftReportCardRemarks(input: z.infer<typeof draftReportCardRemarksSchema>) {
+      const { studentName, overallPercentage, attendanceRate, subjects, tone } = input;
+      const pct = parseFloat(overallPercentage.replace('%', '')) || 75;
+
+      const topSubj = subjects && subjects.length > 0
+        ? subjects[0]!.subjectName
+        : 'scholastic subjects';
+
+      const weakSubj = subjects && subjects.length > 1
+        ? subjects.filter((s) => s.grade === 'D' || s.grade === 'E' || s.grade === 'C2').map((s) => s.subjectName)
+        : [];
+
+      let draftRemarks = '';
+      const alternativeOptions: string[] = [];
+
+      if (tone === 'encouraging') {
+        if (pct >= 85) {
+          draftRemarks = `${studentName} is an exceptionally diligent and motivated student who achieved an outstanding ${overallPercentage} overall score this term. Demonstrating remarkable aptitude in ${topSubj}, they consistently display curiosity, leadership, and enthusiastic classroom engagement. We look forward to seeing their continued brilliance in the upcoming academic session.`;
+          alternativeOptions.push(
+            `${studentName} has demonstrated admirable academic dedication throughout this term, securing a commendable ${overallPercentage}. Their strong conceptual grasp in ${topSubj} and active participation make them a role model for peers. Keep reaching for greater heights!`,
+          );
+          alternativeOptions.push(
+            `A stellar term for ${studentName}! With an impressive ${overallPercentage} aggregate and ${attendanceRate ?? 'strong'} attendance, their intellectual curiosity and consistent work ethic are truly praiseworthy.`,
+          );
+        } else if (pct >= 60) {
+          draftRemarks = `${studentName} has shown steady academic progress and commitment this term, securing an aggregate of ${overallPercentage}. They show great enthusiasm in ${topSubj}. With structured daily revision and focused attention on ${weakSubj.length > 0 ? weakSubj.join(', ') : 'core foundational topics'}, they have the full potential to achieve top honors.`;
+          alternativeOptions.push(
+            `${studentName} is a sincere student with a positive classroom presence. Achieving ${overallPercentage} reflects genuine effort. Continuing to ask questions and reinforcing revision routines will unlock even higher achievements.`,
+          );
+          alternativeOptions.push(
+            `Commendable efforts by ${studentName} this term. Their positive attitude towards learning is appreciated. Strengthening ${weakSubj.length > 0 ? weakSubj[0] : 'conceptual mastery'} will yield substantial academic dividends.`,
+          );
+        } else {
+          draftRemarks = `${studentName} possesses genuine potential and participates enthusiastically in school life. While securing ${overallPercentage} reflects foundational knowledge, targeted daily practice and dedicated guidance in ${weakSubj.length > 0 ? weakSubj.join(', ') : 'core subjects'} will help them reach their true capabilities. We encourage them to remain confident and persevering.`;
+          alternativeOptions.push(
+            `With consistent effort and disciplined study habits, ${studentName} can substantially elevate their academic trajectory. We believe in their capabilities and recommend targeted remedial sessions.`,
+          );
+          alternativeOptions.push(
+            `${studentName} has a friendly disposition and willingness to learn. Regular attendance and focused revision will significantly bolster their confidence and term scores.`,
+          );
+        }
+      } else if (tone === 'constructive') {
+        draftRemarks = `${studentName} attained a cumulative ${overallPercentage} aggregate with ${attendanceRate ?? 'regular'} attendance. Strong analytical skills were evident in ${topSubj}. However, ${weakSubj.length > 0 ? `additional structured practice is needed in ${weakSubj.join(', ')}` : 'maintaining consistency across all examination components is recommended'}. Enhanced time management and note-taking will ensure well-rounded excellence.`;
+        alternativeOptions.push(
+          `Assessment records show ${overallPercentage} aggregate for ${studentName}. While overall comprehension is sound, focused remediation in weaker subject modules and consistent assignment submissions will optimize academic outcomes.`,
+        );
+        alternativeOptions.push(
+          `${studentName} demonstrates adequate subject competence. Developing systematic examination revision routines and participating more actively in classroom discussions will help bridge performance gaps.`,
+        );
+      } else {
+        // formal
+        draftRemarks = `${studentName} has fulfilled the scholastic requirements for the term with an aggregate result of ${overallPercentage} and an attendance rate of ${attendanceRate ?? '100%'}. Satisfactory participation was observed across scholastic and co-scholastic domains. Result status: Promoted.`;
+        alternativeOptions.push(
+          `Official evaluation record confirms an aggregate score of ${overallPercentage} for ${studentName}. Conduct and institutional discipline have been maintained satisfactorily throughout the academic session.`,
+        );
+        alternativeOptions.push(
+          `${studentName} has concluded the term evaluation with ${overallPercentage}. Promotion to the subsequent grade level is recommended based on board criteria.`,
+        );
+      }
+
+      return {
+        studentName,
+        overallPercentage,
+        tone,
+        draftRemarks,
+        alternativeOptions,
+      };
+    },
+
+    draftHomeworkFeedback(input: z.infer<typeof draftHomeworkFeedbackSchema>) {
+      const { assignmentTitle, subject, studentScore, maxScore, strengths, areasForImprovement } = input;
+      const pct = maxScore > 0 ? Math.round((studentScore / maxScore) * 100) : 100;
+
+      let rubricGrade = 'Proficient (Grade B)';
+      let feedbackText = '';
+
+      if (pct >= 90) {
+        rubricGrade = 'Exemplary (Grade A+)';
+        feedbackText = `Outstanding submission on "${assignmentTitle}" (${studentScore}/${maxScore} - ${pct}%)! Your work demonstrates exceptional mastery of ${subject} concepts, meticulous attention to detail, and thorough problem-solving methodology.${strengths ? ` Particularly impressive: ${strengths}.` : ''} Keep up this phenomenal standard of work!`;
+      } else if (pct >= 75) {
+        rubricGrade = 'Proficient (Grade A)';
+        feedbackText = `Well done on completing "${assignmentTitle}" (${studentScore}/${maxScore} - ${pct}%). You demonstrate a solid grasp of core ${subject} principles and structured reasoning.${strengths ? ` Good execution on: ${strengths}.` : ''}${areasForImprovement ? ` For next time, consider refining: ${areasForImprovement}.` : ' Review the minor calculation steps to ensure complete accuracy.'}`;
+      } else if (pct >= 50) {
+        rubricGrade = 'Developing (Grade B)';
+        feedbackText = `Good effort on "${assignmentTitle}" (${studentScore}/${maxScore} - ${pct}%). The foundational approach to ${subject} is visible, but key conceptual steps require reinforcement.${areasForImprovement ? ` Focus on: ${areasForImprovement}.` : ' Please revisit the textbook examples and ensure all problem steps are fully explained.'} Feel free to ask questions during office hours!`;
+      } else {
+        rubricGrade = 'Needs Support (Grade C)';
+        feedbackText = `Submission reviewed for "${assignmentTitle}" (${studentScore}/${maxScore} - ${pct}%). Significant conceptual gaps were noted in this assignment.${areasForImprovement ? ` Immediate attention required in: ${areasForImprovement}.` : ` We recommend reviewing the foundational lesson notes on ${subject} and attempting the practice worksheet.`} Please schedule a 1-on-1 review with your teacher.`;
+      }
+
+      return {
+        assignmentTitle,
+        subject,
+        studentScore,
+        maxScore,
+        scorePercentage: `${pct}%`,
+        rubricGrade,
+        feedbackText,
+      };
     },
   };
 }

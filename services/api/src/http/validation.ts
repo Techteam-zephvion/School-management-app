@@ -778,3 +778,53 @@ export const syncOfflineAttendanceSchema = z.object({
   batches: z.array(syncOfflineAttendanceBatchItemSchema).min(1),
 });
 
+export const recordStudentInterventionSchema = z.object({
+  action: z.string().trim().min(2).max(120),
+  notes: z.string().trim().min(3).max(1000),
+  status: z.enum(['active', 'acknowledged', 'resolved']).optional(),
+});
+
+export const evaluateStudentRiskSchema = z.object({
+  academicYearId: z.uuid().optional(),
+  classId: z.uuid().optional(),
+  sectionId: z.uuid().optional(),
+});
+
+export const naturalLanguageQuerySchema = z.object({
+  query: z.string().trim().min(2).max(500),
+});
+
+export const draftReportCardRemarksSchema = z.object({
+  studentName: z.string().trim().min(1).max(120),
+  overallPercentage: z.string().trim().min(1).max(20),
+  attendanceRate: z.string().trim().min(1).max(20).optional(),
+  subjects: z
+    .array(
+      z.object({
+        subjectName: z.string().trim().min(1).max(100),
+        grade: z.string().trim().min(1).max(10),
+        marksObtained: z.number().optional(),
+        maxMarks: z.number().optional(),
+      }),
+    )
+    .optional(),
+  coScholastic: z
+    .array(
+      z.object({
+        domain: z.string().trim().min(1).max(100),
+        grade: z.string().trim().min(1).max(10),
+      }),
+    )
+    .optional(),
+  tone: z.enum(['encouraging', 'constructive', 'formal']).default('encouraging'),
+});
+
+export const draftHomeworkFeedbackSchema = z.object({
+  assignmentTitle: z.string().trim().min(1).max(200),
+  subject: z.string().trim().min(1).max(100),
+  studentScore: z.number().min(0),
+  maxScore: z.number().positive(),
+  strengths: z.string().trim().max(500).optional(),
+  areasForImprovement: z.string().trim().max(500).optional(),
+});
+

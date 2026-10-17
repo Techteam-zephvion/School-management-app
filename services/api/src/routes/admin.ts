@@ -73,6 +73,9 @@ import {
   createEvaluationComponentSchema,
   generateReportCardsSchema,
   publishReportCardSchema,
+  evaluateStudentRiskSchema,
+  recordStudentInterventionSchema,
+  naturalLanguageQuerySchema,
 } from '../http/validation';
 
 
@@ -85,9 +88,9 @@ adminRoutes.use('*', async (c, next) => {
   const path = c.req.path;
   const method = c.req.method;
 
-  // Principal has read-only institutional oversight
+  // Principal has read-only institutional oversight (NL query is read-only analytics)
   if (user.roles.includes('principal') && !user.roles.includes('admin')) {
-    if (method !== 'GET') {
+    if (method !== 'GET' && !path.includes('/analytics/natural-language-query')) {
       throw new ApiError(403, 'Principal role has read-only institutional access');
     }
   }
@@ -1238,5 +1241,65 @@ adminRoutes.get('/academics/offline-sync-logs', async (c) => {
   const staffId = c.req.query('staffId');
   return c.json(await repo.listOfflineAttendanceSyncLogs(c.get('authUser'), staffId));
 });
+
+// Phase 14: Applied AI & Enhanced Institutional UX
+adminRoutes.post(
+  '/analytics/at-risk-students/evaluate',
+  zValidator('json', evaluateStudentRiskSchema.optional()),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    const input = c.req.valid('json');
+    return c.json(await repo.evaluateStudentRiskScores(c.get('authUser'), input), 200);
+  },
+);
+
+adminRoutes.get('/analytics/at-risk-students', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(
+    await repo.listStudentRiskAlerts(c.get('authUser'), {
+      classId: query.classId,
+      sectionId: query.sectionId,
+      riskLevel: query.riskLevel,
+      status: query.status,
+    }),
+  );
+});
+
+adminRoutes.get(
+  '/analytics/at-risk-students/:studentId',
+  zValidator('param', z.object({ studentId: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.getStudentRiskAlert(c.get('authUser'), c.req.valid('param').studentId));
+  },
+);
+
+adminRoutes.post(
+  '/analytics/at-risk-students/:studentId/intervene',
+  zValidator('param', z.object({ studentId: z.string().uuid() })),
+  zValidator('json', recordStudentInterventionSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.recordStudentIntervention(
+        c.get('authUser'),
+        c.req.valid('param').studentId,
+        c.req.valid('json'),
+      ),
+      200,
+    );
+  },
+);
+
+adminRoutes.post(
+  '/analytics/natural-language-query',
+  zValidator('json', naturalLanguageQuerySchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.executeNaturalLanguageQuery(c.get('authUser'), c.req.valid('json')), 200);
+  },
+);
+
 
 

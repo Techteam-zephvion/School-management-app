@@ -8,6 +8,7 @@ import '../../shared/components/empty_state_view.dart';
 import '../../shared/components/feedback_banner.dart';
 import '../../shared/components/page_header.dart';
 import '../../shared/components/status_badge.dart';
+import '../components/ai_draft_remarks_dialog.dart';
 
 class TeacherMarksView extends ConsumerStatefulWidget {
   const TeacherMarksView({super.key});
@@ -292,7 +293,28 @@ class _TeacherMarksViewState extends ConsumerState<TeacherMarksView> {
                     width: isPhone ? double.infinity : 300,
                     child: TextField(
                       controller: _remarkControllers[id],
-                      decoration: const InputDecoration(labelText: 'Remarks'),
+                      decoration: InputDecoration(
+                        labelText: 'Remarks',
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.auto_awesome, size: 16, color: AppColors.accent),
+                          tooltip: 'AI Draft Remarks',
+                          onPressed: () {
+                            final score = double.tryParse(_markControllers[id]?.text ?? '') ?? 0;
+                            final max = (_selectedExam?['maxMarks'] as num?)?.toDouble() ?? 100;
+                            final pct = max > 0 ? ((score / max) * 100).toStringAsFixed(1) : '75';
+                            AiDraftRemarksDialog.show(
+                              context,
+                              initialStudentName: '${student['fullName'] ?? 'Student'}',
+                              initialPercentage: '$pct%',
+                              onApplyRemark: (remark) {
+                                setState(() {
+                                  _remarkControllers[id]?.text = remark;
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
                     ),
                   ),
                 ],

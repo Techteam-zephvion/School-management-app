@@ -256,6 +256,34 @@ class ApiClient {
     }
   }
 
+  Future<List<Map<String, Object?>>> postList(
+    String path,
+    Map<String, Object?> body, {
+    required AuthSession session,
+  }) async {
+    try {
+      final response = await _sendWithRetry(
+        bearerToken: session.bearerToken,
+        request: (token) => _httpClient.post(
+          Uri.parse('$apiBaseUrl$path'),
+          headers: _headers(bearerToken: token, devSession: session),
+          body: jsonEncode(body),
+        ),
+      );
+      _ensureSuccess(response);
+      return _decodeList(response)
+          .whereType<Map<String, Object?>>()
+          .toList();
+    } on ApiException {
+      rethrow;
+    } on http.ClientException catch (exception) {
+      throw ApiException('Network connection error: ${exception.message}', 503);
+    } catch (exception) {
+      throw ApiException('Failed to communicate with Schoolic API.', 500);
+    }
+  }
+
+
   Future<Map<String, Object?>> createFeePaymentOrder({
     required AuthSession session,
     required String allocationId,
@@ -1544,6 +1572,133 @@ class ApiClient {
       '/api/v1/admin/academics/offline-sync-logs',
       session: session,
       queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  // =========================================================================
+  // Phase 14: Applied AI & Enhanced Institutional UX
+  // =========================================================================
+
+  Future<List<Map<String, Object?>>> evaluateStudentRiskScores({
+    required AuthSession session,
+    String? academicYearId,
+    String? classId,
+    String? sectionId,
+  }) async {
+    final payload = <String, Object?>{
+      'academicYearId': ?academicYearId,
+      'classId': ?classId,
+      'sectionId': ?sectionId,
+    };
+    return postList(
+      '/api/v1/admin/analytics/at-risk-students/evaluate',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getAtRiskStudents({
+    required AuthSession session,
+    String? classId,
+    String? sectionId,
+    String? riskLevel,
+    String? status,
+  }) async {
+    final params = <String, String>{
+      if (classId != null && classId.isNotEmpty) 'classId': classId,
+      if (sectionId != null && sectionId.isNotEmpty) 'sectionId': sectionId,
+      if (riskLevel != null && riskLevel != 'all') 'riskLevel': riskLevel,
+      if (status != null && status != 'all') 'status': status,
+    };
+    return getList(
+      '/api/v1/admin/analytics/at-risk-students',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> getStudentRiskAlert({
+    required AuthSession session,
+    required String studentId,
+  }) async {
+    return getJson(
+      '/api/v1/admin/analytics/at-risk-students/$studentId',
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> recordStudentIntervention({
+    required AuthSession session,
+    required String studentId,
+    required String action,
+    required String notes,
+    String? status,
+  }) async {
+    return postJson(
+      '/api/v1/admin/analytics/at-risk-students/$studentId/intervene',
+      {
+        'action': action,
+        'notes': notes,
+        'status': ?status,
+      },
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> executeNaturalLanguageQuery({
+    required AuthSession session,
+    required String query,
+  }) async {
+    return postJson(
+      '/api/v1/admin/analytics/natural-language-query',
+      {'query': query},
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> draftReportCardRemarks({
+    required AuthSession session,
+    required String studentName,
+    required String overallPercentage,
+    String? attendanceRate,
+    String tone = 'encouraging',
+    List<Map<String, dynamic>>? subjects,
+    List<Map<String, dynamic>>? coScholastic,
+  }) async {
+    return postJson(
+      '/api/v1/teacher/ai/draft-remarks',
+      {
+        'studentName': studentName,
+        'overallPercentage': overallPercentage,
+        'attendanceRate': ?attendanceRate,
+        'tone': tone,
+        'subjects': ?subjects,
+        'coScholastic': ?coScholastic,
+      },
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> draftHomeworkFeedback({
+    required AuthSession session,
+    required String assignmentTitle,
+    required String subject,
+    required num studentScore,
+    required num maxScore,
+    String? strengths,
+    String? areasForImprovement,
+  }) async {
+    return postJson(
+      '/api/v1/teacher/ai/homework-feedback',
+      {
+        'assignmentTitle': assignmentTitle,
+        'subject': subject,
+        'studentScore': studentScore,
+        'maxScore': maxScore,
+        'strengths': ?strengths,
+        'areasForImprovement': ?areasForImprovement,
+      },
+      session: session,
     );
   }
 

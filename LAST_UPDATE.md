@@ -1,4 +1,62 @@
-# Last Update (October 16, 2026)
+# Last Update (October 17, 2026)
+
+## Phase 14: Applied AI & Enhanced Institutional UX
+
+### Summary
+- **Student At-Risk Early Warning System:**
+  - Database schema & migration `0016_calm_deathstrike.sql`:
+    - `riskLevelEnum`: `'low'`, `'moderate'`, `'high'`, `'critical'`.
+    - `riskAlertStatusEnum`: `'active'`, `'acknowledged'`, `'resolved'`.
+    - `studentRiskAlerts`: `schoolId`, `studentId`, `academicYearId`, `compositeScore` (0-100), `attendanceScore`, `academicScore`, `feeScore`, `riskLevel`, `factors` (JSON text array of plain explanations), `status`, `interventions` (logged interventions history JSON), `lastEvaluatedAt`.
+  - Multi-factor algorithmic evaluation engine (`evaluateStudentRiskScores`):
+    - Attendance factor (weight 0.40): flags attendance below 75% or 3+ consecutive unexcused absences.
+    - Academic factor (weight 0.35): flags exam scores below 35% or failed subjects.
+    - Fee payment factor (weight 0.25): flags outstanding fee balances and overdue invoices.
+    - Composite risk level: 80-100 = `critical`, 60-79 = `high`, 40-59 = `moderate`, <40 = `low`.
+  - Admin & Teacher endpoints:
+    - `POST /api/v1/admin/ai/at-risk/evaluate`: batch risk scoring for students.
+    - `GET /api/v1/admin/ai/at-risk`: filtered alerts list by level and status.
+    - `GET /api/v1/admin/ai/at-risk/:id`: single student risk breakdown.
+    - `POST /api/v1/admin/ai/at-risk/:id/interventions`: logs counselor/teacher intervention notes and action plan.
+    - `GET /api/v1/teacher/ai/at-risk`: class-teacher scoped risk alerts for assigned sections.
+- **Natural Language Admin Analytics Engine:**
+  - Table `nlAnalyticsQueries`: logs query text, recognized intent, parameters, explanation, and result row count.
+  - Query parser & parameterized executor (`executeNaturalLanguageQuery` / `POST /api/v1/admin/ai/natural-language-query`):
+    - Supported institutional queries:
+      - Fee defaulters: *"List fee defaulters above ₹5,000"* (returns student, class, balance, status).
+      - Attendance benchmarks: *"Classes with attendance under 85%"* (returns class, section, rate, absentees).
+      - Academic toppers: *"Academic toppers in Class 10"* (returns rank, name, aggregate %, letter grade).
+      - Staff on leave: *"Staff on leave with suggested substitutes"* (returns teacher, dates, available substitutes).
+      - Cohort strength: *"Cohort enrollment strength by class"* (returns class, active students, capacity).
+    - Features: Zero prompt leakage, strictly read-only parameterized queries over Neon Postgres, structured markdown table, natural language summary banner, and suggested follow-up queries.
+- **AI Drafting for Teachers:**
+  - Report Card Remarks Assistant (`draftReportCardRemarks` / `POST /api/v1/teacher/ai/draft-remarks`):
+    - Generates personalized remarks based on student attendance, aggregate percentage, and selected tone (`encouraging`, `constructive`, `formal`).
+    - Provides primary draft remark and 2 alternative choices.
+  - Homework Rubric Feedback Assistant (`draftHomeworkFeedback` / `POST /api/v1/teacher/ai/draft-homework-feedback`):
+    - Generates constructive formative feedback based on assignment score percentage, subject, and rubric criteria.
+- **Power UX & Navigation (Flutter Web & Mobile):**
+  - Global Command Palette (`CommandPaletteDialog`):
+    - Keyboard shortcut: `Cmd/Ctrl + K` global binding via `KeyboardListener` on `SchoolicShell`.
+    - Instant search across navigation targets, AI tools, attendance register, exam schedules, and settings.
+    - Arrow-key navigation (`↑` / `↓`), `Enter` to execute, `Esc` to close.
+    - Top bar "Quick Actions (⌘K)" button on Admin and Teacher dashboard app bars.
+  - `AdminInsightsView` Upgrade:
+    - Subtab 1: **At-Risk Early Warning** with risk level filter, metric stat strip, risk badges, factors pills, and "Log Intervention" modal.
+    - Subtab 2: **Natural Language Queries** with query input, suggested quick pills, zero-leakage badge, and structured results table.
+    - Subtab 3: **Attendance AI Synthesis** with class-wise attendance rates and automated alerts.
+  - Teacher AI Drafting Modals:
+    - `AiDraftRemarksDialog`: Interactive tone picker and 1-click apply to report card remarks.
+    - `AiHomeworkFeedbackDialog`: Rubric criteria input and feedback insertion.
+  - UI Indicators:
+    - `StatusBadge.riskLevel`: Color-coded risk chips with icons (`critical`, `high`, `moderate`, `low`).
+- **Verification:**
+  - Backend: 13/13 Vitest test suites passing (132 passed, 1 skipped).
+  - TypeScript: 0 typecheck errors (`npm run typecheck --prefix services/api`).
+  - Frontend: 91/91 Flutter unit/widget tests passing (`flutter test apps/flutter_app`).
+  - Lint: 0 analyzer warnings (`flutter analyze apps/flutter_app`).
+
+---
 
 ## Phase 13: Academic Depth, Regional Languages & Offline App
 

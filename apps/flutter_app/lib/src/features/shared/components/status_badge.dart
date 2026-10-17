@@ -68,6 +68,37 @@ class StatusBadge extends StatelessWidget {
     }
   }
 
+  factory StatusBadge.riskLevel(String? level) {
+    switch (level?.toLowerCase()) {
+      case 'critical':
+        return const StatusBadge(
+          label: 'CRITICAL RISK',
+          tone: BadgeTone.error,
+          icon: Icons.warning_amber_rounded,
+        );
+      case 'high':
+        return const StatusBadge(
+          label: 'HIGH RISK',
+          tone: BadgeTone.error,
+          icon: Icons.priority_high_rounded,
+        );
+      case 'moderate':
+        return const StatusBadge(
+          label: 'MODERATE RISK',
+          tone: BadgeTone.warning,
+          icon: Icons.trending_down_rounded,
+        );
+      case 'low':
+      default:
+        return const StatusBadge(
+          label: 'LOW RISK',
+          tone: BadgeTone.success,
+          icon: Icons.check_circle_outline_rounded,
+        );
+    }
+  }
+
+
   final String label;
   final BadgeTone tone;
   final IconData? icon;

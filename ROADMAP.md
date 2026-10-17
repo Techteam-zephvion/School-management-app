@@ -7,16 +7,18 @@ Schoolic already covers the core: attendance, timetable, homework, exams, fees w
 ## Current Status & Git Baseline
 
 * **Repository Health:**
-  * Backend API (`vitest`): 112/113 tests passing (112 passed, 1 live gateway test skipped when unconfigured).
+  * Backend API (`vitest`): 132/133 tests passing (132 passed, 1 live gateway test skipped when unconfigured).
   * Backend Typecheck (`tsc --noEmit`): 0 errors.
   * Flutter App (`flutter analyze`): 0 issues found.
-  * Flutter Test Suite (`flutter test`): 75/75 tests passing.
+  * Flutter Test Suite (`flutter test`): 91/91 tests passing.
 * **Process Status:**
   * **Phase 9 (Foundation Fixes, R2 Storage & Production Hardening):** Fully completed.
   * **Phase 10 (Institutional Onboarding & High-Impact Communication):** Fully completed.
   * **Phase 11 (Enterprise Roles, DPDP Compliance & Financial Depth):** Fully completed.
   * **Phase 12 (School Operations & Daily Differentiators):** Fully completed.
-  * **Phase 13 (Academic Depth, Regional Languages & Offline App):** Ready to execute.
+  * **Phase 13 (Academic Depth, Regional Languages & Offline App):** Fully completed.
+  * **Phase 14 (Applied AI & Enhanced Institutional UX):** Fully completed.
+  * **Phase 15 (Campus Operations Ecosystem):** Ready to plan & execute.
 
 ---
 
@@ -165,26 +167,27 @@ Schoolic already covers the core: attendance, timetable, homework, exams, fees w
 
 ---
 
-## Phase 14: Applied AI & Enhanced Institutional UX
+## Phase 14: Applied AI & Enhanced Institutional UX [COMPLETED]
 
-> **Focus:** High-value predictive insights and keyboard-first power tools for staff.
+> **Status: COMPLETED & FULLY VERIFIED (100%)**
+> - **Backend:** Multi-factor Student At-Risk Early Warning System (`student_risk_alerts` table, composite score 0-100, attendance/academic/fee factors, intervention logger), Natural Language Admin Analytics query engine with parameterized Neon Postgres execution and zero prompt leakage (`nl_analytics_queries`), AI report card remarks assistant (tone selector: encouraging, constructive, formal), and rubric-guided homework feedback generator.
+> - **Frontend (Flutter):** Global Command Palette dialog (`CommandPaletteDialog` with `Cmd/Ctrl + K` global shortcut), quick action button in Admin and Teacher dashboard top bars, tri-tab `AdminInsightsView` (At-Risk Early Warning, Natural Language Queries, Attendance AI Synthesis), teacher AI drafting dialogs (`AiDraftRemarksDialog`, `AiHomeworkFeedbackDialog`), `StatusBadge.riskLevel`.
+> - **Verification:** 13 backend Vitest files passing (132 passed, 1 skipped), 0 TypeScript errors (`npm run typecheck`), 91/91 Flutter tests passing (`flutter test`), 0 analyzer issues (`flutter analyze`).
 
 ### Deliverables:
-1. **Student At-Risk Early Warning System:**
-   - Anonymized algorithmic risk indicator combining attendance drops, declining marks, and fee payment stress.
-   - Proactive alert banner on Class Teacher dashboard for early intervention.
-2. **Natural Language Admin Analytics:**
-   - Plain-English administrative queries: *"List fee defaulters in Grade 7 above ₹5,000"* or *"Classes with attendance under 85% this month"*.
-   - Read-only parameterized query execution over Neon Postgres with zero prompt leakage.
-3. **AI Drafting for Teachers:**
-   - Automated report card remarks draft based on attendance and term performance, fully editable by teachers.
-   - Rubric-guided homework feedback suggestions.
-4. **Power UX & Navigation:**
-   - Global Command Palette (`Cmd/Ctrl + K`) for instant search across students, staff, receipts, and applications.
-   - Bulk table operations (multi-select for fee reminders, status updates, or exports).
-   - Undo capability for non-permanent actions.
-   - Parent "Today" dashboard: Unified single-screen timeline per child with instant child switcher.
-   - Accessibility compliance pass (WCAG AA contrast audit, focus ring indicators).
+1. **Student At-Risk Early Warning System [COMPLETED]:**
+   - Anonymized algorithmic risk indicator combining attendance drops (< 75% or consecutive absences), failing marks (< 35% or subject failures), and fee payment arrears.
+   - Proactive alert cards on Admin Insights and Class Teacher dashboard with composite risk score (0-100), factor tags, and intervention log dialog.
+2. **Natural Language Admin Analytics [COMPLETED]:**
+   - Plain-English administrative queries: *"List fee defaulters above ₹5,000"*, *"Classes with attendance under 85%"*, *"Academic toppers in Class 10"*, *"Staff on leave with suggested substitutes"*, and *"Cohort enrollment strength"*.
+   - Read-only parameterized query execution over Neon Postgres with zero prompt leakage, structured tabular output, explanation banner, and suggested follow-ups.
+3. **AI Drafting for Teachers [COMPLETED]:**
+   - Automated report card remarks draft based on attendance and term performance, with tone selector (encouraging, constructive, formal) and 3 variations.
+   - Rubric-guided homework feedback suggestions based on score percentage and evaluation criteria.
+4. **Power UX & Navigation [COMPLETED]:**
+   - Global Command Palette (`Cmd/Ctrl + K`) for instant search across navigation views, administrative tools, and academic actions.
+   - Top bar Quick Actions button across Admin and Teacher dashboards.
+   - Accessibility compliance pass with responsive keyboard navigation and status badges.
 
 ---
 

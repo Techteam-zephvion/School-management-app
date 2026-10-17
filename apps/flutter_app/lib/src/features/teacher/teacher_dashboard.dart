@@ -7,11 +7,14 @@ import '../../core/api_client.dart';
 import '../../core/models.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
+import '../shared/components/command_palette.dart';
 import '../shared/components/feedback_banner.dart';
 import '../shared/components/schoolic_logo.dart';
 import '../shared/components/shortcuts_dialog.dart';
 import '../shared/components/tour_dialog.dart';
 import '../shared/views/announcements_view.dart';
+import 'components/ai_draft_remarks_dialog.dart';
+import 'components/ai_homework_feedback_dialog.dart';
 import 'views/teacher_attendance_view.dart';
 import 'views/teacher_classes_view.dart';
 import 'views/teacher_copilot_view.dart';
@@ -298,6 +301,57 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
                     ],
 
                     const Spacer(),
+
+                    InkWell(
+                      borderRadius: AppRadii.rMd,
+                      onTap: () => CommandPaletteDialog.show(
+                        context,
+                        onActionSelected: _handleCommandPaletteAction,
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondaryBackground,
+                          borderRadius: AppRadii.rMd,
+                          border: Border.all(color: AppColors.primaryBorder),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.search, size: 14, color: AppColors.secondaryText),
+                            const SizedBox(width: 6),
+                            Text(
+                              isMobile ? 'Search' : 'Quick Actions...',
+                              style: const TextStyle(
+                                fontFamily: AppTypography.fontFamily,
+                                fontSize: 12,
+                                color: AppColors.secondaryText,
+                              ),
+                            ),
+                            if (!isMobile) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: AppColors.mainBackground,
+                                  borderRadius: AppRadii.rSm,
+                                  border: Border.all(color: AppColors.primaryBorder),
+                                ),
+                                child: const Text(
+                                  '⌘K',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.secondaryText,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
 
                     // Tutorial button
                     IconButton(
@@ -719,6 +773,35 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
         return const TeacherMessagesView();
       default:
         return const SizedBox.shrink();
+    }
+  }
+
+  void _handleCommandPaletteAction(String action) {
+    if (action.startsWith('nav:')) {
+      final dest = action.replaceFirst('nav:', '');
+      switch (dest) {
+        case 'overview':
+          setState(() => _activeTab = 0);
+          break;
+        case 'attendance':
+          setState(() => _activeTab = 1);
+          break;
+        case 'timetable':
+          setState(() => _activeTab = 2);
+          break;
+        case 'homework':
+          setState(() => _activeTab = 5);
+          break;
+        case 'exams':
+          setState(() => _activeTab = 6);
+          break;
+      }
+    } else if (action == 'action:draft_remarks') {
+      AiDraftRemarksDialog.show(context);
+    } else if (action == 'action:homework_feedback') {
+      AiHomeworkFeedbackDialog.show(context);
+    } else if (action == 'action:shortcuts') {
+      ShortcutsDialog.show(context);
     }
   }
 }

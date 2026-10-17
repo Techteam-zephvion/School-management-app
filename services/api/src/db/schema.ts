@@ -150,6 +150,19 @@ export const offlineSyncStatusEnum = pgEnum('offline_sync_status', [
   'failed',
 ]);
 
+export const riskLevelEnum = pgEnum('risk_level', [
+  'low',
+  'moderate',
+  'high',
+  'critical',
+]);
+
+export const riskAlertStatusEnum = pgEnum('risk_alert_status', [
+  'active',
+  'acknowledged',
+  'resolved',
+]);
+
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -1290,6 +1303,53 @@ export const offlineAttendanceSyncLogs = pgTable(
     index('offline_sync_batch_idx').on(table.schoolId, table.clientSyncBatchId),
   ],
 );
+
+export const studentRiskAlerts = pgTable(
+  'student_risk_alerts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+    academicYearId: uuid('academic_year_id').notNull().references(() => academicYears.id, { onDelete: 'cascade' }),
+    classId: uuid('class_id').notNull().references(() => classes.id, { onDelete: 'cascade' }),
+    sectionId: uuid('section_id').notNull().references(() => sections.id, { onDelete: 'cascade' }),
+    riskLevel: riskLevelEnum('risk_level').default('moderate').notNull(),
+    compositeScore: integer('composite_score').notNull(), // 0-100
+    attendanceScore: integer('attendance_score').notNull(), // 0-100
+    academicScore: integer('academic_score').notNull(), // 0-100
+    feeScore: integer('fee_score').notNull(), // 0-100
+    factors: jsonb('factors').notNull(), // string[]
+    status: riskAlertStatusEnum('status').default('active').notNull(),
+    interventions: jsonb('interventions').default([]).notNull(), // Array of interventions
+    lastEvaluatedAt: timestamp('last_evaluated_at', { withTimezone: true }).defaultNow().notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.schoolId, table.academicYearId, table.studentId),
+    index('student_risk_school_level_idx').on(table.schoolId, table.riskLevel, table.status),
+    index('student_risk_section_idx').on(table.schoolId, table.sectionId, table.riskLevel),
+    index('student_risk_student_idx').on(table.schoolId, table.studentId),
+  ],
+);
+
+export const nlAnalyticsQueries = pgTable(
+  'nl_analytics_queries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull(),
+    query: text('query').notNull(),
+    intent: text('intent').notNull(),
+    explanation: text('explanation'),
+    resultCount: integer('result_count').default(0).notNull(),
+    executedAt: timestamp('executed_at', { withTimezone: true }).defaultNow().notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index('nl_queries_school_idx').on(table.schoolId, table.executedAt),
+  ],
+);
+
 
 
 

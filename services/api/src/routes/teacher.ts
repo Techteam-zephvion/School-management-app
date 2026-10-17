@@ -26,6 +26,9 @@ import {
   updatePtmSlotNotesSchema,
   syncOfflineAttendanceSchema,
   generateReportCardsSchema,
+  recordStudentInterventionSchema,
+  draftReportCardRemarksSchema,
+  draftHomeworkFeedbackSchema,
 } from '../http/validation';
 import type { AppBindings } from '../types';
 
@@ -422,4 +425,54 @@ teacherRoutes.post('/report-cards/generate', zValidator('json', generateReportCa
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
   return c.json(await repo.generateReportCards(c.get('authUser'), c.req.valid('json')), 201);
 });
+
+// Phase 14: Applied AI & Enhanced Institutional UX
+teacherRoutes.get('/at-risk-students', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(
+    await repo.listStudentRiskAlerts(c.get('authUser'), {
+      classId: query.classId,
+      sectionId: query.sectionId,
+      riskLevel: query.riskLevel,
+      status: query.status,
+    }),
+  );
+});
+
+teacherRoutes.post(
+  '/at-risk-students/:studentId/intervene',
+  zValidator('param', z.object({ studentId: z.string().uuid() })),
+  zValidator('json', recordStudentInterventionSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.recordStudentIntervention(
+        c.get('authUser'),
+        c.req.valid('param').studentId,
+        c.req.valid('json'),
+      ),
+      200,
+    );
+  },
+);
+
+teacherRoutes.post(
+  '/ai/draft-remarks',
+  zValidator('json', draftReportCardRemarksSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.draftReportCardRemarks(c.req.valid('json')), 200);
+  },
+);
+
+teacherRoutes.post(
+  '/ai/homework-feedback',
+  zValidator('json', draftHomeworkFeedbackSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.draftHomeworkFeedback(c.req.valid('json')), 200);
+  },
+);
+
 

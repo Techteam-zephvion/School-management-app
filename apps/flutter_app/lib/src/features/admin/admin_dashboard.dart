@@ -9,6 +9,7 @@ import '../../core/csv_exporter.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../shared/components/app_dialog.dart';
+import '../shared/components/command_palette.dart';
 import '../shared/components/feedback_banner.dart';
 import '../shared/components/schoolic_logo.dart';
 import '../shared/components/shortcuts_dialog.dart';
@@ -848,6 +849,56 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
                 ),
               ),
             ],
+            const SizedBox(width: 14),
+            InkWell(
+              borderRadius: AppRadii.rMd,
+              onTap: () => CommandPaletteDialog.show(
+                context,
+                onActionSelected: _handleCommandPaletteAction,
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.secondaryBackground,
+                  borderRadius: AppRadii.rMd,
+                  border: Border.all(color: AppColors.primaryBorder),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.search, size: 14, color: AppColors.secondaryText),
+                    const SizedBox(width: 6),
+                    Text(
+                      isMobile ? 'Search' : 'Quick Actions...',
+                      style: const TextStyle(
+                        fontFamily: 'Switzer',
+                        fontSize: 12,
+                        color: AppColors.secondaryText,
+                      ),
+                    ),
+                    if (!isMobile) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.mainBackground,
+                          borderRadius: AppRadii.rSm,
+                          border: Border.all(color: AppColors.primaryBorder),
+                        ),
+                        child: const Text(
+                          '⌘K',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.secondaryText,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
             const Spacer(),
             if (!isMobile) ...[
               IconButton(
@@ -1113,4 +1164,45 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
         return AdminSettingsView(years: _years, schoolName: _schoolName);
     }
   }
+
+  void _handleCommandPaletteAction(String action) {
+    if (action.startsWith('nav:')) {
+      final dest = action.replaceFirst('nav:', '');
+      switch (dest) {
+        case 'overview':
+          setState(() => _activeSection = AdminNavSection.overview);
+          break;
+        case 'students':
+          setState(() => _activeSection = AdminNavSection.students);
+          break;
+        case 'attendance':
+          setState(() => _activeSection = AdminNavSection.attendance);
+          break;
+        case 'exams':
+          setState(() => _activeSection = AdminNavSection.exams);
+          break;
+        case 'fees':
+          setState(() => _activeSection = AdminNavSection.fees);
+          break;
+        case 'operations':
+          setState(() => _activeSection = AdminNavSection.operations);
+          break;
+        case 'compliance':
+          setState(() => _activeSection = AdminNavSection.compliance);
+          break;
+        case 'insights':
+          setState(() => _activeSection = AdminNavSection.insights);
+          break;
+      }
+    } else if (action == 'action:nl_query' || action == 'action:at_risk') {
+      setState(() => _activeSection = AdminNavSection.insights);
+    } else if (action == 'action:shortcuts') {
+      ShortcutsDialog.show(context);
+    } else if (action == 'action:new_announcement') {
+      setState(() => _activeSection = AdminNavSection.announcements);
+    } else if (action == 'action:take_attendance') {
+      setState(() => _activeSection = AdminNavSection.attendance);
+    }
+  }
 }
+
