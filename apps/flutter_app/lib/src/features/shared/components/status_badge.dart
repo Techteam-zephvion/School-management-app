@@ -98,6 +98,57 @@ class StatusBadge extends StatelessWidget {
     }
   }
 
+  factory StatusBadge.payrollStatus(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'paid':
+        return const StatusBadge(
+          label: 'PAID',
+          tone: BadgeTone.success,
+          icon: Icons.check_circle_outline_rounded,
+        );
+      case 'approved':
+      case 'processed':
+        return const StatusBadge(
+          label: 'APPROVED',
+          tone: BadgeTone.info,
+          icon: Icons.verified_outlined,
+        );
+      case 'voided':
+        return const StatusBadge(
+          label: 'VOID',
+          tone: BadgeTone.error,
+          icon: Icons.block_rounded,
+        );
+      case 'draft':
+      default:
+        return const StatusBadge(
+          label: 'DRAFT',
+          tone: BadgeTone.neutral,
+          icon: Icons.edit_note_rounded,
+        );
+    }
+  }
+
+  factory StatusBadge.inventoryCondition(String? condition) {
+    switch (condition?.toLowerCase()) {
+      case 'new':
+        return const StatusBadge(label: 'NEW', tone: BadgeTone.success);
+      case 'good':
+        return const StatusBadge(label: 'GOOD', tone: BadgeTone.success);
+      case 'fair':
+        return const StatusBadge(label: 'FAIR', tone: BadgeTone.info);
+      case 'maintenance_required':
+      case 'under_repair':
+        return const StatusBadge(label: 'MAINTENANCE', tone: BadgeTone.warning);
+      case 'damaged':
+        return const StatusBadge(label: 'DAMAGED', tone: BadgeTone.error);
+      case 'disposed':
+        return const StatusBadge(label: 'DISPOSED', tone: BadgeTone.neutral);
+      default:
+        return StatusBadge(label: condition?.toUpperCase() ?? 'GOOD', tone: BadgeTone.neutral);
+    }
+  }
+
 
   final String label;
   final BadgeTone tone;

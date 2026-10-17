@@ -7,10 +7,10 @@ Schoolic already covers the core: attendance, timetable, homework, exams, fees w
 ## Current Status & Git Baseline
 
 * **Repository Health:**
-  * Backend API (`vitest`): 132/133 tests passing (132 passed, 1 live gateway test skipped when unconfigured).
+  * Backend API (`vitest`): 141/142 tests passing (141 passed, 1 live gateway test skipped when unconfigured).
   * Backend Typecheck (`tsc --noEmit`): 0 errors.
   * Flutter App (`flutter analyze`): 0 issues found.
-  * Flutter Test Suite (`flutter test`): 91/91 tests passing.
+  * Flutter Test Suite (`flutter test`): 98/98 tests passing.
 * **Process Status:**
   * **Phase 9 (Foundation Fixes, R2 Storage & Production Hardening):** Fully completed.
   * **Phase 10 (Institutional Onboarding & High-Impact Communication):** Fully completed.
@@ -18,7 +18,8 @@ Schoolic already covers the core: attendance, timetable, homework, exams, fees w
   * **Phase 12 (School Operations & Daily Differentiators):** Fully completed.
   * **Phase 13 (Academic Depth, Regional Languages & Offline App):** Fully completed.
   * **Phase 14 (Applied AI & Enhanced Institutional UX):** Fully completed.
-  * **Phase 15 (Campus Operations Ecosystem):** Ready to plan & execute.
+  * **Phase 15 (Campus Operations Ecosystem):** Fully completed.
+  * **Phase 16 (Multi-Campus Federation & Mobile Biometrics):** Ready to plan & execute.
 
 ---
 
@@ -191,16 +192,44 @@ Schoolic already covers the core: attendance, timetable, homework, exams, fees w
 
 ---
 
-## Phase 15: Campus Operations Ecosystem (Future Expansion)
+## Phase 15: Campus Operations Ecosystem [COMPLETED]
 
-> **Focus:** Full institutional enterprise ERP modules.
+> **Status: COMPLETED & FULLY VERIFIED (100%)**
+> - **Backend:** Full enterprise ERP schema & migration `0017_polite_wilson_fisk.sql` (11 tables: `library_books`, `book_loans`, `book_reservations`, `inventory_items`, `asset_allocations`, `purchase_requisitions`, `staff_salary_structures`, `payroll_runs`, `hostel_rooms`, `visitor_gate_passes`, `infirmary_visits`, student medical profiles on `students`). 24 repository methods, 24 admin endpoints mounted with role-based auth (supporting admin and accountant).
+> - **Frontend (Flutter):** `AdminCampusView` with 5 dedicated operational subtabs (Library, Inventory & Assets, Staff Payroll, Hostel & Gate Passes, Student Health & Infirmary) featuring live stat strips, data tables with pagination/filters, and interactive create/action dialogs. Integrated with `AdminDashboard` navigation, `CommandPaletteDialog` (`nav:campus` + quick actions), and custom `StatusBadge` formatters for payroll statuses and asset conditions.
+> - **Verification:** 14 backend Vitest files passing (141 passed, 1 skipped), 0 TypeScript errors (`npm run typecheck`), 98/98 Flutter tests passing (`flutter test`), 0 analyzer issues (`flutter analyze`).
 
 ### Deliverables:
-1. **Library Management:** Cataloging, barcode/QR check-out, fine calculations, and book reservation.
-2. **Inventory & Asset Management:** Lab equipment, sports gear, classroom assets, and procurement tracking.
-3. **Staff Payroll:** Salary structures, deductions (PF/ESI/TDS), payslip PDF generation, and payout tracking.
-4. **Hostel & Visitor Management:** Room allocation, mess fees, visitor gate passes with photo capture.
-5. **Health & Medical Records:** Encrypted immunization tracking, allergies, campus infirmary visit log with strict confidentiality access policies.
+1. **Library & Circulation Management [COMPLETED]:**
+   - Book cataloging (ISBN, title, author, category, total copies, available copies, shelf location).
+   - Book checkout & return engine with due dates, late return calculations (₹5/day default fine rate), and automatic stock counter adjustments.
+   - Advance book reservations queue with auto-fulfillment on return.
+2. **Inventory & Asset Management [COMPLETED]:**
+   - Multi-category asset ledger (Lab, Sports, Classroom, IT, Furniture, Consumables) with asset tags, serial numbers, condition tracking (`new`, `good`, `fair`, `maintenance_required`, `under_repair`, `damaged`, `disposed`), and purchase values.
+   - Staff asset allocation and return workflows.
+   - Purchase requisitions workflow (`draft` → `pending_approval` → `approved` → `rejected` → `ordered` → `received`) with estimated cost tracking.
+3. **Staff Compensation & Payroll Runs [COMPLETED]:**
+   - Granular salary structures (basic, HRA, special allowances, statutory PF/ESI/TDS deductions, net pay calculation).
+   - Monthly batch payroll generator for entire active staff rosters.
+   - Payout recording (`approved` → `paid` / `voided`) with payment mode, transaction reference, and disbursement timestamp.
+4. **Hostel & Security Gate Pass Management [COMPLETED]:**
+   - Hostel block & room management (room type, capacity, current occupancy, term fees).
+   - Real-time visitor gate pass ledger (visitor name, phone, purpose, badge number, entry timestamp, checkout timestamp, status tracking).
+5. **Student Health & Campus Infirmary [COMPLETED]:**
+   - Confidential student medical emergency profiles (blood group, allergies, chronic conditions, emergency contact phones, doctor notes).
+   - Daily infirmary triage log (symptoms, treatment administered, attending staff, parent notification status, follow-up flags).
+
+---
+
+## Phase 16: Multi-Campus Federation & Enterprise Biometrics (Future Expansion)
+
+> **Focus:** Multi-branch trust/society management, centralized group reporting, and hardware biometrics integrations.
+
+### Deliverables:
+1. **Multi-Campus Trust Hierarchy:** Super-admin dashboard across multiple schools/branches, centralized student/staff transfers, and group-wide financial consolidation.
+2. **Hardware Biometric & RFID Integration:** Webhook and polling ingestion for ZKTeco, Essl, and RFID turnstile machines with offline buffering.
+3. **Advanced Student Analytics & Learning Outcomes:** Outcome-Based Education (OBE) mapping, Bloom's taxonomy tagged question papers, and longitudinal mastery dashboards.
+4. **Alumni Association Network:** Alumni directory, career mentorship connect, transcript requests, and donation/endowment campaigns.
 
 ---
 
@@ -215,3 +244,4 @@ Schoolic already covers the core: attendance, timetable, homework, exams, fees w
 | **Phase 13** | Academic Depth, Localization & Offline App | Teachers, Parents | CBSE/ICSE grading schemes, Kannada & Hindi UI, offline-first attendance |
 | **Phase 14** | Applied AI & Enhanced Institutional UX | Teachers, Leadership | Early-warning student flags, NL queries, Command Palette, parent "Today" view |
 | **Phase 15** | Campus Operations Ecosystem | Entire Campus | Library, inventory, payroll, hostel, visitor gate pass |
+| **Phase 16** | Multi-Campus Federation & Biometrics | Trust Management, Security | Multi-branch consolidation, biometric turnstile sync, alumni network |

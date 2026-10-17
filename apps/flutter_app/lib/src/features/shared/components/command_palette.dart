@@ -168,6 +168,51 @@ class _CommandPaletteDialogState extends State<CommandPaletteDialog> {
         shortcut: 'G D',
         onSelect: () => widget.onActionSelected?.call('nav:compliance'),
       ),
+      CommandItem(
+        title: 'Campus Operations & Assets',
+        subtitle: 'Library circulation, inventory register, staff payroll, hostels, and infirmary',
+        category: 'Navigation',
+        icon: Icons.apartment_rounded,
+        shortcut: 'G C',
+        onSelect: () => widget.onActionSelected?.call('nav:campus'),
+      ),
+
+      // Campus Operations Quick Actions
+      CommandItem(
+        title: 'Library Circulation & Catalog',
+        subtitle: 'Check out books, issue returns, and inspect reserve queues',
+        category: 'Campus Operations',
+        icon: Icons.local_library_outlined,
+        onSelect: () => widget.onActionSelected?.call('action:campus_library'),
+      ),
+      CommandItem(
+        title: 'Campus Asset & Inventory Register',
+        subtitle: 'Track equipment, custodian allocations, and purchase requests',
+        category: 'Campus Operations',
+        icon: Icons.inventory_2_outlined,
+        onSelect: () => widget.onActionSelected?.call('action:campus_assets'),
+      ),
+      CommandItem(
+        title: 'Monthly Staff Payroll Disbursement',
+        subtitle: 'Calculate salary structures, tax deductions, and record bank payouts',
+        category: 'Campus Operations',
+        icon: Icons.payments_outlined,
+        onSelect: () => widget.onActionSelected?.call('action:campus_payroll'),
+      ),
+      CommandItem(
+        title: 'Visitor Security Gate Pass',
+        subtitle: 'Issue visitor security badges and track campus entry/exit',
+        category: 'Campus Operations',
+        icon: Icons.badge_outlined,
+        onSelect: () => widget.onActionSelected?.call('action:campus_gatepass'),
+      ),
+      CommandItem(
+        title: 'Student Health & Infirmary Log',
+        subtitle: 'Triage clinic visits, medical profiles, and emergency conditions',
+        category: 'Campus Operations',
+        icon: Icons.medical_services_outlined,
+        onSelect: () => widget.onActionSelected?.call('action:campus_health'),
+      ),
 
       // Quick Actions
       CommandItem(

@@ -1702,6 +1702,408 @@ class ApiClient {
     );
   }
 
+  // ==========================================
+  // Phase 15: Campus Operations Ecosystem
+  // ==========================================
+
+  // --- 1. Library Management ---
+  Future<List<Map<String, Object?>>> getLibraryBooks({
+    required AuthSession session,
+    String? search,
+    String? category,
+  }) async {
+    final queryParams = <String, String>{};
+    if (search != null && search.isNotEmpty) queryParams['search'] = search;
+    if (category != null && category.isNotEmpty) queryParams['category'] = category;
+
+    final queryString = queryParams.isEmpty
+        ? ''
+        : '?${queryParams.entries.map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}').join('&')}';
+
+    return getList(
+      '/api/v1/admin/operations/library/books$queryString',
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> createLibraryBook({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/operations/library/books',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getLibraryLoans({
+    required AuthSession session,
+    String? status,
+    String? memberType,
+  }) async {
+    final queryParams = <String, String>{};
+    if (status != null && status.isNotEmpty) queryParams['status'] = status;
+    if (memberType != null && memberType.isNotEmpty) queryParams['memberType'] = memberType;
+
+    final queryString = queryParams.isEmpty
+        ? ''
+        : '?${queryParams.entries.map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}').join('&')}';
+
+    return getList(
+      '/api/v1/admin/operations/library/loans$queryString',
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> issueLibraryLoan({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/operations/library/loans/issue',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> returnLibraryLoan({
+    required AuthSession session,
+    required String loanId,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/operations/library/loans/$loanId/return',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> getLibraryStats({
+    required AuthSession session,
+  }) async {
+    return getJson(
+      '/api/v1/admin/operations/library/stats',
+      session: session,
+    );
+  }
+
+  // --- 2. Inventory & Asset Management ---
+  Future<List<Map<String, Object?>>> getInventoryItems({
+    required AuthSession session,
+    String? category,
+    String? condition,
+  }) async {
+    final queryParams = <String, String>{};
+    if (category != null && category.isNotEmpty) queryParams['category'] = category;
+    if (condition != null && condition.isNotEmpty) queryParams['condition'] = condition;
+
+    final queryString = queryParams.isEmpty
+        ? ''
+        : '?${queryParams.entries.map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}').join('&')}';
+
+    return getList(
+      '/api/v1/admin/operations/inventory/items$queryString',
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> createInventoryItem({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/operations/inventory/items',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> allocateInventoryItem({
+    required AuthSession session,
+    required String itemId,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/operations/inventory/items/$itemId/allocate',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> returnInventoryAllocation({
+    required AuthSession session,
+    required String allocationId,
+  }) async {
+    return postJson(
+      '/api/v1/admin/operations/inventory/allocations/$allocationId/return',
+      {},
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getInventoryPurchaseRequests({
+    required AuthSession session,
+    String? status,
+  }) async {
+    final queryParams = <String, String>{};
+    if (status != null && status.isNotEmpty) queryParams['status'] = status;
+
+    final queryString = queryParams.isEmpty
+        ? ''
+        : '?${queryParams.entries.map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}').join('&')}';
+
+    return getList(
+      '/api/v1/admin/operations/inventory/purchase-requests$queryString',
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> createInventoryPurchaseRequest({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/operations/inventory/purchase-requests',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> reviewInventoryPurchaseRequest({
+    required AuthSession session,
+    required String requestId,
+    required Map<String, Object?> payload,
+  }) async {
+    return putJson(
+      '/api/v1/admin/operations/inventory/purchase-requests/$requestId/status',
+      payload,
+      session: session,
+    );
+  }
+
+  // --- 3. Staff Payroll ---
+  Future<List<Map<String, Object?>>> getStaffSalaryStructures({
+    required AuthSession session,
+  }) async {
+    return getList(
+      '/api/v1/admin/operations/payroll/salary-structures',
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> upsertStaffSalaryStructure({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/operations/payroll/salary-structures',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> generateMonthlyPayroll({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/operations/payroll/generate-monthly',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getStaffPayrollRecords({
+    required AuthSession session,
+    int? month,
+    int? year,
+    String? status,
+  }) async {
+    final queryParams = <String, String>{};
+    if (month != null) queryParams['month'] = month.toString();
+    if (year != null) queryParams['year'] = year.toString();
+    if (status != null && status.isNotEmpty) queryParams['status'] = status;
+
+    final queryString = queryParams.isEmpty
+        ? ''
+        : '?${queryParams.entries.map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}').join('&')}';
+
+    return getList(
+      '/api/v1/admin/operations/payroll/records$queryString',
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> markPayrollPaid({
+    required AuthSession session,
+    required String recordId,
+    required Map<String, Object?> payload,
+  }) async {
+    return putJson(
+      '/api/v1/admin/operations/payroll/records/$recordId/mark-paid',
+      payload,
+      session: session,
+    );
+  }
+
+  // --- 4. Hostel & Visitor Management ---
+  Future<List<Map<String, Object?>>> getHostelRooms({
+    required AuthSession session,
+    String? roomType,
+  }) async {
+    final queryParams = <String, String>{};
+    if (roomType != null && roomType.isNotEmpty) queryParams['roomType'] = roomType;
+
+    final queryString = queryParams.isEmpty
+        ? ''
+        : '?${queryParams.entries.map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}').join('&')}';
+
+    return getList(
+      '/api/v1/admin/operations/hostel/rooms$queryString',
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> createHostelRoom({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/operations/hostel/rooms',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getHostelAllocations({
+    required AuthSession session,
+    String? status,
+  }) async {
+    final queryParams = <String, String>{};
+    if (status != null && status.isNotEmpty) queryParams['status'] = status;
+
+    final queryString = queryParams.isEmpty
+        ? ''
+        : '?${queryParams.entries.map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}').join('&')}';
+
+    return getList(
+      '/api/v1/admin/operations/hostel/allocations$queryString',
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> allocateHostelBed({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/operations/hostel/allocations',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> vacateHostelBed({
+    required AuthSession session,
+    required String allocationId,
+  }) async {
+    return putJson(
+      '/api/v1/admin/operations/hostel/allocations/$allocationId/vacate',
+      {},
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getVisitorGatePasses({
+    required AuthSession session,
+    String? status,
+  }) async {
+    final queryParams = <String, String>{};
+    if (status != null && status.isNotEmpty) queryParams['status'] = status;
+
+    final queryString = queryParams.isEmpty
+        ? ''
+        : '?${queryParams.entries.map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}').join('&')}';
+
+    return getList(
+      '/api/v1/admin/operations/visitors/passes$queryString',
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> createVisitorGatePass({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/operations/visitors/passes',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> checkoutVisitorGatePass({
+    required AuthSession session,
+    required String passId,
+  }) async {
+    return putJson(
+      '/api/v1/admin/operations/visitors/passes/$passId/checkout',
+      {},
+      session: session,
+    );
+  }
+
+  // --- 5. Student Health & Infirmary ---
+  Future<Map<String, Object?>> getStudentHealthProfile({
+    required AuthSession session,
+    required String studentId,
+  }) async {
+    return getJson(
+      '/api/v1/admin/operations/health/profiles/$studentId',
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> upsertStudentHealthProfile({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/operations/health/profiles',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getInfirmaryVisits({
+    required AuthSession session,
+    String? studentId,
+  }) async {
+    final queryParams = <String, String>{};
+    if (studentId != null && studentId.isNotEmpty) queryParams['studentId'] = studentId;
+
+    final queryString = queryParams.isEmpty
+        ? ''
+        : '?${queryParams.entries.map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}').join('&')}';
+
+    return getList(
+      '/api/v1/admin/operations/health/infirmary-visits$queryString',
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> recordInfirmaryVisit({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/operations/health/infirmary-visits',
+      payload,
+      session: session,
+    );
+  }
+
   Map<String, String> _headers({String? bearerToken, AuthSession? devSession}) {
     return {
       'content-type': 'application/json',

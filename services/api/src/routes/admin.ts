@@ -76,6 +76,21 @@ import {
   evaluateStudentRiskSchema,
   recordStudentInterventionSchema,
   naturalLanguageQuerySchema,
+  createLibraryBookSchema,
+  issueLibraryLoanSchema,
+  returnLibraryLoanSchema,
+  createInventoryItemSchema,
+  allocateInventoryItemSchema,
+  createInventoryPurchaseRequestSchema,
+  reviewInventoryPurchaseRequestSchema,
+  upsertStaffSalaryStructureSchema,
+  generateMonthlyPayrollSchema,
+  markPayrollPaidSchema,
+  createHostelRoomSchema,
+  allocateHostelBedSchema,
+  createVisitorGatePassSchema,
+  upsertStudentHealthProfileSchema,
+  recordInfirmaryVisitSchema,
 } from '../http/validation';
 
 
@@ -95,7 +110,7 @@ adminRoutes.use('*', async (c, next) => {
     }
   }
 
-  // Accountant is restricted to finance, fee, concession, and refund endpoints
+  // Accountant is restricted to finance, fee, concession, refund, and payroll endpoints
   if (
     user.roles.includes('accountant') &&
     !user.roles.includes('admin') &&
@@ -105,6 +120,7 @@ adminRoutes.use('*', async (c, next) => {
       path.includes('/fees') ||
       path.includes('/concessions') ||
       path.includes('/refunds') ||
+      path.includes('/payroll') ||
       path.includes('/overview');
     if (!isFeeOrFinance) {
       throw new ApiError(403, 'Accountant role is restricted to financial operations');
@@ -1298,6 +1314,300 @@ adminRoutes.post(
   async (c) => {
     const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
     return c.json(await repo.executeNaturalLanguageQuery(c.get('authUser'), c.req.valid('json')), 200);
+  },
+);
+
+// ==========================================
+// Phase 15: Campus Operations Ecosystem Routes
+// ==========================================
+
+// --- 1. Library Management ---
+adminRoutes.get('/operations/library/books', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listLibraryBooks(c.get('authUser'), query));
+});
+
+adminRoutes.post(
+  '/operations/library/books',
+  zValidator('json', createLibraryBookSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createLibraryBook(c.get('authUser'), c.req.valid('json')), 201);
+  },
+);
+
+adminRoutes.get('/operations/library/loans', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listLibraryLoans(c.get('authUser'), query));
+});
+
+adminRoutes.post(
+  '/operations/library/loans/issue',
+  zValidator('json', issueLibraryLoanSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.issueLibraryLoan(c.get('authUser'), c.req.valid('json')), 201);
+  },
+);
+
+adminRoutes.post(
+  '/operations/library/loans/:loanId/return',
+  zValidator('param', z.object({ loanId: z.string().uuid() })),
+  zValidator('json', returnLibraryLoanSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.returnLibraryLoan(
+        c.get('authUser'),
+        c.req.valid('param').loanId,
+        c.req.valid('json'),
+      ),
+      200,
+    );
+  },
+);
+
+adminRoutes.get('/operations/library/stats', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.getLibraryStats(c.get('authUser')));
+});
+
+// --- 2. Inventory & Asset Management ---
+adminRoutes.get('/operations/inventory/items', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listInventoryItems(c.get('authUser'), query));
+});
+
+adminRoutes.post(
+  '/operations/inventory/items',
+  zValidator('json', createInventoryItemSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createInventoryItem(c.get('authUser'), c.req.valid('json')), 201);
+  },
+);
+
+adminRoutes.post(
+  '/operations/inventory/items/:itemId/allocate',
+  zValidator('param', z.object({ itemId: z.string().uuid() })),
+  zValidator('json', allocateInventoryItemSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.allocateInventoryItem(
+        c.get('authUser'),
+        c.req.valid('param').itemId,
+        c.req.valid('json'),
+      ),
+      201,
+    );
+  },
+);
+
+adminRoutes.post(
+  '/operations/inventory/allocations/:allocationId/return',
+  zValidator('param', z.object({ allocationId: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.returnInventoryAllocation(c.get('authUser'), c.req.valid('param').allocationId),
+      200,
+    );
+  },
+);
+
+adminRoutes.get('/operations/inventory/purchase-requests', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listInventoryPurchaseRequests(c.get('authUser'), query));
+});
+
+adminRoutes.post(
+  '/operations/inventory/purchase-requests',
+  zValidator('json', createInventoryPurchaseRequestSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.createInventoryPurchaseRequest(c.get('authUser'), c.req.valid('json')),
+      201,
+    );
+  },
+);
+
+adminRoutes.put(
+  '/operations/inventory/purchase-requests/:requestId/status',
+  zValidator('param', z.object({ requestId: z.string().uuid() })),
+  zValidator('json', reviewInventoryPurchaseRequestSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.reviewInventoryPurchaseRequest(
+        c.get('authUser'),
+        c.req.valid('param').requestId,
+        c.req.valid('json'),
+      ),
+      200,
+    );
+  },
+);
+
+// --- 3. Staff Payroll ---
+adminRoutes.get('/operations/payroll/salary-structures', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.listStaffSalaryStructures(c.get('authUser')));
+});
+
+adminRoutes.post(
+  '/operations/payroll/salary-structures',
+  zValidator('json', upsertStaffSalaryStructureSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.upsertStaffSalaryStructure(c.get('authUser'), c.req.valid('json')), 200);
+  },
+);
+
+adminRoutes.post(
+  '/operations/payroll/generate-monthly',
+  zValidator('json', generateMonthlyPayrollSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.generateMonthlyPayroll(c.get('authUser'), c.req.valid('json')), 200);
+  },
+);
+
+adminRoutes.get('/operations/payroll/records', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  const filters: { month?: number; year?: number; status?: string } = {};
+  if (query.month) filters.month = parseInt(query.month);
+  if (query.year) filters.year = parseInt(query.year);
+  if (query.status) filters.status = query.status;
+  return c.json(await repo.listStaffPayrollRecords(c.get('authUser'), filters));
+});
+
+adminRoutes.put(
+  '/operations/payroll/records/:recordId/mark-paid',
+  zValidator('param', z.object({ recordId: z.string().uuid() })),
+  zValidator('json', markPayrollPaidSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.markPayrollPaid(
+        c.get('authUser'),
+        c.req.valid('param').recordId,
+        c.req.valid('json'),
+      ),
+      200,
+    );
+  },
+);
+
+// --- 4. Hostel & Visitor Management ---
+adminRoutes.get('/operations/hostel/rooms', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listHostelRooms(c.get('authUser'), query));
+});
+
+adminRoutes.post(
+  '/operations/hostel/rooms',
+  zValidator('json', createHostelRoomSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createHostelRoom(c.get('authUser'), c.req.valid('json')), 201);
+  },
+);
+
+adminRoutes.get('/operations/hostel/allocations', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listHostelAllocations(c.get('authUser'), query));
+});
+
+adminRoutes.post(
+  '/operations/hostel/allocations',
+  zValidator('json', allocateHostelBedSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.allocateHostelBed(c.get('authUser'), c.req.valid('json')), 201);
+  },
+);
+
+adminRoutes.put(
+  '/operations/hostel/allocations/:allocationId/vacate',
+  zValidator('param', z.object({ allocationId: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.vacateHostelBed(c.get('authUser'), c.req.valid('param').allocationId),
+      200,
+    );
+  },
+);
+
+adminRoutes.get('/operations/visitors/passes', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listVisitorGatePasses(c.get('authUser'), query));
+});
+
+adminRoutes.post(
+  '/operations/visitors/passes',
+  zValidator('json', createVisitorGatePassSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createVisitorGatePass(c.get('authUser'), c.req.valid('json')), 201);
+  },
+);
+
+adminRoutes.put(
+  '/operations/visitors/passes/:passId/checkout',
+  zValidator('param', z.object({ passId: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.checkoutVisitorGatePass(c.get('authUser'), c.req.valid('param').passId),
+      200,
+    );
+  },
+);
+
+// --- 5. Student Health & Infirmary ---
+adminRoutes.get(
+  '/operations/health/profiles/:studentId',
+  zValidator('param', z.object({ studentId: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.getStudentHealthProfile(c.get('authUser'), c.req.valid('param').studentId),
+    );
+  },
+);
+
+adminRoutes.post(
+  '/operations/health/profiles',
+  zValidator('json', upsertStudentHealthProfileSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.upsertStudentHealthProfile(c.get('authUser'), c.req.valid('json')), 200);
+  },
+);
+
+adminRoutes.get('/operations/health/infirmary-visits', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const query = c.req.query();
+  return c.json(await repo.listInfirmaryVisits(c.get('authUser'), query));
+});
+
+adminRoutes.post(
+  '/operations/health/infirmary-visits',
+  zValidator('json', recordInfirmaryVisitSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.recordInfirmaryVisit(c.get('authUser'), c.req.valid('json')), 201);
   },
 );
 

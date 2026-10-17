@@ -120,6 +120,13 @@
       "when": 1792140662631,
       "tag": "0016_calm_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792237380521,
+      "tag": "0017_polite_wilson_fisk",
+      "breakpoints": true
     }
   ]
 }

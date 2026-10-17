@@ -60,6 +60,19 @@ import {
   offlineAttendanceSyncLogs,
   studentRiskAlerts,
   nlAnalyticsQueries,
+  libraryBooks,
+  libraryLoans,
+  libraryReservations,
+  inventoryItems,
+  inventoryAllocations,
+  inventoryPurchaseRequests,
+  staffSalaryStructures,
+  staffPayrollRecords,
+  hostelRooms,
+  hostelAllocations,
+  visitorGatePasses,
+  studentHealthProfiles,
+  infirmaryVisits,
 } from '../db/schema';
 
 import { BulkImporter } from '../importers/bulk-importer';
@@ -140,6 +153,21 @@ import type {
   naturalLanguageQuerySchema,
   draftReportCardRemarksSchema,
   draftHomeworkFeedbackSchema,
+  createLibraryBookSchema,
+  issueLibraryLoanSchema,
+  returnLibraryLoanSchema,
+  createInventoryItemSchema,
+  allocateInventoryItemSchema,
+  createInventoryPurchaseRequestSchema,
+  reviewInventoryPurchaseRequestSchema,
+  upsertStaffSalaryStructureSchema,
+  generateMonthlyPayrollSchema,
+  markPayrollPaidSchema,
+  createHostelRoomSchema,
+  allocateHostelBedSchema,
+  createVisitorGatePassSchema,
+  upsertStudentHealthProfileSchema,
+  recordInfirmaryVisitSchema,
 } from '../http/validation';
 
 import type { z } from 'zod';
@@ -7251,6 +7279,912 @@ export function createSchoolRepository(db: Db) {
         rubricGrade,
         feedbackText,
       };
+    },
+
+    // ==========================================
+    // Phase 15: Campus Operations Ecosystem
+    // ==========================================
+
+    // --- 1. Library Management ---
+    async listLibraryBooks(user: AuthUser, query?: { search?: string; category?: string }) {
+      const conditions = [eq(libraryBooks.schoolId, user.schoolId)];
+      if (query?.category && query.category !== 'all') {
+        conditions.push(eq(libraryBooks.category, query.category as any));
+      }
+      const rows = await db
+        .select()
+        .from(libraryBooks)
+        .where(and(...conditions))
+        .orderBy(desc(libraryBooks.createdAt));
+
+      if (query?.search && query.search.trim()) {
+        const q = query.search.toLowerCase().trim();
+        return rows.filter(
+          (b) =>
+            b.title.toLowerCase().includes(q) ||
+            b.author.toLowerCase().includes(q) ||
+            (b.isbn && b.isbn.toLowerCase().includes(q)),
+        );
+      }
+      return rows;
+    },
+
+    async createLibraryBook(user: AuthUser, input: z.infer<typeof createLibraryBookSchema>) {
+      const [book] = await db
+        .insert(libraryBooks)
+        .values({
+          schoolId: user.schoolId,
+          title: input.title,
+          author: input.author,
+          isbn: input.isbn ?? null,
+          publisher: input.publisher ?? null,
+          publishedYear: input.publishedYear ?? null,
+          category: input.category,
+          shelfLocation: input.shelfLocation,
+          totalCopies: input.totalCopies,
+          availableCopies: input.totalCopies,
+        })
+        .returning();
+      return book;
+    },
+
+    async listLibraryLoans(user: AuthUser, query?: { status?: string; memberType?: string }) {
+      const conditions = [eq(libraryLoans.schoolId, user.schoolId)];
+      if (query?.status && query.status !== 'all') {
+        conditions.push(eq(libraryLoans.status, query.status as any));
+      }
+      if (query?.memberType && query.memberType !== 'all') {
+        conditions.push(eq(libraryLoans.memberType, query.memberType));
+      }
+
+      const loans = await db
+        .select({
+          loan: libraryLoans,
+          book: {
+            id: libraryBooks.id,
+            title: libraryBooks.title,
+            author: libraryBooks.author,
+            isbn: libraryBooks.isbn,
+          },
+        })
+        .from(libraryLoans)
+        .innerJoin(libraryBooks, eq(libraryBooks.id, libraryLoans.bookId))
+        .where(and(...conditions))
+        .orderBy(desc(libraryLoans.issuedAt));
+
+      return loans.map((r) => ({
+        ...r.loan,
+        bookTitle: r.book.title,
+        bookAuthor: r.book.author,
+        bookIsbn: r.book.isbn,
+      }));
+    },
+
+    async issueLibraryLoan(user: AuthUser, input: z.infer<typeof issueLibraryLoanSchema>) {
+      const [book] = await db
+        .select()
+        .from(libraryBooks)
+        .where(and(eq(libraryBooks.id, input.bookId), eq(libraryBooks.schoolId, user.schoolId)));
+
+      if (!book) {
+        throw new ApiError(404, 'Book not found in school library');
+      }
+      if (book.availableCopies <= 0) {
+        throw new ApiError(409, 'No copies currently available for checkout');
+      }
+
+      const [loan] = await db
+        .insert(libraryLoans)
+        .values({
+          schoolId: user.schoolId,
+          bookId: input.bookId,
+          memberType: input.memberType,
+          memberId: input.memberId,
+          issuedAt: input.issuedAt ?? new Date().toISOString().split('T')[0]!,
+          dueDate: input.dueDate,
+          notes: input.notes ?? null,
+          status: 'issued',
+          fineAmount: 0,
+          finePaid: false,
+        })
+        .returning();
+
+      // Decrement available copies
+      await db
+        .update(libraryBooks)
+        .set({
+          availableCopies: book.availableCopies - 1,
+          updatedAt: new Date(),
+        })
+        .where(eq(libraryBooks.id, book.id));
+
+      return loan;
+    },
+
+    async returnLibraryLoan(user: AuthUser, loanId: string, input: z.infer<typeof returnLibraryLoanSchema>) {
+      const [loan] = await db
+        .select()
+        .from(libraryLoans)
+        .where(and(eq(libraryLoans.id, loanId), eq(libraryLoans.schoolId, user.schoolId)));
+
+      if (!loan) {
+        throw new ApiError(404, 'Library loan record not found');
+      }
+      if (loan.status === 'returned') {
+        throw new ApiError(400, 'Book has already been returned');
+      }
+
+      const returnedAt = input.returnedAt ?? new Date().toISOString().split('T')[0]!;
+      const status = input.status ?? 'returned';
+
+      const [updated] = await db
+        .update(libraryLoans)
+        .set({
+          returnedAt,
+          status,
+          fineAmount: input.fineAmount ?? loan.fineAmount,
+          finePaid: input.finePaid ?? loan.finePaid,
+          notes: input.notes ?? loan.notes,
+          updatedAt: new Date(),
+        })
+        .where(eq(libraryLoans.id, loan.id))
+        .returning();
+
+      // If returned (and not lost), restore available copies
+      if (status === 'returned') {
+        const [book] = await db
+          .select()
+          .from(libraryBooks)
+          .where(eq(libraryBooks.id, loan.bookId));
+
+        if (book) {
+          await db
+            .update(libraryBooks)
+            .set({
+              availableCopies: Math.min(book.totalCopies, book.availableCopies + 1),
+              updatedAt: new Date(),
+            })
+            .where(eq(libraryBooks.id, book.id));
+        }
+      }
+
+      return updated;
+    },
+
+    async getLibraryStats(user: AuthUser) {
+      const books = await db
+        .select({
+          totalCopies: libraryBooks.totalCopies,
+          availableCopies: libraryBooks.availableCopies,
+        })
+        .from(libraryBooks)
+        .where(eq(libraryBooks.schoolId, user.schoolId));
+
+      const loans = await db
+        .select({
+          status: libraryLoans.status,
+          fineAmount: libraryLoans.fineAmount,
+        })
+        .from(libraryLoans)
+        .where(eq(libraryLoans.schoolId, user.schoolId));
+
+      const totalTitles = books.length;
+      const totalInventory = books.reduce((acc, b) => acc + b.totalCopies, 0);
+      const totalAvailable = books.reduce((acc, b) => acc + b.availableCopies, 0);
+      const activeLoans = loans.filter((l) => l.status === 'issued').length;
+      const overdueLoans = loans.filter((l) => l.status === 'overdue').length;
+      const totalFines = loans.reduce((acc, l) => acc + l.fineAmount, 0);
+
+      return {
+        totalTitles,
+        totalInventory,
+        totalAvailable,
+        activeLoans,
+        overdueLoans,
+        totalFinesPaise: totalFines,
+      };
+    },
+
+    // --- 2. Inventory & Asset Management ---
+    async listInventoryItems(user: AuthUser, query?: { category?: string; condition?: string }) {
+      const conditions = [eq(inventoryItems.schoolId, user.schoolId)];
+      if (query?.category && query.category !== 'all') {
+        conditions.push(eq(inventoryItems.category, query.category as any));
+      }
+      if (query?.condition && query.condition !== 'all') {
+        conditions.push(eq(inventoryItems.condition, query.condition as any));
+      }
+
+      return db
+        .select()
+        .from(inventoryItems)
+        .where(and(...conditions))
+        .orderBy(desc(inventoryItems.createdAt));
+    },
+
+    async createInventoryItem(user: AuthUser, input: z.infer<typeof createInventoryItemSchema>) {
+      const [item] = await db
+        .insert(inventoryItems)
+        .values({
+          schoolId: user.schoolId,
+          itemCode: input.itemCode,
+          name: input.name,
+          category: input.category,
+          quantity: input.quantity,
+          availableQuantity: input.quantity,
+          unit: input.unit,
+          condition: input.condition,
+          roomLocation: input.roomLocation,
+          purchaseCost: input.purchaseCost ?? null,
+          purchaseDate: input.purchaseDate ?? null,
+        })
+        .returning();
+      return item;
+    },
+
+    async allocateInventoryItem(user: AuthUser, itemId: string, input: z.infer<typeof allocateInventoryItemSchema>) {
+      const [item] = await db
+        .select()
+        .from(inventoryItems)
+        .where(and(eq(inventoryItems.id, itemId), eq(inventoryItems.schoolId, user.schoolId)));
+
+      if (!item) {
+        throw new ApiError(404, 'Inventory item not found');
+      }
+      if (item.availableQuantity < input.quantity) {
+        throw new ApiError(400, `Insufficient quantity available (Available: ${item.availableQuantity})`);
+      }
+
+      const [allocation] = await db
+        .insert(inventoryAllocations)
+        .values({
+          schoolId: user.schoolId,
+          itemId: item.id,
+          allocatedToStaffId: input.allocatedToStaffId,
+          purpose: input.purpose,
+          quantity: input.quantity,
+          allocatedAt: input.allocatedAt ?? new Date().toISOString().split('T')[0]!,
+          status: 'active',
+        })
+        .returning();
+
+      await db
+        .update(inventoryItems)
+        .set({
+          availableQuantity: item.availableQuantity - input.quantity,
+          updatedAt: new Date(),
+        })
+        .where(eq(inventoryItems.id, item.id));
+
+      return allocation;
+    },
+
+    async returnInventoryAllocation(user: AuthUser, allocationId: string) {
+      const [alloc] = await db
+        .select()
+        .from(inventoryAllocations)
+        .where(and(eq(inventoryAllocations.id, allocationId), eq(inventoryAllocations.schoolId, user.schoolId)));
+
+      if (!alloc) {
+        throw new ApiError(404, 'Inventory allocation not found');
+      }
+      if (alloc.status === 'returned') {
+        throw new ApiError(400, 'Allocation already marked returned');
+      }
+
+      const [updated] = await db
+        .update(inventoryAllocations)
+        .set({
+          status: 'returned',
+          returnedAt: new Date().toISOString().split('T')[0]!,
+          updatedAt: new Date(),
+        })
+        .where(eq(inventoryAllocations.id, alloc.id))
+        .returning();
+
+      const [item] = await db
+        .select()
+        .from(inventoryItems)
+        .where(eq(inventoryItems.id, alloc.itemId));
+
+      if (item) {
+        await db
+          .update(inventoryItems)
+          .set({
+            availableQuantity: Math.min(item.quantity, item.availableQuantity + alloc.quantity),
+            updatedAt: new Date(),
+          })
+          .where(eq(inventoryItems.id, item.id));
+      }
+
+      return updated;
+    },
+
+    async listInventoryPurchaseRequests(user: AuthUser, query?: { status?: string }) {
+      const conditions = [eq(inventoryPurchaseRequests.schoolId, user.schoolId)];
+      if (query?.status && query.status !== 'all') {
+        conditions.push(eq(inventoryPurchaseRequests.status, query.status as any));
+      }
+
+      const rows = await db
+        .select({
+          req: inventoryPurchaseRequests,
+          staffName: staff.fullName,
+        })
+        .from(inventoryPurchaseRequests)
+        .innerJoin(staff, eq(staff.id, inventoryPurchaseRequests.requestedByStaffId))
+        .where(and(...conditions))
+        .orderBy(desc(inventoryPurchaseRequests.createdAt));
+
+      return rows.map((r) => ({
+        ...r.req,
+        requestedByStaffName: r.staffName,
+      }));
+    },
+
+    async createInventoryPurchaseRequest(user: AuthUser, input: z.infer<typeof createInventoryPurchaseRequestSchema>) {
+      const [currentStaff] = await db
+        .select()
+        .from(staff)
+        .where(and(eq(staff.userId, user.appUserId), eq(staff.schoolId, user.schoolId)));
+
+      const requestedByStaffId = currentStaff?.id ?? user.appUserId;
+
+      const [req] = await db
+        .insert(inventoryPurchaseRequests)
+        .values({
+          schoolId: user.schoolId,
+          itemName: input.itemName,
+          category: input.category,
+          quantity: input.quantity,
+          estimatedCost: input.estimatedCost,
+          requestedByStaffId,
+          status: 'pending',
+        })
+        .returning();
+
+      return req;
+    },
+
+    async reviewInventoryPurchaseRequest(user: AuthUser, requestId: string, input: z.infer<typeof reviewInventoryPurchaseRequestSchema>) {
+      const [req] = await db
+        .select()
+        .from(inventoryPurchaseRequests)
+        .where(and(eq(inventoryPurchaseRequests.id, requestId), eq(inventoryPurchaseRequests.schoolId, user.schoolId)));
+
+      if (!req) {
+        throw new ApiError(404, 'Purchase request not found');
+      }
+
+      const [updated] = await db
+        .update(inventoryPurchaseRequests)
+        .set({
+          status: input.status,
+          reviewNotes: input.reviewNotes ?? req.reviewNotes,
+          updatedAt: new Date(),
+        })
+        .where(eq(inventoryPurchaseRequests.id, req.id))
+        .returning();
+
+      return updated;
+    },
+
+    // --- 3. Staff Payroll ---
+    async listStaffSalaryStructures(user: AuthUser) {
+      const rows = await db
+        .select({
+          structure: staffSalaryStructures,
+          staffName: staff.fullName,
+          staffCode: staff.staffCode,
+          isTeacher: staff.isTeacher,
+          email: staff.email,
+        })
+        .from(staffSalaryStructures)
+        .innerJoin(staff, eq(staff.id, staffSalaryStructures.staffId))
+        .where(eq(staffSalaryStructures.schoolId, user.schoolId))
+        .orderBy(staff.fullName);
+
+      return rows.map((r) => ({
+        ...r.structure,
+        staffName: r.staffName,
+        staffCode: r.staffCode,
+        staffRole: r.isTeacher ? 'Teacher' : 'Staff',
+        email: r.email,
+      }));
+    },
+
+    async upsertStaffSalaryStructure(user: AuthUser, input: z.infer<typeof upsertStaffSalaryStructureSchema>) {
+      const netSalary =
+        input.basicSalary +
+        input.hra +
+        input.allowances -
+        input.pfDeduction -
+        input.esiDeduction -
+        input.tdsDeduction;
+
+      const [existing] = await db
+        .select()
+        .from(staffSalaryStructures)
+        .where(
+          and(
+            eq(staffSalaryStructures.schoolId, user.schoolId),
+            eq(staffSalaryStructures.staffId, input.staffId),
+          ),
+        );
+
+      if (existing) {
+        const [updated] = await db
+          .update(staffSalaryStructures)
+          .set({
+            basicSalary: input.basicSalary,
+            hra: input.hra,
+            allowances: input.allowances,
+            pfDeduction: input.pfDeduction,
+            esiDeduction: input.esiDeduction,
+            tdsDeduction: input.tdsDeduction,
+            netSalary,
+            effectiveFrom: input.effectiveFrom,
+            updatedAt: new Date(),
+          })
+          .where(eq(staffSalaryStructures.id, existing.id))
+          .returning();
+        return updated;
+      }
+
+      const [created] = await db
+        .insert(staffSalaryStructures)
+        .values({
+          schoolId: user.schoolId,
+          staffId: input.staffId,
+          basicSalary: input.basicSalary,
+          hra: input.hra,
+          allowances: input.allowances,
+          pfDeduction: input.pfDeduction,
+          esiDeduction: input.esiDeduction,
+          tdsDeduction: input.tdsDeduction,
+          netSalary,
+          effectiveFrom: input.effectiveFrom,
+        })
+        .returning();
+
+      return created;
+    },
+
+    async generateMonthlyPayroll(user: AuthUser, input: z.infer<typeof generateMonthlyPayrollSchema>) {
+      const { month, year, academicYearId } = input;
+
+      const structures = await db
+        .select()
+        .from(staffSalaryStructures)
+        .where(eq(staffSalaryStructures.schoolId, user.schoolId));
+
+      if (structures.length === 0) {
+        throw new ApiError(400, 'No staff salary structures configured. Set up staff salary structures first.');
+      }
+
+      const createdRecords = [];
+
+      for (const s of structures) {
+        const [existing] = await db
+          .select()
+          .from(staffPayrollRecords)
+          .where(
+            and(
+              eq(staffPayrollRecords.schoolId, user.schoolId),
+              eq(staffPayrollRecords.staffId, s.staffId),
+              eq(staffPayrollRecords.month, month),
+              eq(staffPayrollRecords.year, year),
+            ),
+          );
+
+        if (existing) continue;
+
+        const totalAllowances = s.hra + s.allowances;
+        const totalDeductions = s.pfDeduction + s.esiDeduction + s.tdsDeduction;
+
+        const [rec] = await db
+          .insert(staffPayrollRecords)
+          .values({
+            schoolId: user.schoolId,
+            staffId: s.staffId,
+            academicYearId: academicYearId ?? null,
+            month,
+            year,
+            basicSalary: s.basicSalary,
+            allowances: totalAllowances,
+            deductions: totalDeductions,
+            netSalary: s.netSalary,
+            status: 'draft',
+          })
+          .returning();
+
+        createdRecords.push(rec);
+      }
+
+      return {
+        month,
+        year,
+        generatedCount: createdRecords.length,
+        totalConfiguredStaff: structures.length,
+      };
+    },
+
+    async listStaffPayrollRecords(user: AuthUser, query?: { month?: number; year?: number; status?: string }) {
+      const conditions = [eq(staffPayrollRecords.schoolId, user.schoolId)];
+      if (query?.month) {
+        conditions.push(eq(staffPayrollRecords.month, query.month));
+      }
+      if (query?.year) {
+        conditions.push(eq(staffPayrollRecords.year, query.year));
+      }
+      if (query?.status && query.status !== 'all') {
+        conditions.push(eq(staffPayrollRecords.status, query.status as any));
+      }
+
+      const rows = await db
+        .select({
+          payroll: staffPayrollRecords,
+          staffName: staff.fullName,
+          staffCode: staff.staffCode,
+          isTeacher: staff.isTeacher,
+        })
+        .from(staffPayrollRecords)
+        .innerJoin(staff, eq(staff.id, staffPayrollRecords.staffId))
+        .where(and(...conditions))
+        .orderBy(desc(staffPayrollRecords.year), desc(staffPayrollRecords.month), staff.fullName);
+
+      return rows.map((r) => ({
+        ...r.payroll,
+        staffName: r.staffName,
+        staffCode: r.staffCode,
+        staffRole: r.isTeacher ? 'Teacher' : 'Staff',
+      }));
+    },
+
+    async markPayrollPaid(user: AuthUser, recordId: string, input: z.infer<typeof markPayrollPaidSchema>) {
+      const [rec] = await db
+        .select()
+        .from(staffPayrollRecords)
+        .where(and(eq(staffPayrollRecords.id, recordId), eq(staffPayrollRecords.schoolId, user.schoolId)));
+
+      if (!rec) {
+        throw new ApiError(404, 'Payroll record not found');
+      }
+
+      const [updated] = await db
+        .update(staffPayrollRecords)
+        .set({
+          status: 'paid',
+          paidOn: input.paidOn ?? new Date().toISOString().split('T')[0]!,
+          paymentReference: input.paymentReference ?? null,
+          notes: input.notes ?? rec.notes,
+          updatedAt: new Date(),
+        })
+        .where(eq(staffPayrollRecords.id, rec.id))
+        .returning();
+
+      return updated;
+    },
+
+    // --- 4. Hostel & Visitor Management ---
+    async listHostelRooms(user: AuthUser, query?: { roomType?: string }) {
+      const conditions = [eq(hostelRooms.schoolId, user.schoolId)];
+      if (query?.roomType && query.roomType !== 'all') {
+        conditions.push(eq(hostelRooms.roomType, query.roomType as any));
+      }
+
+      return db
+        .select()
+        .from(hostelRooms)
+        .where(and(...conditions))
+        .orderBy(hostelRooms.blockName, hostelRooms.roomNumber);
+    },
+
+    async createHostelRoom(user: AuthUser, input: z.infer<typeof createHostelRoomSchema>) {
+      const [room] = await db
+        .insert(hostelRooms)
+        .values({
+          schoolId: user.schoolId,
+          blockName: input.blockName,
+          roomNumber: input.roomNumber,
+          roomType: input.roomType,
+          capacity: input.capacity,
+          termFee: input.termFee,
+          occupiedCount: 0,
+        })
+        .returning();
+      return room;
+    },
+
+    async listHostelAllocations(user: AuthUser, query?: { status?: string }) {
+      const conditions = [eq(hostelAllocations.schoolId, user.schoolId)];
+      if (query?.status && query.status !== 'all') {
+        conditions.push(eq(hostelAllocations.status, query.status));
+      }
+
+      const rows = await db
+        .select({
+          allocation: hostelAllocations,
+          studentName: students.fullName,
+          admissionNumber: students.admissionNumber,
+          roomNumber: hostelRooms.roomNumber,
+          blockName: hostelRooms.blockName,
+          roomType: hostelRooms.roomType,
+        })
+        .from(hostelAllocations)
+        .innerJoin(students, eq(students.id, hostelAllocations.studentId))
+        .innerJoin(hostelRooms, eq(hostelRooms.id, hostelAllocations.roomId))
+        .where(and(...conditions))
+        .orderBy(desc(hostelAllocations.allocatedAt));
+
+      return rows.map((r) => ({
+        ...r.allocation,
+        studentName: r.studentName,
+        admissionNumber: r.admissionNumber,
+        roomNumber: r.roomNumber,
+        blockName: r.blockName,
+        roomType: r.roomType,
+      }));
+    },
+
+    async allocateHostelBed(user: AuthUser, input: z.infer<typeof allocateHostelBedSchema>) {
+      const [room] = await db
+        .select()
+        .from(hostelRooms)
+        .where(and(eq(hostelRooms.id, input.roomId), eq(hostelRooms.schoolId, user.schoolId)));
+
+      if (!room) {
+        throw new ApiError(404, 'Hostel room not found');
+      }
+      if (room.occupiedCount >= room.capacity) {
+        throw new ApiError(409, 'Room is at maximum capacity');
+      }
+
+      const [existing] = await db
+        .select()
+        .from(hostelAllocations)
+        .where(
+          and(
+            eq(hostelAllocations.schoolId, user.schoolId),
+            eq(hostelAllocations.studentId, input.studentId),
+            eq(hostelAllocations.status, 'active'),
+          ),
+        );
+
+      if (existing) {
+        throw new ApiError(409, 'Student already has an active hostel bed allocation');
+      }
+
+      const [alloc] = await db
+        .insert(hostelAllocations)
+        .values({
+          schoolId: user.schoolId,
+          studentId: input.studentId,
+          roomId: room.id,
+          bedNumber: input.bedNumber,
+          allocatedAt: input.allocatedAt ?? new Date().toISOString().split('T')[0]!,
+          status: 'active',
+        })
+        .returning();
+
+      await db
+        .update(hostelRooms)
+        .set({
+          occupiedCount: room.occupiedCount + 1,
+          updatedAt: new Date(),
+        })
+        .where(eq(hostelRooms.id, room.id));
+
+      return alloc;
+    },
+
+    async vacateHostelBed(user: AuthUser, allocationId: string) {
+      const [alloc] = await db
+        .select()
+        .from(hostelAllocations)
+        .where(and(eq(hostelAllocations.id, allocationId), eq(hostelAllocations.schoolId, user.schoolId)));
+
+      if (!alloc) {
+        throw new ApiError(404, 'Hostel allocation not found');
+      }
+      if (alloc.status === 'vacated') {
+        throw new ApiError(400, 'Allocation already vacated');
+      }
+
+      const [updated] = await db
+        .update(hostelAllocations)
+        .set({
+          status: 'vacated',
+          vacatedAt: new Date().toISOString().split('T')[0]!,
+          updatedAt: new Date(),
+        })
+        .where(eq(hostelAllocations.id, alloc.id))
+        .returning();
+
+      const [room] = await db
+        .select()
+        .from(hostelRooms)
+        .where(eq(hostelRooms.id, alloc.roomId));
+
+      if (room && room.occupiedCount > 0) {
+        await db
+          .update(hostelRooms)
+          .set({
+            occupiedCount: room.occupiedCount - 1,
+            updatedAt: new Date(),
+          })
+          .where(eq(hostelRooms.id, room.id));
+      }
+
+      return updated;
+    },
+
+    async listVisitorGatePasses(user: AuthUser, query?: { status?: string }) {
+      const conditions = [eq(visitorGatePasses.schoolId, user.schoolId)];
+      if (query?.status && query.status !== 'all') {
+        conditions.push(eq(visitorGatePasses.status, query.status as any));
+      }
+
+      return db
+        .select()
+        .from(visitorGatePasses)
+        .where(and(...conditions))
+        .orderBy(desc(visitorGatePasses.checkInAt));
+    },
+
+    async createVisitorGatePass(user: AuthUser, input: z.infer<typeof createVisitorGatePassSchema>) {
+      const [pass] = await db
+        .insert(visitorGatePasses)
+        .values({
+          schoolId: user.schoolId,
+          visitorName: input.visitorName,
+          phone: input.phone,
+          purpose: input.purpose,
+          personToVisitType: input.personToVisitType,
+          personToVisitId: input.personToVisitId ?? null,
+          badgeNumber: input.badgeNumber,
+          vehicleNumber: input.vehicleNumber ?? null,
+          status: 'active',
+        })
+        .returning();
+
+      return pass;
+    },
+
+    async checkoutVisitorGatePass(user: AuthUser, passId: string) {
+      const [pass] = await db
+        .select()
+        .from(visitorGatePasses)
+        .where(and(eq(visitorGatePasses.id, passId), eq(visitorGatePasses.schoolId, user.schoolId)));
+
+      if (!pass) {
+        throw new ApiError(404, 'Visitor gate pass not found');
+      }
+
+      const [updated] = await db
+        .update(visitorGatePasses)
+        .set({
+          status: 'checked_out',
+          checkOutAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(visitorGatePasses.id, pass.id))
+        .returning();
+
+      return updated;
+    },
+
+    // --- 5. Student Health & Infirmary ---
+    async getStudentHealthProfile(user: AuthUser, studentId: string) {
+      const [profile] = await db
+        .select()
+        .from(studentHealthProfiles)
+        .where(
+          and(
+            eq(studentHealthProfiles.schoolId, user.schoolId),
+            eq(studentHealthProfiles.studentId, studentId),
+          ),
+        );
+
+      return profile ?? null;
+    },
+
+    async upsertStudentHealthProfile(user: AuthUser, input: z.infer<typeof upsertStudentHealthProfileSchema>) {
+      const [existing] = await db
+        .select()
+        .from(studentHealthProfiles)
+        .where(
+          and(
+            eq(studentHealthProfiles.schoolId, user.schoolId),
+            eq(studentHealthProfiles.studentId, input.studentId),
+          ),
+        );
+
+      if (existing) {
+        const [updated] = await db
+          .update(studentHealthProfiles)
+          .set({
+            bloodGroup: input.bloodGroup,
+            allergies: input.allergies ?? null,
+            chronicConditions: input.chronicConditions ?? null,
+            emergencyContactName: input.emergencyContactName,
+            emergencyContactPhone: input.emergencyContactPhone,
+            doctorNotes: input.doctorNotes ?? null,
+            updatedAt: new Date(),
+          })
+          .where(eq(studentHealthProfiles.id, existing.id))
+          .returning();
+        return updated;
+      }
+
+      const [created] = await db
+        .insert(studentHealthProfiles)
+        .values({
+          schoolId: user.schoolId,
+          studentId: input.studentId,
+          bloodGroup: input.bloodGroup,
+          allergies: input.allergies ?? null,
+          chronicConditions: input.chronicConditions ?? null,
+          emergencyContactName: input.emergencyContactName,
+          emergencyContactPhone: input.emergencyContactPhone,
+          doctorNotes: input.doctorNotes ?? null,
+        })
+        .returning();
+
+      return created;
+    },
+
+    async listInfirmaryVisits(user: AuthUser, query?: { studentId?: string }) {
+      const conditions = [eq(infirmaryVisits.schoolId, user.schoolId)];
+      if (query?.studentId) {
+        conditions.push(eq(infirmaryVisits.studentId, query.studentId));
+      }
+
+      const rows = await db
+        .select({
+          visit: infirmaryVisits,
+          studentName: students.fullName,
+          admissionNumber: students.admissionNumber,
+          attendedByStaffName: staff.fullName,
+        })
+        .from(infirmaryVisits)
+        .innerJoin(students, eq(students.id, infirmaryVisits.studentId))
+        .innerJoin(staff, eq(staff.id, infirmaryVisits.attendedByStaffId))
+        .where(and(...conditions))
+        .orderBy(desc(infirmaryVisits.visitedAt));
+
+      return rows.map((r) => ({
+        ...r.visit,
+        studentName: r.studentName,
+        admissionNumber: r.admissionNumber,
+        attendedByStaffName: r.attendedByStaffName,
+      }));
+    },
+
+    async recordInfirmaryVisit(user: AuthUser, input: z.infer<typeof recordInfirmaryVisitSchema>) {
+      const [currentStaff] = await db
+        .select()
+        .from(staff)
+        .where(and(eq(staff.userId, user.appUserId), eq(staff.schoolId, user.schoolId)));
+
+      const attendedByStaffId = input.attendedByStaffId ?? currentStaff?.id ?? user.appUserId;
+
+      const [visit] = await db
+        .insert(infirmaryVisits)
+        .values({
+          schoolId: user.schoolId,
+          studentId: input.studentId,
+          visitedAt: input.visitedAt ? new Date(input.visitedAt) : new Date(),
+          symptoms: input.symptoms,
+          treatmentGiven: input.treatmentGiven,
+          attendedByStaffId,
+          parentNotified: input.parentNotified ?? false,
+          followUpNeeded: input.followUpNeeded ?? false,
+          notes: input.notes ?? null,
+        })
+        .returning();
+
+      return visit;
     },
   };
 }

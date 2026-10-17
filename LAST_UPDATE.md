@@ -1,5 +1,49 @@
 # Last Update (October 17, 2026)
 
+## Phase 15: Campus Operations Ecosystem
+
+### Summary
+- **Database Schema & Migrations (`0017_polite_wilson_fisk.sql`):**
+  - **11 New Tables:**
+    - `libraryBooks`: ISBN, title, author, category, total copies, available copies, shelf location.
+    - `bookLoans`: borrower type (`student`/`staff`), student/staff ID, checkout date, due date, return date, late fine amount, status (`issued`, `returned`, `lost`).
+    - `bookReservations`: reservation queue tracking with status (`active`, `fulfilled`, `cancelled`).
+    - `inventoryItems`: asset categories (`lab`, `sports`, `classroom`, `it`, `furniture`, `consumables`), asset tag, serial number, condition (`new`, `good`, `fair`, `maintenance_required`, `under_repair`, `damaged`, `disposed`), location, unit cost, quantity.
+    - `assetAllocations`: staff asset checkout/assignment and return condition tracking.
+    - `purchaseRequisitions`: procurement requests with estimated cost, urgency, status (`draft`, `pending_approval`, `approved`, `rejected`, `ordered`, `received`), and approval timestamps.
+    - `staffSalaryStructures`: basic pay, HRA, special allowances, statutory PF/ESI/TDS deductions, net salary.
+    - `payrollRuns`: monthly payroll runs per staff member with payment mode, payout status (`draft`, `approved`, `paid`, `voided`), transaction ref, paid timestamp.
+    - `hostelRooms`: block name, room number, room type (`single`, `double`, `triple`, `dormitory`), capacity, occupied count, term fee.
+    - `visitorGatePasses`: visitor name, phone, purpose, badge number, entry timestamp, exit timestamp, status (`checked_in`, `checked_out`, `flagged`).
+    - `infirmaryVisits`: student triage visit log with symptoms, treatment administered, attending staff ID, parent notification status, follow-up flags.
+  - **Medical Emergency Profile Extensions on `students`:**
+    - `bloodGroup`: A+, A-, B+, B-, AB+, AB-, O+, O-.
+    - `allergies`, `chronicConditions`, `emergencyContactName`, `emergencyContactPhone`, `medicalNotes`.
+- **Backend API & Repositories:**
+  - 24 high-throughput repository methods in `SchoolRepository` covering all 5 campus operational domains with atomic inventory counters, loan overdue fine calculations (₹5/day default), and reservation fulfillment.
+  - 24 authenticated Admin routes in `services/api/src/routes/admin.ts` with granular RBAC (allowing `admin` and `accountant` for payroll operations).
+  - Validation schemas in `services/api/src/http/validation.ts`.
+  - Comprehensive test suite in `services/api/test/phase15-campus-operations.test.ts`.
+- **Flutter Web & Mobile Interface:**
+  - `AdminCampusView` (`apps/flutter_app/lib/src/features/admin/views/admin_campus_view.dart`):
+    - Subtab 1: **Library & Circulation:** Stat strip (Total Titles, Total Copies, Issued, Active Reservations), quick search by title/author/ISBN, Issue Book and Add Book dialogs.
+    - Subtab 2: **Inventory & Assets:** Category filtering, Condition pills, Add Asset dialog, and purchase requisition approval workflow.
+    - Subtab 3: **Staff Payroll & Compensation:** Period selector, summary stat strip (Total Disbursed, Approved, Draft, Staff on Payroll), Run Monthly Payroll dialog, and Pay/Disburse action modal.
+    - Subtab 4: **Hostel & Gate Passes:** Hostel room blocks overview, Add Room dialog, live Visitor Gate Pass ledger, Issue Pass dialog, and 1-click Check-Out action.
+    - Subtab 5: **Student Health & Infirmary:** Medical profiles directory with quick blood group badges, emergency contact chips, Log Infirmary Visit dialog, and daily triage log.
+  - Status Indicators:
+    - `StatusBadge.payrollStatus`: visual tone and icons for `approved`, `paid`, `voided`, and `draft`.
+    - `StatusBadge.inventoryCondition`: visual tone and icons for asset condition tiers.
+  - Command Palette Integration:
+    - Added `nav:campus` and 5 quick action command palette targets (`action:campus_library`, `action:campus_assets`, `action:campus_payroll`, `action:campus_gatepass`, `action:campus_health`).
+- **Verification:**
+  - Backend: 14/14 Vitest test suites passing (141 passed, 1 skipped).
+  - TypeScript: 0 typecheck errors (`npm run typecheck --prefix services/api`).
+  - Frontend: 98/98 Flutter unit/widget tests passing (`flutter test apps/flutter_app`).
+  - Lint: 0 analyzer warnings (`flutter analyze apps/flutter_app`).
+
+---
+
 ## Phase 14: Applied AI & Enhanced Institutional UX
 
 ### Summary

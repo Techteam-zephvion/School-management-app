@@ -828,3 +828,151 @@ export const draftHomeworkFeedbackSchema = z.object({
   areasForImprovement: z.string().trim().max(500).optional(),
 });
 
+// --- Phase 15: Campus Operations Ecosystem ---
+
+export const createLibraryBookSchema = z.object({
+  isbn: z.string().trim().max(50).nullable().optional(),
+  title: z.string().trim().min(1).max(200),
+  author: z.string().trim().min(1).max(150),
+  publisher: z.string().trim().max(150).nullable().optional(),
+  publishedYear: z.number().int().min(1800).max(2100).nullable().optional(),
+  category: z
+    .enum(['general', 'science', 'mathematics', 'literature', 'history', 'reference', 'periodical'])
+    .default('general'),
+  shelfLocation: z.string().trim().min(1).max(100),
+  totalCopies: z.number().int().min(1).default(1),
+});
+
+export const issueLibraryLoanSchema = z.object({
+  bookId: z.uuid(),
+  memberType: z.enum(['student', 'staff']),
+  memberId: z.uuid(),
+  issuedAt: z.iso.date().optional(),
+  dueDate: z.iso.date(),
+  notes: z.string().trim().max(500).nullable().optional(),
+});
+
+export const returnLibraryLoanSchema = z.object({
+  returnedAt: z.iso.date().optional(),
+  fineAmount: z.number().int().min(0).optional(),
+  finePaid: z.boolean().optional(),
+  status: z.enum(['returned', 'lost']).default('returned'),
+  notes: z.string().trim().max(500).nullable().optional(),
+});
+
+export const createInventoryItemSchema = z.object({
+  itemCode: z.string().trim().min(2).max(50),
+  name: z.string().trim().min(2).max(150),
+  category: z.enum([
+    'lab_equipment',
+    'sports_gear',
+    'classroom',
+    'it_hardware',
+    'furniture',
+    'consumables',
+  ]),
+  quantity: z.number().int().min(1).default(1),
+  unit: z.string().trim().min(1).max(30).default('pcs'),
+  condition: z
+    .enum(['good', 'fair', 'maintenance_required', 'damaged', 'disposed'])
+    .default('good'),
+  roomLocation: z.string().trim().min(1).max(100),
+  purchaseCost: z.number().int().min(0).nullable().optional(),
+  purchaseDate: z.iso.date().nullable().optional(),
+});
+
+export const allocateInventoryItemSchema = z.object({
+  allocatedToStaffId: z.uuid(),
+  purpose: z.string().trim().min(2).max(200),
+  quantity: z.number().int().min(1).default(1),
+  allocatedAt: z.iso.date().optional(),
+});
+
+export const createInventoryPurchaseRequestSchema = z.object({
+  itemName: z.string().trim().min(2).max(150),
+  category: z.enum([
+    'lab_equipment',
+    'sports_gear',
+    'classroom',
+    'it_hardware',
+    'furniture',
+    'consumables',
+  ]),
+  quantity: z.number().int().min(1).default(1),
+  estimatedCost: z.number().int().min(0),
+});
+
+export const reviewInventoryPurchaseRequestSchema = z.object({
+  status: z.enum(['approved', 'ordered', 'received', 'rejected']),
+  reviewNotes: z.string().trim().max(500).nullable().optional(),
+});
+
+export const upsertStaffSalaryStructureSchema = z.object({
+  staffId: z.uuid(),
+  basicSalary: z.number().int().min(0),
+  hra: z.number().int().min(0).default(0),
+  allowances: z.number().int().min(0).default(0),
+  pfDeduction: z.number().int().min(0).default(0),
+  esiDeduction: z.number().int().min(0).default(0),
+  tdsDeduction: z.number().int().min(0).default(0),
+  effectiveFrom: z.iso.date(),
+});
+
+export const generateMonthlyPayrollSchema = z.object({
+  month: z.number().int().min(1).max(12),
+  year: z.number().int().min(2020).max(2100),
+  academicYearId: z.uuid().optional(),
+});
+
+export const markPayrollPaidSchema = z.object({
+  paidOn: z.iso.date().optional(),
+  paymentReference: z.string().trim().max(100).optional(),
+  notes: z.string().trim().max(300).optional(),
+});
+
+export const createHostelRoomSchema = z.object({
+  blockName: z.string().trim().min(1).max(50),
+  roomNumber: z.string().trim().min(1).max(30),
+  roomType: z.enum(['boys', 'girls', 'staff']).default('boys'),
+  capacity: z.number().int().min(1).default(2),
+  termFee: z.number().int().min(0).default(0),
+});
+
+export const allocateHostelBedSchema = z.object({
+  studentId: z.uuid(),
+  roomId: z.uuid(),
+  bedNumber: z.string().trim().min(1).max(20),
+  allocatedAt: z.iso.date().optional(),
+});
+
+export const createVisitorGatePassSchema = z.object({
+  visitorName: z.string().trim().min(2).max(120),
+  phone: z.string().trim().min(7).max(20),
+  purpose: z.string().trim().min(2).max(200),
+  personToVisitType: z.enum(['student', 'staff', 'admin']),
+  personToVisitId: z.uuid().nullable().optional(),
+  badgeNumber: z.string().trim().min(1).max(30),
+  vehicleNumber: z.string().trim().max(30).nullable().optional(),
+});
+
+export const upsertStudentHealthProfileSchema = z.object({
+  studentId: z.uuid(),
+  bloodGroup: z.string().trim().min(2).max(10),
+  allergies: z.string().trim().max(500).nullable().optional(),
+  chronicConditions: z.string().trim().max(500).nullable().optional(),
+  emergencyContactName: z.string().trim().min(2).max(120),
+  emergencyContactPhone: z.string().trim().min(7).max(20),
+  doctorNotes: z.string().trim().max(500).nullable().optional(),
+});
+
+export const recordInfirmaryVisitSchema = z.object({
+  studentId: z.uuid(),
+  visitedAt: z.string().optional(),
+  symptoms: z.string().trim().min(2).max(500),
+  treatmentGiven: z.string().trim().min(2).max(500),
+  attendedByStaffId: z.uuid().optional(),
+  parentNotified: z.boolean().default(false),
+  followUpNeeded: z.boolean().default(false),
+  notes: z.string().trim().max(500).nullable().optional(),
+});
+

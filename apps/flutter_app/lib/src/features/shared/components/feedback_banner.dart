@@ -20,6 +20,33 @@ class FeedbackBanner extends StatelessWidget {
     super.key,
   });
 
+  const FeedbackBanner.error({
+    required this.message,
+    this.title,
+    this.actionLabel,
+    this.onAction,
+    this.onDismiss,
+    super.key,
+  }) : tone = FeedbackTone.error;
+
+  const FeedbackBanner.success({
+    required this.message,
+    this.title,
+    this.actionLabel,
+    this.onAction,
+    this.onDismiss,
+    super.key,
+  }) : tone = FeedbackTone.success;
+
+  const FeedbackBanner.warning({
+    required this.message,
+    this.title,
+    this.actionLabel,
+    this.onAction,
+    this.onDismiss,
+    super.key,
+  }) : tone = FeedbackTone.warning;
+
   final String message;
   final FeedbackTone tone;
   final String? title;
