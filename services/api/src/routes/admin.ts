@@ -91,6 +91,21 @@ import {
   createVisitorGatePassSchema,
   upsertStudentHealthProfileSchema,
   recordInfirmaryVisitSchema,
+  createTrustSchema,
+  linkSchoolToTrustSchema,
+  createCampusTransferSchema,
+  updateCampusTransferStatusSchema,
+  registerBiometricDeviceSchema,
+  deviceHeartbeatSchema,
+  ingestBiometricPunchesSchema,
+  reconcileBiometricPunchesSchema,
+  createCourseOutcomeSchema,
+  createExamQuestionSchema,
+  generateBlueprintedPaperSchema,
+  createAlumniProfileSchema,
+  updateAlumniProfileSchema,
+  createTranscriptRequestSchema,
+  updateTranscriptRequestStatusSchema,
 } from '../http/validation';
 
 
@@ -121,6 +136,7 @@ adminRoutes.use('*', async (c, next) => {
       path.includes('/concessions') ||
       path.includes('/refunds') ||
       path.includes('/payroll') ||
+      path.includes('/consolidated-stats') ||
       path.includes('/overview');
     if (!isFeeOrFinance) {
       throw new ApiError(403, 'Accountant role is restricted to financial operations');
@@ -1608,6 +1624,249 @@ adminRoutes.post(
   async (c) => {
     const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
     return c.json(await repo.recordInfirmaryVisit(c.get('authUser'), c.req.valid('json')), 201);
+  },
+);
+
+// ==========================================
+// Phase 16: Multi-Campus Federation & Enterprise Biometrics
+// ==========================================
+
+// --- 1. Multi-Campus Trust Federation ---
+adminRoutes.get('/federation/trusts', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.listEducationalTrusts(c.get('authUser')));
+});
+
+adminRoutes.post(
+  '/federation/trusts',
+  zValidator('json', createTrustSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createEducationalTrust(c.get('authUser'), c.req.valid('json')), 201);
+  },
+);
+
+adminRoutes.post(
+  '/federation/trusts/link',
+  zValidator('json', linkSchoolToTrustSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.linkSchoolToTrust(c.get('authUser'), c.req.valid('json')), 200);
+  },
+);
+
+adminRoutes.get(
+  '/federation/trusts/:trustId/campuses',
+  zValidator('param', z.object({ trustId: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.getTrustCampuses(c.get('authUser'), c.req.valid('param').trustId));
+  },
+);
+
+adminRoutes.get(
+  '/federation/trusts/:trustId/consolidated-stats',
+  zValidator('param', z.object({ trustId: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.getTrustConsolidatedStats(c.get('authUser'), c.req.valid('param').trustId));
+  },
+);
+
+adminRoutes.get('/federation/transfers', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const trustId = c.req.query('trustId');
+  return c.json(await repo.listCampusTransfers(c.get('authUser'), trustId));
+});
+
+adminRoutes.post(
+  '/federation/transfers',
+  zValidator('json', createCampusTransferSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createCampusTransfer(c.get('authUser'), c.req.valid('json')), 201);
+  },
+);
+
+adminRoutes.put(
+  '/federation/transfers/:transferId/status',
+  zValidator('param', z.object({ transferId: z.string().uuid() })),
+  zValidator('json', updateCampusTransferStatusSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.updateCampusTransferStatus(
+        c.get('authUser'),
+        c.req.valid('param').transferId,
+        c.req.valid('json'),
+      ),
+      200,
+    );
+  },
+);
+
+// --- 2. Biometric Turnstiles & Devices ---
+adminRoutes.get('/biometrics/devices', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.listBiometricDevices(c.get('authUser')));
+});
+
+adminRoutes.post(
+  '/biometrics/devices',
+  zValidator('json', registerBiometricDeviceSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.registerBiometricDevice(c.get('authUser'), c.req.valid('json')), 201);
+  },
+);
+
+adminRoutes.post(
+  '/biometrics/devices/:deviceId/heartbeat',
+  zValidator('param', z.object({ deviceId: z.string().uuid() })),
+  zValidator('json', deviceHeartbeatSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.recordDeviceHeartbeat(
+        c.get('authUser'),
+        c.req.valid('param').deviceId,
+        c.req.valid('json'),
+      ),
+      200,
+    );
+  },
+);
+
+adminRoutes.post(
+  '/biometrics/punches/ingest',
+  zValidator('json', ingestBiometricPunchesSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.ingestBiometricPunches(c.get('authUser'), c.req.valid('json')), 201);
+  },
+);
+
+adminRoutes.get('/biometrics/punches', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const limit = c.req.query('limit') ? Number(c.req.query('limit')) : 100;
+  return c.json(await repo.listBiometricPunches(c.get('authUser'), limit));
+});
+
+adminRoutes.post(
+  '/biometrics/punches/reconcile',
+  zValidator('json', reconcileBiometricPunchesSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.reconcileBiometricPunches(c.get('authUser'), c.req.valid('json')), 200);
+  },
+);
+
+// --- 3. Outcome-Based Education (OBE) & Assessment ---
+adminRoutes.get('/obe/course-outcomes', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const classId = c.req.query('classId');
+  const subjectId = c.req.query('subjectId');
+  return c.json(await repo.listCourseOutcomes(c.get('authUser'), classId, subjectId));
+});
+
+adminRoutes.post(
+  '/obe/course-outcomes',
+  zValidator('json', createCourseOutcomeSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createCourseOutcome(c.get('authUser'), c.req.valid('json')), 201);
+  },
+);
+
+adminRoutes.get('/obe/questions', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const classId = c.req.query('classId');
+  const subjectId = c.req.query('subjectId');
+  const bloomLevel = c.req.query('bloomLevel');
+  return c.json(await repo.listExamQuestions(c.get('authUser'), { classId, subjectId, bloomLevel }));
+});
+
+adminRoutes.post(
+  '/obe/questions',
+  zValidator('json', createExamQuestionSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createExamQuestion(c.get('authUser'), c.req.valid('json')), 201);
+  },
+);
+
+adminRoutes.post(
+  '/obe/blueprint/generate',
+  zValidator('json', generateBlueprintedPaperSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.generateBlueprintedPaper(c.get('authUser'), c.req.valid('json')), 200);
+  },
+);
+
+// --- 4. Alumni Association & Transcripts ---
+adminRoutes.get('/alumni/profiles', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const graduationYear = c.req.query('graduationYear') ? Number(c.req.query('graduationYear')) : undefined;
+  const verifiedOnly = c.req.query('verifiedOnly') === 'true';
+  return c.json(await repo.listAlumniProfiles(c.get('authUser'), { graduationYear, verifiedOnly }));
+});
+
+adminRoutes.post(
+  '/alumni/profiles',
+  zValidator('json', createAlumniProfileSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createAlumniProfile(c.get('authUser'), c.req.valid('json')), 201);
+  },
+);
+
+adminRoutes.put(
+  '/alumni/profiles/:id',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('json', updateAlumniProfileSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.updateAlumniProfile(
+        c.get('authUser'),
+        c.req.valid('param').id,
+        c.req.valid('json'),
+      ),
+      200,
+    );
+  },
+);
+
+adminRoutes.get('/alumni/transcripts', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  const status = c.req.query('status');
+  return c.json(await repo.listTranscriptRequests(c.get('authUser'), status));
+});
+
+adminRoutes.post(
+  '/alumni/transcripts',
+  zValidator('json', createTranscriptRequestSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(await repo.createTranscriptRequest(c.get('authUser'), c.req.valid('json')), 201);
+  },
+);
+
+adminRoutes.put(
+  '/alumni/transcripts/:id/status',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('json', updateTranscriptRequestStatusSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.updateTranscriptRequestStatus(
+        c.get('authUser'),
+        c.req.valid('param').id,
+        c.req.valid('json'),
+      ),
+      200,
+    );
   },
 );
 

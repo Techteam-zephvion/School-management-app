@@ -976,3 +976,140 @@ export const recordInfirmaryVisitSchema = z.object({
   notes: z.string().trim().max(500).nullable().optional(),
 });
 
+// Phase 16: Multi-Campus Federation & Enterprise Biometrics
+
+export const createTrustSchema = z.object({
+  name: z.string().trim().min(2).max(150),
+  code: z.string().trim().min(2).max(50),
+  registrationNumber: z.string().trim().max(80).optional().nullable(),
+  address: z.string().trim().max(300).optional().nullable(),
+  contactEmail: z.string().trim().email().optional().nullable(),
+  contactPhone: z.string().trim().max(25).optional().nullable(),
+});
+
+export const linkSchoolToTrustSchema = z.object({
+  trustId: z.uuid(),
+  schoolId: z.uuid().optional(),
+});
+
+export const createCampusTransferSchema = z.object({
+  trustId: z.uuid(),
+  targetSchoolId: z.uuid(),
+  entityType: z.enum(['student', 'staff']).default('student'),
+  studentId: z.uuid().optional(),
+  staffId: z.uuid().optional(),
+  targetClassId: z.uuid().optional(),
+  reason: z.string().trim().min(3).max(500),
+  transferDate: z.iso.date().optional(),
+  remarks: z.string().trim().max(500).optional(),
+});
+
+export const updateCampusTransferStatusSchema = z.object({
+  status: z.enum(['approved', 'rejected', 'completed']),
+  remarks: z.string().trim().max(500).optional(),
+});
+
+export const registerBiometricDeviceSchema = z.object({
+  name: z.string().trim().min(2).max(100),
+  deviceCode: z.string().trim().min(2).max(50),
+  deviceType: z.enum(['fingerprint', 'facial_recognition', 'rfid_card', 'turnstile']).default('facial_recognition'),
+  ipAddress: z.string().trim().max(50).optional().nullable(),
+  macAddress: z.string().trim().max(50).optional().nullable(),
+  serialNumber: z.string().trim().max(100).optional().nullable(),
+  location: z.string().trim().min(2).max(100),
+  status: z.enum(['online', 'offline', 'maintenance']).default('online'),
+});
+
+export const deviceHeartbeatSchema = z.object({
+  status: z.enum(['online', 'offline', 'maintenance']).default('online'),
+  ipAddress: z.string().trim().max(50).optional().nullable(),
+});
+
+export const ingestBiometricPunchesSchema = z.object({
+  deviceId: z.uuid(),
+  punches: z.array(
+    z.object({
+      cardOrTokenNumber: z.string().trim().min(1),
+      userType: z.enum(['student', 'staff']).default('student'),
+      studentId: z.uuid().optional(),
+      staffId: z.uuid().optional(),
+      punchTimestamp: z.string(),
+      punchType: z.enum(['in', 'out', 'auto']).default('auto'),
+      rawPayload: z.string().optional(),
+    }),
+  ).min(1).max(500),
+});
+
+export const reconcileBiometricPunchesSchema = z.object({
+  date: z.iso.date().optional(),
+  classId: z.uuid().optional(),
+});
+
+export const createCourseOutcomeSchema = z.object({
+  classId: z.uuid(),
+  subjectId: z.uuid(),
+  code: z.string().trim().min(1).max(20),
+  description: z.string().trim().min(5).max(500),
+  targetAttainmentPercent: z.number().int().min(1).max(100).default(70),
+});
+
+export const createExamQuestionSchema = z.object({
+  classId: z.uuid(),
+  subjectId: z.uuid(),
+  courseOutcomeId: z.uuid().optional().nullable(),
+  questionText: z.string().trim().min(3).max(2000),
+  questionType: z.enum(['mcq', 'short_answer', 'long_answer', 'numerical']).default('short_answer'),
+  bloomLevel: z.enum(['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create']).default('understand'),
+  marks: z.number().int().min(1).max(100).default(2),
+  options: z.array(z.string()).optional().nullable(),
+  answerKey: z.string().trim().max(1000).optional().nullable(),
+  rubrics: z.string().trim().max(1000).optional().nullable(),
+});
+
+export const generateBlueprintedPaperSchema = z.object({
+  classId: z.uuid(),
+  subjectId: z.uuid(),
+  totalMarks: z.number().int().min(10).max(200).default(100),
+  bloomDistribution: z.record(z.string(), z.number()).optional(),
+});
+
+export const createAlumniProfileSchema = z.object({
+  studentId: z.uuid().optional().nullable(),
+  fullName: z.string().trim().min(2).max(120),
+  email: z.string().trim().email(),
+  phone: z.string().trim().max(20).optional().nullable(),
+  graduationYear: z.number().int().min(1950).max(2100),
+  higherEducation: z.string().trim().max(200).optional().nullable(),
+  currentOrganization: z.string().trim().max(200).optional().nullable(),
+  designation: z.string().trim().max(100).optional().nullable(),
+  industry: z.string().trim().max(100).optional().nullable(),
+  linkedinUrl: z.string().trim().url().optional().nullable(),
+  mentorshipAvailable: z.boolean().default(false),
+});
+
+export const updateAlumniProfileSchema = z.object({
+  higherEducation: z.string().trim().max(200).optional().nullable(),
+  currentOrganization: z.string().trim().max(200).optional().nullable(),
+  designation: z.string().trim().max(100).optional().nullable(),
+  industry: z.string().trim().max(100).optional().nullable(),
+  linkedinUrl: z.string().trim().url().optional().nullable(),
+  mentorshipAvailable: z.boolean().optional(),
+  verificationStatus: z.enum(['pending', 'verified', 'rejected']).optional(),
+});
+
+export const createTranscriptRequestSchema = z.object({
+  alumniId: z.uuid(),
+  documentType: z.enum(['transcript', 'migration_certificate', 'recommendation_letter', 'duplicate_grade_sheet']).default('transcript'),
+  copies: z.number().int().min(1).max(10).default(1),
+  deliveryMode: z.enum(['digital', 'postal']).default('digital'),
+  shippingAddress: z.string().trim().max(300).optional().nullable(),
+  notes: z.string().trim().max(500).optional().nullable(),
+});
+
+export const updateTranscriptRequestStatusSchema = z.object({
+  status: z.enum(['submitted', 'processing', 'ready', 'dispatched', 'rejected']),
+  feePaid: z.boolean().optional(),
+  issuedDocumentKey: z.string().trim().max(255).optional().nullable(),
+  notes: z.string().trim().max(500).optional().nullable(),
+});
+

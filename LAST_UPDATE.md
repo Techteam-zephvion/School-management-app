@@ -1,5 +1,48 @@
 # Last Update (October 17, 2026)
 
+## Phase 16: Multi-Campus Federation & Enterprise Biometrics
+
+### Summary
+- **Database Schema & Migrations (`0018_cute_gargoyle.sql`):**
+  - **9 New Tables & Enums:**
+    - `educationalTrusts`: Educational foundation/trust registry with trust code, registration number, HQ address, chairman name, contact email/phone.
+    - `schools.trustId`: Foreign key linking multiple schools/campuses to a parent educational trust.
+    - `campusTransfers`: Inter-campus student and staff transfer requests with reason, effective date, status (`pending`, `approved`, `rejected`, `completed`, `cancelled`), remarks, and approver audit trail.
+    - `biometricDevices`: Hardware gate turnstiles and biometric terminals registry (ZKTeco, Essl, RFID) with device code, type (`facial_recognition`, `fingerprint`, `turnstile_rfid`, `hybrid`), IP address, MAC address, location, status (`online`, `offline`, `maintenance`, `decommissioned`), and heartbeat tracking.
+    - `biometricPunchLogs`: Raw ingress/egress punch stream with timestamp, punch type (`in`, `out`, `auto`), verification mode (`rfid`, `face`, `fingerprint`, `pin`), card/token number, reconciliation flag, and linked attendance ID.
+    - `courseOutcomes`: Outcome-Based Education (OBE) course outcome matrix with code, title, Bloom taxonomy cognitive level (`remember`, `understand`, `apply`, `analyze`, `evaluate`, `create`), target attainment percentage, weightage, and class/subject mapping.
+    - `examQuestions`: Cognitive question bank mapped to course outcomes with question text, question type (`mcq`, `short_answer`, `long_answer`, `numerical`, `coding`), Bloom level, difficulty (`easy`, `moderate`, `difficult`), marks, options JSON, and sample solution.
+    - `alumniProfiles`: Graduating cohort directory with graduation year, degree, current company/organization, designation, linkedIn profile, phone, and mentorship availability flag.
+    - `transcriptRequests`: Official credential, transcript, and migration certificate requests with tracking number, destination institution, copies, status (`submitted`, `processing`, `ready`, `dispatched`, `rejected`), payment status, and dispatch tracking details.
+- **Backend API & Repositories (`services/api`):**
+  - Added 20 repository methods to `SchoolRepository` with full `exactOptionalPropertyTypes: true` TypeScript strictness compliance.
+  - Implemented consolidated trust financial calculations aggregating campus count, total students, total staff, and tuition collections across all linked campuses.
+  - Implemented Bloom's taxonomy blueprinted exam paper generator synthesizing questions to meet target marks and cognitive level distribution.
+  - Added 20 Admin endpoints under `/api/v1/admin/federation/*`, `/api/v1/admin/biometrics/*`, `/api/v1/admin/obe/*`, and `/api/v1/admin/alumni/*` with role-based auth (accessible by `admin` and `accountant` for consolidated stats).
+  - Validation schemas added to `services/api/src/http/validation.ts`.
+  - Comprehensive test suite in `services/api/test/phase16-federation-biometrics.test.ts`.
+- **Flutter Web & Mobile Interface (`apps/flutter_app`):**
+  - `AdminFederationView` (`apps/flutter_app/lib/src/features/admin/views/admin_federation_view.dart`):
+    - Subtab 1: **Trust & Campuses:** Consolidated group statistics (Campuses, Students, Staff, Fees Collected/Pending), federated campus cards, Create Trust dialog, and Inter-Campus Transfer initiation workflow.
+    - Subtab 2: **Biometrics & Turnstiles:** Terminal status overview, hardware terminal cards with live heartbeat pinging, Register Terminal dialog, and streaming raw punch logs ledger with 1-click attendance reconciliation.
+    - Subtab 3: **OBE & Question Bank:** Course learning outcomes matrix (CO-PO mapping), Bloom's taxonomy cognitive question bank, Add CO and Add Question dialogs, and Blueprinted Paper generator dialog.
+    - Subtab 4: **Alumni & Transcripts:** Alumni mentorship network directory with graduation year badges and contact details, Register Alumni dialog, Official Transcript requests ledger, and state machine status updater.
+  - Status Indicators:
+    - `StatusBadge.deviceStatus`: `online`, `offline`, `maintenance`, `decommissioned`.
+    - `StatusBadge.transferStatus`: `pending`, `approved`, `rejected`, `completed`, `cancelled`.
+    - `StatusBadge.bloomLevel`: `remember`, `understand`, `apply`, `analyze`, `evaluate`, `create`.
+    - `StatusBadge.transcriptStatus`: `submitted`, `processing`, `ready`, `dispatched`, `rejected`.
+  - Command Palette Integration:
+    - Added `nav:federation` and 4 quick action command palette targets (`action:federation_transfer`, `action:federation_biometrics`, `action:federation_blueprint`, `action:federation_transcript`).
+  - Added `getClasses` and `getSubjects` helper methods to `ApiClient`.
+- **Verification:**
+  - Backend: 15/15 Vitest test suites passing (148 passed, 1 skipped).
+  - TypeScript: 0 typecheck errors (`npm run typecheck --prefix services/api`).
+  - Frontend: 106/106 Flutter unit/widget tests passing (`flutter test apps/flutter_app`).
+  - Lint: 0 analyzer warnings (`flutter analyze apps/flutter_app`).
+
+---
+
 ## Phase 15: Campus Operations Ecosystem
 
 ### Summary

@@ -176,6 +176,14 @@ class _CommandPaletteDialogState extends State<CommandPaletteDialog> {
         shortcut: 'G C',
         onSelect: () => widget.onActionSelected?.call('nav:campus'),
       ),
+      CommandItem(
+        title: 'Multi-Campus Federation & Biometrics',
+        subtitle: 'Trust hierarchy, turnstile biometrics, OBE curriculum, and alumni network',
+        category: 'Navigation',
+        icon: Icons.hub_outlined,
+        shortcut: 'G M',
+        onSelect: () => widget.onActionSelected?.call('nav:federation'),
+      ),
 
       // Campus Operations Quick Actions
       CommandItem(
@@ -212,6 +220,36 @@ class _CommandPaletteDialogState extends State<CommandPaletteDialog> {
         category: 'Campus Operations',
         icon: Icons.medical_services_outlined,
         onSelect: () => widget.onActionSelected?.call('action:campus_health'),
+      ),
+
+      // Federation & Biometrics Quick Actions
+      CommandItem(
+        title: 'Initiate Inter-Campus Transfer',
+        subtitle: 'Transfer students or staff across educational trust branch campuses',
+        category: 'Federation & Biometrics',
+        icon: Icons.swap_horiz_rounded,
+        onSelect: () => widget.onActionSelected?.call('action:federation_transfer'),
+      ),
+      CommandItem(
+        title: 'Sync Biometric Gate Attendance',
+        subtitle: 'Ingest raw turnstile punches and reconcile daily student/staff attendance',
+        category: 'Federation & Biometrics',
+        icon: Icons.fingerprint_rounded,
+        onSelect: () => widget.onActionSelected?.call('action:federation_biometrics'),
+      ),
+      CommandItem(
+        title: "Generate Bloom's Blueprint Paper",
+        subtitle: 'Synthesize balanced exam paper according to target marks and cognitive levels',
+        category: 'Federation & Biometrics',
+        icon: Icons.auto_awesome_motion_rounded,
+        onSelect: () => widget.onActionSelected?.call('action:federation_blueprint'),
+      ),
+      CommandItem(
+        title: 'Process Alumni Transcript Request',
+        subtitle: 'Review, seal, and dispatch official academic transcripts and credentials',
+        category: 'Federation & Biometrics',
+        icon: Icons.school_outlined,
+        onSelect: () => widget.onActionSelected?.call('action:federation_transcript'),
       ),
 
       // Quick Actions

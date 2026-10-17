@@ -222,14 +222,88 @@ export const visitorGatePassStatusEnum = pgEnum('visitor_gate_pass_status', [
   'checked_out',
 ]);
 
+export const campusTransferStatusEnum = pgEnum('campus_transfer_status', [
+  'pending',
+  'approved',
+  'rejected',
+  'completed',
+]);
+
+export const biometricDeviceTypeEnum = pgEnum('biometric_device_type', [
+  'fingerprint',
+  'facial_recognition',
+  'rfid_card',
+  'turnstile',
+]);
+
+export const biometricDeviceStatusEnum = pgEnum('biometric_device_status', [
+  'online',
+  'offline',
+  'maintenance',
+]);
+
+export const biometricPunchTypeEnum = pgEnum('biometric_punch_type', [
+  'in',
+  'out',
+  'auto',
+]);
+
+export const biometricPunchStatusEnum = pgEnum('biometric_punch_status', [
+  'pending',
+  'reconciled',
+  'ignored',
+  'error',
+]);
+
+export const bloomLevelEnum = pgEnum('bloom_level', [
+  'remember',
+  'understand',
+  'apply',
+  'analyze',
+  'evaluate',
+  'create',
+]);
+
+export const questionTypeEnum = pgEnum('question_type', [
+  'mcq',
+  'short_answer',
+  'long_answer',
+  'numerical',
+]);
+
+export const alumniVerificationStatusEnum = pgEnum('alumni_verification_status', [
+  'pending',
+  'verified',
+  'rejected',
+]);
+
+export const transcriptRequestStatusEnum = pgEnum('transcript_request_status', [
+  'submitted',
+  'processing',
+  'ready',
+  'dispatched',
+  'rejected',
+]);
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 };
 
+export const educationalTrusts = pgTable('educational_trusts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  code: text('code').notNull().unique(),
+  registrationNumber: text('registration_number'),
+  address: text('address'),
+  contactEmail: text('contact_email'),
+  contactPhone: text('contact_phone'),
+  ...timestamps,
+});
+
 export const schools = pgTable('schools', {
   id: uuid('id').primaryKey().defaultRandom(),
+  trustId: uuid('trust_id').references(() => educationalTrusts.id, { onDelete: 'set null' }),
   name: text('name').notNull(),
   code: text('code').notNull().unique(),
   ...timestamps,
@@ -1685,6 +1759,155 @@ export const infirmaryVisits = pgTable(
   ],
 );
 
+export const campusTransfers = pgTable(
+  'campus_transfers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    trustId: uuid('trust_id').notNull().references(() => educationalTrusts.id, { onDelete: 'cascade' }),
+    sourceSchoolId: uuid('source_school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    targetSchoolId: uuid('target_school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    entityType: text('entity_type').default('student').notNull(), // 'student', 'staff'
+    studentId: uuid('student_id').references(() => students.id, { onDelete: 'cascade' }),
+    staffId: uuid('staff_id').references(() => staff.id, { onDelete: 'cascade' }),
+    targetClassId: uuid('target_class_id').references(() => classes.id, { onDelete: 'set null' }),
+    reason: text('reason').notNull(),
+    status: campusTransferStatusEnum('status').default('pending').notNull(),
+    transferDate: date('transfer_date'),
+    remarks: text('remarks'),
+    approvedByUserId: uuid('approved_by_user_id').references(() => appUsers.id, { onDelete: 'set null' }),
+    ...timestamps,
+  },
+  (table) => [
+    index('transfers_trust_status_idx').on(table.trustId, table.status),
+    index('transfers_source_target_idx').on(table.sourceSchoolId, table.targetSchoolId),
+  ],
+);
 
+export const biometricDevices = pgTable(
+  'biometric_devices',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    deviceCode: text('device_code').notNull(),
+    deviceType: biometricDeviceTypeEnum('device_type').default('facial_recognition').notNull(),
+    ipAddress: text('ip_address'),
+    macAddress: text('mac_address'),
+    serialNumber: text('serial_number'),
+    location: text('location').notNull(),
+    status: biometricDeviceStatusEnum('status').default('offline').notNull(),
+    lastHeartbeatAt: timestamp('last_heartbeat_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.schoolId, table.deviceCode),
+    index('biometric_devices_school_status_idx').on(table.schoolId, table.status),
+  ],
+);
 
+export const biometricPunchLogs = pgTable(
+  'biometric_punch_logs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    deviceId: uuid('device_id').notNull().references(() => biometricDevices.id, { onDelete: 'cascade' }),
+    userType: text('user_type').default('student').notNull(), // 'student', 'staff'
+    studentId: uuid('student_id').references(() => students.id, { onDelete: 'cascade' }),
+    staffId: uuid('staff_id').references(() => staff.id, { onDelete: 'cascade' }),
+    cardOrTokenNumber: text('card_or_token_number').notNull(),
+    punchTimestamp: timestamp('punch_timestamp', { withTimezone: true }).notNull(),
+    punchType: biometricPunchTypeEnum('punch_type').default('auto').notNull(),
+    status: biometricPunchStatusEnum('status').default('pending').notNull(),
+    rawPayload: text('raw_payload'),
+    ...timestamps,
+  },
+  (table) => [
+    index('punch_logs_school_time_idx').on(table.schoolId, table.punchTimestamp, table.status),
+  ],
+);
 
+export const courseOutcomes = pgTable(
+  'course_outcomes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    classId: uuid('class_id').notNull().references(() => classes.id, { onDelete: 'cascade' }),
+    subjectId: uuid('subject_id').notNull().references(() => subjects.id, { onDelete: 'cascade' }),
+    code: text('code').notNull(), // e.g. "CO1", "CO2"
+    description: text('description').notNull(),
+    targetAttainmentPercent: integer('target_attainment_percent').default(70).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.schoolId, table.classId, table.subjectId, table.code),
+    index('course_outcomes_school_idx').on(table.schoolId, table.classId, table.subjectId),
+  ],
+);
+
+export const examQuestions = pgTable(
+  'exam_questions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    classId: uuid('class_id').notNull().references(() => classes.id, { onDelete: 'cascade' }),
+    subjectId: uuid('subject_id').notNull().references(() => subjects.id, { onDelete: 'cascade' }),
+    courseOutcomeId: uuid('course_outcome_id').references(() => courseOutcomes.id, { onDelete: 'set null' }),
+    questionText: text('question_text').notNull(),
+    questionType: questionTypeEnum('question_type').default('short_answer').notNull(),
+    bloomLevel: bloomLevelEnum('bloom_level').default('understand').notNull(),
+    marks: integer('marks').default(2).notNull(),
+    options: text('options'), // JSON string array of options for MCQ
+    answerKey: text('answer_key'),
+    rubrics: text('rubrics'),
+    ...timestamps,
+  },
+  (table) => [
+    index('exam_questions_school_subject_idx').on(table.schoolId, table.classId, table.subjectId, table.bloomLevel),
+  ],
+);
+
+export const alumniProfiles = pgTable(
+  'alumni_profiles',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    studentId: uuid('student_id').references(() => students.id, { onDelete: 'set null' }),
+    fullName: text('full_name').notNull(),
+    email: text('email').notNull(),
+    phone: text('phone'),
+    graduationYear: integer('graduation_year').notNull(),
+    higherEducation: text('higher_education'),
+    currentOrganization: text('current_organization'),
+    designation: text('designation'),
+    industry: text('industry'),
+    linkedinUrl: text('linkedin_url'),
+    mentorshipAvailable: boolean('mentorship_available').default(false).notNull(),
+    verificationStatus: alumniVerificationStatusEnum('verification_status').default('pending').notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index('alumni_school_year_idx').on(table.schoolId, table.graduationYear, table.verificationStatus),
+  ],
+);
+
+export const transcriptRequests = pgTable(
+  'transcript_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    alumniId: uuid('alumni_id').notNull().references(() => alumniProfiles.id, { onDelete: 'cascade' }),
+    requestNumber: text('request_number').notNull(),
+    documentType: text('document_type').notNull(), // 'transcript', 'migration_certificate', 'recommendation_letter', 'duplicate_grade_sheet'
+    copies: integer('copies').default(1).notNull(),
+    deliveryMode: text('delivery_mode').default('digital').notNull(), // 'digital', 'postal'
+    shippingAddress: text('shipping_address'),
+    status: transcriptRequestStatusEnum('status').default('submitted').notNull(),
+    feePaid: boolean('fee_paid').default(false).notNull(),
+    issuedDocumentKey: text('issued_document_key'),
+    notes: text('notes'),
+    ...timestamps,
+  },
+  (table) => [
+    index('transcripts_school_status_idx').on(table.schoolId, table.status, table.requestNumber),
+  ],
+);

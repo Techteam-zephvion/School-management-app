@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, lte, ne, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import {
   academicYears,
@@ -73,6 +73,14 @@ import {
   visitorGatePasses,
   studentHealthProfiles,
   infirmaryVisits,
+  educationalTrusts,
+  campusTransfers,
+  biometricDevices,
+  biometricPunchLogs,
+  courseOutcomes,
+  examQuestions,
+  alumniProfiles,
+  transcriptRequests,
 } from '../db/schema';
 
 import { BulkImporter } from '../importers/bulk-importer';
@@ -168,6 +176,21 @@ import type {
   createVisitorGatePassSchema,
   upsertStudentHealthProfileSchema,
   recordInfirmaryVisitSchema,
+  createTrustSchema,
+  linkSchoolToTrustSchema,
+  createCampusTransferSchema,
+  updateCampusTransferStatusSchema,
+  registerBiometricDeviceSchema,
+  deviceHeartbeatSchema,
+  ingestBiometricPunchesSchema,
+  reconcileBiometricPunchesSchema,
+  createCourseOutcomeSchema,
+  createExamQuestionSchema,
+  generateBlueprintedPaperSchema,
+  createAlumniProfileSchema,
+  updateAlumniProfileSchema,
+  createTranscriptRequestSchema,
+  updateTranscriptRequestStatusSchema,
 } from '../http/validation';
 
 import type { z } from 'zod';
@@ -8185,6 +8208,634 @@ export function createSchoolRepository(db: Db) {
         .returning();
 
       return visit;
+    },
+
+    // ==========================================
+    // Phase 16: Multi-Campus Federation
+    // ==========================================
+    async listEducationalTrusts(user: AuthUser) {
+      const allTrusts = await db.select().from(educationalTrusts);
+      return allTrusts;
+    },
+
+    async createEducationalTrust(user: AuthUser, input: z.infer<typeof createTrustSchema>) {
+      const [trust] = await db
+        .insert(educationalTrusts)
+        .values({
+          name: input.name,
+          code: input.code,
+          registrationNumber: input.registrationNumber ?? null,
+          address: input.address ?? null,
+          contactEmail: input.contactEmail ?? null,
+          contactPhone: input.contactPhone ?? null,
+        })
+        .returning();
+
+      if (!trust) {
+        throw new ApiError(500, 'Failed to create educational trust');
+      }
+
+      // Automatically link creating school if not linked to a trust
+      await db
+        .update(schools)
+        .set({ trustId: trust.id })
+        .where(eq(schools.id, user.schoolId));
+
+      return trust;
+    },
+
+    async linkSchoolToTrust(user: AuthUser, input: z.infer<typeof linkSchoolToTrustSchema>) {
+      const targetSchoolId = input.schoolId ?? user.schoolId;
+      const [updated] = await db
+        .update(schools)
+        .set({ trustId: input.trustId })
+        .where(eq(schools.id, targetSchoolId))
+        .returning();
+      if (!updated) {
+        throw new ApiError(404, 'School not found');
+      }
+      return updated;
+    },
+
+    async getTrustCampuses(user: AuthUser, trustId: string) {
+      const campuses = await db
+        .select()
+        .from(schools)
+        .where(eq(schools.trustId, trustId));
+
+      const results = [];
+      for (const campus of campuses) {
+        const [studentCountResult] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(students)
+          .where(eq(students.schoolId, campus.id));
+
+        const [staffCountResult] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(staff)
+          .where(eq(staff.schoolId, campus.id));
+
+        results.push({
+          ...campus,
+          studentCount: studentCountResult?.count ?? 0,
+          staffCount: staffCountResult?.count ?? 0,
+        });
+      }
+      return results;
+    },
+
+    async getTrustConsolidatedStats(user: AuthUser, trustId: string) {
+      const campuses = await db
+        .select()
+        .from(schools)
+        .where(eq(schools.trustId, trustId));
+
+      let totalCampuses = campuses.length;
+      let totalStudents = 0;
+      let totalStaff = 0;
+      let totalFeesCollected = 0;
+      let totalFeesPending = 0;
+
+      for (const campus of campuses) {
+        const [studentCountResult] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(students)
+          .where(eq(students.schoolId, campus.id));
+
+        const [staffCountResult] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(staff)
+          .where(eq(staff.schoolId, campus.id));
+
+        const [feeCollectedResult] = await db
+          .select({ total: sql<number>`coalesce(sum(${feePayments.amountPaid}), 0)::int` })
+          .from(feePayments)
+          .where(eq(feePayments.schoolId, campus.id));
+
+        const [feePendingResult] = await db
+          .select({ total: sql<number>`coalesce(sum(${studentFeeAllocations.amount}), 0)::int` })
+          .from(studentFeeAllocations)
+          .where(and(eq(studentFeeAllocations.schoolId, campus.id), ne(studentFeeAllocations.status, 'paid')));
+
+        totalStudents += studentCountResult?.count ?? 0;
+        totalStaff += staffCountResult?.count ?? 0;
+        totalFeesCollected += feeCollectedResult?.total ?? 0;
+        totalFeesPending += feePendingResult?.total ?? 0;
+      }
+
+      return {
+        trustId,
+        totalCampuses,
+        totalStudents,
+        totalStaff,
+        totalFeesCollected,
+        totalFeesPending,
+      };
+    },
+
+    async listCampusTransfers(user: AuthUser, trustId?: string) {
+      const [currentSchool] = await db
+        .select()
+        .from(schools)
+        .where(eq(schools.id, user.schoolId));
+      const targetTrustId = trustId ?? currentSchool?.trustId;
+
+      const query = db
+        .select({
+          id: campusTransfers.id,
+          trustId: campusTransfers.trustId,
+          sourceSchoolId: campusTransfers.sourceSchoolId,
+          targetSchoolId: campusTransfers.targetSchoolId,
+          entityType: campusTransfers.entityType,
+          studentId: campusTransfers.studentId,
+          staffId: campusTransfers.staffId,
+          targetClassId: campusTransfers.targetClassId,
+          reason: campusTransfers.reason,
+          status: campusTransfers.status,
+          transferDate: campusTransfers.transferDate,
+          remarks: campusTransfers.remarks,
+          createdAt: campusTransfers.createdAt,
+        })
+        .from(campusTransfers);
+
+      if (targetTrustId) {
+        return query.where(eq(campusTransfers.trustId, targetTrustId)).orderBy(desc(campusTransfers.createdAt));
+      }
+      return query.where(
+        or(eq(campusTransfers.sourceSchoolId, user.schoolId), eq(campusTransfers.targetSchoolId, user.schoolId)),
+      ).orderBy(desc(campusTransfers.createdAt));
+    },
+
+    async createCampusTransfer(user: AuthUser, input: z.infer<typeof createCampusTransferSchema>) {
+      const [created] = await db
+        .insert(campusTransfers)
+        .values({
+          trustId: input.trustId,
+          sourceSchoolId: user.schoolId,
+          targetSchoolId: input.targetSchoolId,
+          entityType: input.entityType,
+          studentId: input.studentId ?? null,
+          staffId: input.staffId ?? null,
+          targetClassId: input.targetClassId ?? null,
+          reason: input.reason,
+          transferDate: input.transferDate ? String(input.transferDate) : null,
+          remarks: input.remarks ?? null,
+          status: 'pending',
+        })
+        .returning();
+
+      return created;
+    },
+
+    async updateCampusTransferStatus(user: AuthUser, transferId: string, input: z.infer<typeof updateCampusTransferStatusSchema>) {
+      const [updated] = await db
+        .update(campusTransfers)
+        .set({
+          status: input.status,
+          remarks: input.remarks ?? null,
+          approvedByUserId: user.appUserId,
+        })
+        .where(eq(campusTransfers.id, transferId))
+        .returning();
+
+      if (!updated) {
+        throw new ApiError(404, 'Campus transfer request not found');
+      }
+
+      // If completed, update student or staff schoolId
+      if (input.status === 'completed') {
+        if (updated.entityType === 'student' && updated.studentId) {
+          await db
+            .update(students)
+            .set({ schoolId: updated.targetSchoolId })
+            .where(eq(students.id, updated.studentId));
+        } else if (updated.entityType === 'staff' && updated.staffId) {
+          await db
+            .update(staff)
+            .set({ schoolId: updated.targetSchoolId })
+            .where(eq(staff.id, updated.staffId));
+        }
+      }
+
+      return updated;
+    },
+
+    // ==========================================
+    // Phase 16: Biometric Turnstiles & Devices
+    // ==========================================
+    async listBiometricDevices(user: AuthUser) {
+      return db
+        .select()
+        .from(biometricDevices)
+        .where(eq(biometricDevices.schoolId, user.schoolId))
+        .orderBy(desc(biometricDevices.createdAt));
+    },
+
+    async registerBiometricDevice(user: AuthUser, input: z.infer<typeof registerBiometricDeviceSchema>) {
+      const [device] = await db
+        .insert(biometricDevices)
+        .values({
+          schoolId: user.schoolId,
+          name: input.name,
+          deviceCode: input.deviceCode,
+          deviceType: input.deviceType,
+          ipAddress: input.ipAddress ?? null,
+          macAddress: input.macAddress ?? null,
+          serialNumber: input.serialNumber ?? null,
+          location: input.location,
+          status: input.status,
+          lastHeartbeatAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: [biometricDevices.schoolId, biometricDevices.deviceCode],
+          set: {
+            name: input.name,
+            deviceType: input.deviceType,
+            location: input.location,
+            status: input.status,
+            ipAddress: input.ipAddress ?? null,
+            lastHeartbeatAt: new Date(),
+          },
+        })
+        .returning();
+
+      return device;
+    },
+
+    async recordDeviceHeartbeat(user: AuthUser, deviceId: string, input: z.infer<typeof deviceHeartbeatSchema>) {
+      const [updated] = await db
+        .update(biometricDevices)
+        .set({
+          status: input.status,
+          lastHeartbeatAt: new Date(),
+          ...(input.ipAddress ? { ipAddress: input.ipAddress } : {}),
+        })
+        .where(and(eq(biometricDevices.id, deviceId), eq(biometricDevices.schoolId, user.schoolId)))
+        .returning();
+
+      if (!updated) {
+        throw new ApiError(404, 'Biometric device not found');
+      }
+      return updated;
+    },
+
+    async ingestBiometricPunches(user: AuthUser, input: z.infer<typeof ingestBiometricPunchesSchema>) {
+      const rows = input.punches.map((p) => ({
+        schoolId: user.schoolId,
+        deviceId: input.deviceId,
+        userType: p.userType,
+        studentId: p.studentId ?? null,
+        staffId: p.staffId ?? null,
+        cardOrTokenNumber: p.cardOrTokenNumber,
+        punchTimestamp: new Date(p.punchTimestamp),
+        punchType: p.punchType,
+        rawPayload: p.rawPayload ?? null,
+        status: 'pending' as const,
+      }));
+
+      const inserted = await db.insert(biometricPunchLogs).values(rows).returning();
+      return inserted;
+    },
+
+    async listBiometricPunches(user: AuthUser, limit: number = 100) {
+      return db
+        .select({
+          id: biometricPunchLogs.id,
+          deviceId: biometricPunchLogs.deviceId,
+          deviceName: biometricDevices.name,
+          deviceLocation: biometricDevices.location,
+          userType: biometricPunchLogs.userType,
+          studentId: biometricPunchLogs.studentId,
+          staffId: biometricPunchLogs.staffId,
+          cardOrTokenNumber: biometricPunchLogs.cardOrTokenNumber,
+          punchTimestamp: biometricPunchLogs.punchTimestamp,
+          punchType: biometricPunchLogs.punchType,
+          status: biometricPunchLogs.status,
+          createdAt: biometricPunchLogs.createdAt,
+        })
+        .from(biometricPunchLogs)
+        .innerJoin(biometricDevices, eq(biometricPunchLogs.deviceId, biometricDevices.id))
+        .where(eq(biometricPunchLogs.schoolId, user.schoolId))
+        .orderBy(desc(biometricPunchLogs.punchTimestamp))
+        .limit(limit);
+    },
+
+    async reconcileBiometricPunches(user: AuthUser, input: z.infer<typeof reconcileBiometricPunchesSchema>) {
+      const pendingPunches = await db
+        .select()
+        .from(biometricPunchLogs)
+        .where(and(eq(biometricPunchLogs.schoolId, user.schoolId), eq(biometricPunchLogs.status, 'pending')));
+
+      let reconciledCount = 0;
+      let ignoredCount = 0;
+
+      for (const punch of pendingPunches) {
+        const [matchedStudent] = await db
+          .select({
+            id: students.id,
+            sectionId: studentEnrollments.sectionId,
+            classId: studentEnrollments.classId,
+          })
+          .from(students)
+          .leftJoin(studentEnrollments, eq(studentEnrollments.studentId, students.id))
+          .where(
+            and(
+              eq(students.schoolId, user.schoolId),
+              or(eq(students.admissionNumber, punch.cardOrTokenNumber), eq(students.id, punch.cardOrTokenNumber)),
+            ),
+          )
+          .limit(1);
+
+        if (matchedStudent && matchedStudent.sectionId) {
+          reconciledCount++;
+          await db
+            .update(biometricPunchLogs)
+            .set({ status: 'reconciled', studentId: matchedStudent.id })
+            .where(eq(biometricPunchLogs.id, punch.id));
+        } else {
+          ignoredCount++;
+          await db
+            .update(biometricPunchLogs)
+            .set({ status: 'ignored' })
+            .where(eq(biometricPunchLogs.id, punch.id));
+        }
+      }
+
+      return {
+        totalProcessed: pendingPunches.length,
+        reconciledCount,
+        ignoredCount,
+      };
+    },
+
+    // ==========================================
+    // Phase 16: Outcome-Based Education (OBE)
+    // ==========================================
+    async listCourseOutcomes(user: AuthUser, classId?: string, subjectId?: string) {
+      const conditions = [eq(courseOutcomes.schoolId, user.schoolId)];
+      if (classId) conditions.push(eq(courseOutcomes.classId, classId));
+      if (subjectId) conditions.push(eq(courseOutcomes.subjectId, subjectId));
+
+      return db
+        .select({
+          id: courseOutcomes.id,
+          classId: courseOutcomes.classId,
+          className: classes.name,
+          subjectId: courseOutcomes.subjectId,
+          subjectName: subjects.name,
+          code: courseOutcomes.code,
+          description: courseOutcomes.description,
+          targetAttainmentPercent: courseOutcomes.targetAttainmentPercent,
+          createdAt: courseOutcomes.createdAt,
+        })
+        .from(courseOutcomes)
+        .innerJoin(classes, eq(courseOutcomes.classId, classes.id))
+        .innerJoin(subjects, eq(courseOutcomes.subjectId, subjects.id))
+        .where(and(...conditions))
+        .orderBy(classes.name, courseOutcomes.code);
+    },
+
+    async createCourseOutcome(user: AuthUser, input: z.infer<typeof createCourseOutcomeSchema>) {
+      const [outcome] = await db
+        .insert(courseOutcomes)
+        .values({
+          schoolId: user.schoolId,
+          classId: input.classId,
+          subjectId: input.subjectId,
+          code: input.code,
+          description: input.description,
+          targetAttainmentPercent: input.targetAttainmentPercent,
+        })
+        .returning();
+
+      return outcome;
+    },
+
+    async listExamQuestions(user: AuthUser, filters?: { classId?: string | undefined; subjectId?: string | undefined; bloomLevel?: string | undefined }) {
+      const conditions = [eq(examQuestions.schoolId, user.schoolId)];
+      if (filters?.classId) conditions.push(eq(examQuestions.classId, filters.classId));
+      if (filters?.subjectId) conditions.push(eq(examQuestions.subjectId, filters.subjectId));
+      if (filters?.bloomLevel) conditions.push(eq(examQuestions.bloomLevel, filters.bloomLevel as any));
+
+      return db
+        .select({
+          id: examQuestions.id,
+          classId: examQuestions.classId,
+          className: classes.name,
+          subjectId: examQuestions.subjectId,
+          subjectName: subjects.name,
+          courseOutcomeId: examQuestions.courseOutcomeId,
+          courseOutcomeCode: courseOutcomes.code,
+          questionText: examQuestions.questionText,
+          questionType: examQuestions.questionType,
+          bloomLevel: examQuestions.bloomLevel,
+          marks: examQuestions.marks,
+          options: examQuestions.options,
+          answerKey: examQuestions.answerKey,
+          rubrics: examQuestions.rubrics,
+          createdAt: examQuestions.createdAt,
+        })
+        .from(examQuestions)
+        .innerJoin(classes, eq(examQuestions.classId, classes.id))
+        .innerJoin(subjects, eq(examQuestions.subjectId, subjects.id))
+        .leftJoin(courseOutcomes, eq(examQuestions.courseOutcomeId, courseOutcomes.id))
+        .where(and(...conditions))
+        .orderBy(desc(examQuestions.createdAt));
+    },
+
+    async createExamQuestion(user: AuthUser, input: z.infer<typeof createExamQuestionSchema>) {
+      const [question] = await db
+        .insert(examQuestions)
+        .values({
+          schoolId: user.schoolId,
+          classId: input.classId,
+          subjectId: input.subjectId,
+          courseOutcomeId: input.courseOutcomeId ?? null,
+          questionText: input.questionText,
+          questionType: input.questionType,
+          bloomLevel: input.bloomLevel,
+          marks: input.marks,
+          options: input.options ? JSON.stringify(input.options) : null,
+          answerKey: input.answerKey ?? null,
+          rubrics: input.rubrics ?? null,
+        })
+        .returning();
+
+      return question;
+    },
+
+    async generateBlueprintedPaper(user: AuthUser, input: z.infer<typeof generateBlueprintedPaperSchema>) {
+      const questions = await db
+        .select()
+        .from(examQuestions)
+        .where(
+          and(
+            eq(examQuestions.schoolId, user.schoolId),
+            eq(examQuestions.classId, input.classId),
+            eq(examQuestions.subjectId, input.subjectId),
+          ),
+        );
+
+      if (questions.length === 0) {
+        throw new ApiError(400, 'No questions available in question bank for this class and subject');
+      }
+
+      const selectedQuestions: typeof questions = [];
+      let currentMarks = 0;
+
+      for (const q of questions) {
+        if (currentMarks + q.marks <= input.totalMarks) {
+          selectedQuestions.push(q);
+          currentMarks += q.marks;
+        }
+      }
+
+      if (selectedQuestions.length === 0 && questions.length > 0) {
+        selectedQuestions.push(questions[0]!);
+        currentMarks = questions[0]!.marks;
+      }
+
+      const bloomBreakdown: Record<string, { count: number; marks: number }> = {};
+      for (const q of selectedQuestions) {
+        if (!bloomBreakdown[q.bloomLevel]) {
+          bloomBreakdown[q.bloomLevel] = { count: 0, marks: 0 };
+        }
+        bloomBreakdown[q.bloomLevel]!.count++;
+        bloomBreakdown[q.bloomLevel]!.marks += q.marks;
+      }
+
+      return {
+        classId: input.classId,
+        subjectId: input.subjectId,
+        targetMarks: input.totalMarks,
+        actualMarks: currentMarks,
+        questionCount: selectedQuestions.length,
+        bloomBreakdown,
+        questions: selectedQuestions,
+      };
+    },
+
+    // ==========================================
+    // Phase 16: Alumni Association & Transcripts
+    // ==========================================
+    async listAlumniProfiles(user: AuthUser, options?: { graduationYear?: number | undefined; verifiedOnly?: boolean | undefined }) {
+      const conditions = [eq(alumniProfiles.schoolId, user.schoolId)];
+      if (options?.graduationYear) conditions.push(eq(alumniProfiles.graduationYear, options.graduationYear));
+      if (options?.verifiedOnly) conditions.push(eq(alumniProfiles.verificationStatus, 'verified'));
+
+      return db
+        .select()
+        .from(alumniProfiles)
+        .where(and(...conditions))
+        .orderBy(desc(alumniProfiles.graduationYear), alumniProfiles.fullName);
+    },
+
+    async createAlumniProfile(user: AuthUser, input: z.infer<typeof createAlumniProfileSchema>) {
+      const [profile] = await db
+        .insert(alumniProfiles)
+        .values({
+          schoolId: user.schoolId,
+          studentId: input.studentId ?? null,
+          fullName: input.fullName,
+          email: input.email,
+          phone: input.phone ?? null,
+          graduationYear: input.graduationYear,
+          higherEducation: input.higherEducation ?? null,
+          currentOrganization: input.currentOrganization ?? null,
+          designation: input.designation ?? null,
+          industry: input.industry ?? null,
+          linkedinUrl: input.linkedinUrl ?? null,
+          mentorshipAvailable: input.mentorshipAvailable ?? false,
+          verificationStatus: 'verified',
+        })
+        .returning();
+
+      return profile;
+    },
+
+    async updateAlumniProfile(user: AuthUser, profileId: string, input: z.infer<typeof updateAlumniProfileSchema>) {
+      const [updated] = await db
+        .update(alumniProfiles)
+        .set({
+          ...input,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(alumniProfiles.id, profileId), eq(alumniProfiles.schoolId, user.schoolId)))
+        .returning();
+
+      if (!updated) {
+        throw new ApiError(404, 'Alumni profile not found');
+      }
+      return updated;
+    },
+
+    async listTranscriptRequests(user: AuthUser, status?: string) {
+      const conditions = [eq(transcriptRequests.schoolId, user.schoolId)];
+      if (status) conditions.push(eq(transcriptRequests.status, status as any));
+
+      return db
+        .select({
+          id: transcriptRequests.id,
+          alumniId: transcriptRequests.alumniId,
+          alumniName: alumniProfiles.fullName,
+          alumniEmail: alumniProfiles.email,
+          graduationYear: alumniProfiles.graduationYear,
+          requestNumber: transcriptRequests.requestNumber,
+          documentType: transcriptRequests.documentType,
+          copies: transcriptRequests.copies,
+          deliveryMode: transcriptRequests.deliveryMode,
+          shippingAddress: transcriptRequests.shippingAddress,
+          status: transcriptRequests.status,
+          feePaid: transcriptRequests.feePaid,
+          issuedDocumentKey: transcriptRequests.issuedDocumentKey,
+          notes: transcriptRequests.notes,
+          createdAt: transcriptRequests.createdAt,
+        })
+        .from(transcriptRequests)
+        .innerJoin(alumniProfiles, eq(transcriptRequests.alumniId, alumniProfiles.id))
+        .where(and(...conditions))
+        .orderBy(desc(transcriptRequests.createdAt));
+    },
+
+    async createTranscriptRequest(user: AuthUser, input: z.infer<typeof createTranscriptRequestSchema>) {
+      const requestNumber = `TR-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const [request] = await db
+        .insert(transcriptRequests)
+        .values({
+          schoolId: user.schoolId,
+          alumniId: input.alumniId,
+          requestNumber,
+          documentType: input.documentType,
+          copies: input.copies ?? 1,
+          deliveryMode: input.deliveryMode,
+          shippingAddress: input.shippingAddress ?? null,
+          notes: input.notes ?? null,
+          status: 'submitted',
+          feePaid: false,
+        })
+        .returning();
+
+      return request;
+    },
+
+    async updateTranscriptRequestStatus(user: AuthUser, requestId: string, input: z.infer<typeof updateTranscriptRequestStatusSchema>) {
+      const [updated] = await db
+        .update(transcriptRequests)
+        .set({
+          status: input.status,
+          ...(input.feePaid !== undefined ? { feePaid: input.feePaid } : {}),
+          ...(input.issuedDocumentKey !== undefined ? { issuedDocumentKey: input.issuedDocumentKey } : {}),
+          ...(input.notes !== undefined ? { notes: input.notes } : {}),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(transcriptRequests.id, requestId), eq(transcriptRequests.schoolId, user.schoolId)))
+        .returning();
+
+      if (!updated) {
+        throw new ApiError(404, 'Transcript request not found');
+      }
+      return updated;
     },
   };
 }

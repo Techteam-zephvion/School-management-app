@@ -37,6 +37,7 @@ import 'views/admin_communications_view.dart';
 import 'views/admin_compliance_view.dart';
 import 'views/admin_operations_view.dart';
 import 'views/admin_campus_view.dart';
+import 'views/admin_federation_view.dart';
 
 enum AdminNavSection {
   overview,
@@ -47,6 +48,7 @@ enum AdminNavSection {
   admissions,
   operations,
   campus,
+  federation,
   students,
   staff,
   classesAndSubjects,
@@ -504,6 +506,12 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
                     AdminNavSection.campus,
                     Icons.domain_rounded,
                     'Campus ERP',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
+                    AdminNavSection.federation,
+                    Icons.hub_outlined,
+                    'Federation & Biometrics',
                     isDrawer: isDrawer,
                   ),
                   _sidebarItem(
@@ -983,6 +991,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
         return 'School Operations';
       case AdminNavSection.campus:
         return 'Campus Operations';
+      case AdminNavSection.federation:
+        return 'Multi-Campus Federation & Biometrics';
       case AdminNavSection.students:
         return 'Students';
       case AdminNavSection.staff:
@@ -1156,6 +1166,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
           students: _students,
           staff: _staff,
         );
+      case AdminNavSection.federation:
+        return const AdminFederationView();
       case AdminNavSection.communications:
         return AdminCommunicationsView(
           years: _years,
@@ -1205,6 +1217,9 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
         case 'campus':
           setState(() => _activeSection = AdminNavSection.campus);
           break;
+        case 'federation':
+          setState(() => _activeSection = AdminNavSection.federation);
+          break;
         case 'compliance':
           setState(() => _activeSection = AdminNavSection.compliance);
           break;
@@ -1216,6 +1231,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
       setState(() => _activeSection = AdminNavSection.insights);
     } else if (action.startsWith('action:campus_')) {
       setState(() => _activeSection = AdminNavSection.campus);
+    } else if (action.startsWith('action:federation_')) {
+      setState(() => _activeSection = AdminNavSection.federation);
     } else if (action == 'action:shortcuts') {
       ShortcutsDialog.show(context);
     } else if (action == 'action:new_announcement') {

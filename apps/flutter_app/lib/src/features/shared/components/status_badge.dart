@@ -149,6 +149,127 @@ class StatusBadge extends StatelessWidget {
     }
   }
 
+  factory StatusBadge.deviceStatus(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'online':
+        return const StatusBadge(
+          label: 'ONLINE',
+          tone: BadgeTone.success,
+          icon: Icons.wifi_rounded,
+        );
+      case 'maintenance':
+        return const StatusBadge(
+          label: 'MAINTENANCE',
+          tone: BadgeTone.warning,
+          icon: Icons.build_circle_outlined,
+        );
+      case 'decommissioned':
+        return const StatusBadge(
+          label: 'DECOMMISSIONED',
+          tone: BadgeTone.neutral,
+          icon: Icons.do_not_disturb_on_outlined,
+        );
+      case 'offline':
+      default:
+        return const StatusBadge(
+          label: 'OFFLINE',
+          tone: BadgeTone.error,
+          icon: Icons.wifi_off_rounded,
+        );
+    }
+  }
+
+  factory StatusBadge.transferStatus(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'completed':
+        return const StatusBadge(
+          label: 'COMPLETED',
+          tone: BadgeTone.success,
+          icon: Icons.check_circle_rounded,
+        );
+      case 'approved':
+        return const StatusBadge(
+          label: 'APPROVED',
+          tone: BadgeTone.info,
+          icon: Icons.thumb_up_alt_outlined,
+        );
+      case 'rejected':
+        return const StatusBadge(
+          label: 'REJECTED',
+          tone: BadgeTone.error,
+          icon: Icons.cancel_outlined,
+        );
+      case 'cancelled':
+        return const StatusBadge(
+          label: 'CANCELLED',
+          tone: BadgeTone.neutral,
+          icon: Icons.block_rounded,
+        );
+      case 'pending':
+      default:
+        return const StatusBadge(
+          label: 'PENDING',
+          tone: BadgeTone.warning,
+          icon: Icons.schedule_rounded,
+        );
+    }
+  }
+
+  factory StatusBadge.bloomLevel(String? level) {
+    switch (level?.toLowerCase()) {
+      case 'remember':
+        return const StatusBadge(label: 'REMEMBER', tone: BadgeTone.neutral);
+      case 'understand':
+        return const StatusBadge(label: 'UNDERSTAND', tone: BadgeTone.info);
+      case 'apply':
+        return const StatusBadge(label: 'APPLY', tone: BadgeTone.success);
+      case 'analyze':
+        return const StatusBadge(label: 'ANALYZE', tone: BadgeTone.warning);
+      case 'evaluate':
+        return const StatusBadge(label: 'EVALUATE', tone: BadgeTone.warning);
+      case 'create':
+        return const StatusBadge(label: 'CREATE', tone: BadgeTone.error);
+      default:
+        return StatusBadge(label: level?.toUpperCase() ?? 'COGNITIVE', tone: BadgeTone.neutral);
+    }
+  }
+
+  factory StatusBadge.transcriptStatus(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'dispatched':
+        return const StatusBadge(
+          label: 'DISPATCHED',
+          tone: BadgeTone.success,
+          icon: Icons.local_shipping_outlined,
+        );
+      case 'ready':
+        return const StatusBadge(
+          label: 'READY',
+          tone: BadgeTone.info,
+          icon: Icons.mark_email_read_outlined,
+        );
+      case 'processing':
+        return const StatusBadge(
+          label: 'PROCESSING',
+          tone: BadgeTone.info,
+          icon: Icons.sync_rounded,
+        );
+      case 'rejected':
+        return const StatusBadge(
+          label: 'REJECTED',
+          tone: BadgeTone.error,
+          icon: Icons.highlight_off_rounded,
+        );
+      case 'submitted':
+      default:
+        return const StatusBadge(
+          label: 'SUBMITTED',
+          tone: BadgeTone.warning,
+          icon: Icons.hourglass_bottom_rounded,
+        );
+    }
+  }
+
 
   final String label;
   final BadgeTone tone;

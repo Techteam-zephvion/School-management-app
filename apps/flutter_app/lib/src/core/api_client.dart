@@ -2104,6 +2104,372 @@ class ApiClient {
     );
   }
 
+  Future<List<Map<String, Object?>>> getClasses({
+    required AuthSession session,
+  }) async {
+    return getList(
+      '/api/v1/admin/classes',
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getSubjects({
+    required AuthSession session,
+  }) async {
+    return getList(
+      '/api/v1/admin/subjects',
+      session: session,
+    );
+  }
+
+  // ==========================================
+  // Phase 16: Multi-Campus Federation
+  // ==========================================
+
+  Future<List<Map<String, Object?>>> getEducationalTrusts({
+    required AuthSession session,
+  }) async {
+    return getList(
+      '/api/v1/admin/federation/trusts',
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> createEducationalTrust({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/federation/trusts',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> linkSchoolToTrust({
+    required AuthSession session,
+    required String trustId,
+    String? schoolId,
+  }) async {
+    return postJson(
+      '/api/v1/admin/federation/trusts/link',
+      {
+        'trustId': trustId,
+        'schoolId': ?schoolId,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getTrustCampuses({
+    required AuthSession session,
+    required String trustId,
+  }) async {
+    return getList(
+      '/api/v1/admin/federation/trusts/$trustId/campuses',
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> getTrustConsolidatedStats({
+    required AuthSession session,
+    required String trustId,
+  }) async {
+    return getJson(
+      '/api/v1/admin/federation/trusts/$trustId/consolidated-stats',
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getCampusTransfers({
+    required AuthSession session,
+    String? trustId,
+  }) async {
+    final params = <String, String>{
+      if (trustId != null && trustId.isNotEmpty) 'trustId': trustId,
+    };
+    return getList(
+      '/api/v1/admin/federation/transfers',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> createCampusTransfer({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/federation/transfers',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> updateCampusTransferStatus({
+    required AuthSession session,
+    required String transferId,
+    required String status,
+    String? remarks,
+  }) async {
+    return putJson(
+      '/api/v1/admin/federation/transfers/$transferId/status',
+      {
+        'status': status,
+        'remarks': ?remarks,
+      },
+      session: session,
+    );
+  }
+
+  // ==========================================
+  // Phase 16: Hardware Biometrics & Devices
+  // ==========================================
+
+  Future<List<Map<String, Object?>>> getBiometricDevices({
+    required AuthSession session,
+  }) async {
+    return getList(
+      '/api/v1/admin/biometrics/devices',
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> registerBiometricDevice({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/biometrics/devices',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> recordDeviceHeartbeat({
+    required AuthSession session,
+    required String deviceId,
+    String status = 'online',
+    String? ipAddress,
+  }) async {
+    return postJson(
+      '/api/v1/admin/biometrics/devices/$deviceId/heartbeat',
+      {
+        'status': status,
+        'ipAddress': ?ipAddress,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> ingestBiometricPunches({
+    required AuthSession session,
+    required String deviceId,
+    required List<Map<String, Object?>> punches,
+  }) async {
+    return postList(
+      '/api/v1/admin/biometrics/punches/ingest',
+      {
+        'deviceId': deviceId,
+        'punches': punches,
+      },
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getBiometricPunches({
+    required AuthSession session,
+    int limit = 100,
+  }) async {
+    return getList(
+      '/api/v1/admin/biometrics/punches',
+      session: session,
+      queryParameters: {'limit': limit.toString()},
+    );
+  }
+
+  Future<Map<String, Object?>> reconcileBiometricPunches({
+    required AuthSession session,
+    String? date,
+    String? classId,
+  }) async {
+    return postJson(
+      '/api/v1/admin/biometrics/punches/reconcile',
+      {
+        'date': ?date,
+        'classId': ?classId,
+      },
+      session: session,
+    );
+  }
+
+  // ==========================================
+  // Phase 16: OBE & Blueprinted Question Bank
+  // ==========================================
+
+  Future<List<Map<String, Object?>>> getCourseOutcomes({
+    required AuthSession session,
+    String? classId,
+    String? subjectId,
+  }) async {
+    final params = <String, String>{
+      if (classId != null && classId.isNotEmpty) 'classId': classId,
+      if (subjectId != null && subjectId.isNotEmpty) 'subjectId': subjectId,
+    };
+    return getList(
+      '/api/v1/admin/obe/course-outcomes',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> createCourseOutcome({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/obe/course-outcomes',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getExamQuestions({
+    required AuthSession session,
+    String? classId,
+    String? subjectId,
+    String? bloomLevel,
+  }) async {
+    final params = <String, String>{
+      if (classId != null && classId.isNotEmpty) 'classId': classId,
+      if (subjectId != null && subjectId.isNotEmpty) 'subjectId': subjectId,
+      if (bloomLevel != null && bloomLevel.isNotEmpty && bloomLevel != 'all') 'bloomLevel': bloomLevel,
+    };
+    return getList(
+      '/api/v1/admin/obe/questions',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> createExamQuestion({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/obe/questions',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> generateBlueprintedPaper({
+    required AuthSession session,
+    required String classId,
+    required String subjectId,
+    int totalMarks = 100,
+    Map<String, int>? bloomDistribution,
+  }) async {
+    return postJson(
+      '/api/v1/admin/obe/blueprint/generate',
+      {
+        'classId': classId,
+        'subjectId': subjectId,
+        'totalMarks': totalMarks,
+        'bloomDistribution': ?bloomDistribution,
+      },
+      session: session,
+    );
+  }
+
+  // ==========================================
+  // Phase 16: Alumni Association & Transcripts
+  // ==========================================
+
+  Future<List<Map<String, Object?>>> getAlumniProfiles({
+    required AuthSession session,
+    int? graduationYear,
+    bool verifiedOnly = false,
+  }) async {
+    final params = <String, String>{
+      if (graduationYear != null) 'graduationYear': graduationYear.toString(),
+      if (verifiedOnly) 'verifiedOnly': 'true',
+    };
+    return getList(
+      '/api/v1/admin/alumni/profiles',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> createAlumniProfile({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/alumni/profiles',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> updateAlumniProfile({
+    required AuthSession session,
+    required String profileId,
+    required Map<String, Object?> payload,
+  }) async {
+    return putJson(
+      '/api/v1/admin/alumni/profiles/$profileId',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getTranscriptRequests({
+    required AuthSession session,
+    String? status,
+  }) async {
+    final params = <String, String>{
+      if (status != null && status.isNotEmpty && status != 'all') 'status': status,
+    };
+    return getList(
+      '/api/v1/admin/alumni/transcripts',
+      session: session,
+      queryParameters: params.isNotEmpty ? params : null,
+    );
+  }
+
+  Future<Map<String, Object?>> createTranscriptRequest({
+    required AuthSession session,
+    required Map<String, Object?> payload,
+  }) async {
+    return postJson(
+      '/api/v1/admin/alumni/transcripts',
+      payload,
+      session: session,
+    );
+  }
+
+  Future<Map<String, Object?>> updateTranscriptRequestStatus({
+    required AuthSession session,
+    required String requestId,
+    required String status,
+    bool? feePaid,
+    String? issuedDocumentKey,
+    String? notes,
+  }) async {
+    return putJson(
+      '/api/v1/admin/alumni/transcripts/$requestId/status',
+      {
+        'status': status,
+        'feePaid': ?feePaid,
+        'issuedDocumentKey': ?issuedDocumentKey,
+        'notes': ?notes,
+      },
+      session: session,
+    );
+  }
+
   Map<String, String> _headers({String? bearerToken, AuthSession? devSession}) {
     return {
       'content-type': 'application/json',
