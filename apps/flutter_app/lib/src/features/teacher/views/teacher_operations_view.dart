@@ -10,9 +10,14 @@ import '../../shared/components/page_header.dart';
 import '../../shared/components/status_badge.dart';
 
 class TeacherOperationsView extends ConsumerStatefulWidget {
-  const TeacherOperationsView({required this.assignments, super.key});
+  const TeacherOperationsView({
+    required this.assignments,
+    this.initialTab = 0,
+    super.key,
+  });
 
   final List<Map<String, Object?>> assignments;
+  final int initialTab;
 
   @override
   ConsumerState<TeacherOperationsView> createState() =>
@@ -36,8 +41,20 @@ class _TeacherOperationsViewState extends ConsumerState<TeacherOperationsView>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 5, vsync: this);
+    _tabs = TabController(
+      length: 5,
+      vsync: this,
+      initialIndex: widget.initialTab.clamp(0, 4),
+    );
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant TeacherOperationsView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTab != widget.initialTab) {
+      _tabs.animateTo(widget.initialTab.clamp(0, 4));
+    }
   }
 
   @override
@@ -151,9 +168,145 @@ class _TeacherOperationsViewState extends ConsumerState<TeacherOperationsView>
     );
   }
 
+  int _approvedDays(String type) {
+    int count = 0;
+    for (final l in _myLeaves) {
+      if (l['status'] == 'approved' &&
+          (l['leaveType'] as String? ?? '').toLowerCase() ==
+              type.toLowerCase()) {
+        final start = DateTime.tryParse(l['startDate'] as String? ?? '');
+        final end = DateTime.tryParse(l['endDate'] as String? ?? '');
+        if (start != null && end != null) {
+          count += end.difference(start).inDays + 1;
+        } else {
+          count += 1;
+        }
+      }
+    }
+    return count;
+  }
+
+  Widget _balanceCard(
+    String label,
+    int remaining,
+    int total,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.mainBackground,
+        borderRadius: AppRadii.rMd,
+        border: Border.all(color: AppColors.primaryBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+              const SizedBox(height: 2),
+              RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '$remaining',
+                      style: const TextStyle(
+                        fontFamily: 'Switzer',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primaryText,
+                      ),
+                    ),
+                    TextSpan(
+                      text: ' / $total days',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.mutedText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _leaveTab() {
+    final casualRem = (12 - _approvedDays('casual')).clamp(0, 12);
+    final sickRem = (10 - _approvedDays('sick')).clamp(0, 10);
+    final earnedRem = (15 - _approvedDays('earned')).clamp(0, 15);
+
     return ListView(
       children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 600;
+            return Wrap(
+              spacing: 12,
+              runSpacing: 10,
+              children: [
+                SizedBox(
+                  width: isNarrow
+                      ? constraints.maxWidth
+                      : (constraints.maxWidth - 24) / 3,
+                  child: _balanceCard(
+                    'Casual Leave',
+                    casualRem,
+                    12,
+                    Icons.beach_access_outlined,
+                    AppColors.brandCyanDark,
+                  ),
+                ),
+                SizedBox(
+                  width: isNarrow
+                      ? constraints.maxWidth
+                      : (constraints.maxWidth - 24) / 3,
+                  child: _balanceCard(
+                    'Sick Leave',
+                    sickRem,
+                    10,
+                    Icons.healing_outlined,
+                    AppColors.statusWarning,
+                  ),
+                ),
+                SizedBox(
+                  width: isNarrow
+                      ? constraints.maxWidth
+                      : (constraints.maxWidth - 24) / 3,
+                  child: _balanceCard(
+                    'Earned Leave',
+                    earnedRem,
+                    15,
+                    Icons.stars_outlined,
+                    AppColors.statusSuccess,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 16),
         Align(
           alignment: Alignment.centerLeft,
           child: FilledButton.icon(

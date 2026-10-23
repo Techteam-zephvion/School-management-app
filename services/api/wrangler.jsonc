@@ -48,8 +48,7 @@
         "AI_TIMEOUT_MS": "30000",
         "AI_REQUESTS_PER_USER": "20",
         "AI_REQUEST_WINDOW_MINUTES": "60",
-        "CASHFREE_APP_ID": "TEST112097243d3d637f11e796a7739842790211",
-        "CASHFREE_ENV": "sandbox",
+        "CASHFREE_ENV": "production",
         "CASHFREE_API_VERSION": "2023-08-01"
       }
     }

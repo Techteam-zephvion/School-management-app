@@ -37,6 +37,7 @@ class TeacherDashboard extends ConsumerStatefulWidget {
 class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
     with WidgetsBindingObserver {
   int _activeTab = 0;
+  int _operationsInitialTab = 0;
   List<Map<String, Object?>> _assignments = [];
   List<Map<String, Object?>> _timetable = [];
   List<Map<String, Object?>> _recentSessions = [];
@@ -492,8 +493,21 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
                   ),
                   _drawerTabItem(
                     9,
-                    'Teacher operations',
+                    'Leave & Balances',
+                    Icons.beach_access_outlined,
+                    operationsTab: 0,
+                  ),
+                  _drawerTabItem(
+                    9,
+                    'Student Leave Review',
+                    Icons.rule_folder_outlined,
+                    operationsTab: 1,
+                  ),
+                  _drawerTabItem(
+                    9,
+                    'PTM & Operations',
                     Icons.event_note_outlined,
+                    operationsTab: 2,
                   ),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -580,12 +594,19 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
     );
   }
 
-  Widget _drawerTabItem(int index, String label, IconData icon) {
-    final isSelected = _activeTab == index;
+  Widget _drawerTabItem(
+    int index,
+    String label,
+    IconData icon, {
+    int operationsTab = 0,
+  }) {
+    final isSelected = _activeTab == index &&
+        (index != 9 || _operationsInitialTab == operationsTab);
     return InkWell(
       onTap: () {
         setState(() {
           _activeTab = index;
+          if (index == 9) _operationsInitialTab = operationsTab;
           _error = null;
         });
         Navigator.of(context).pop();
@@ -769,7 +790,10 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
       case 8:
         return const TeacherMessagesView();
       case 9:
-        return TeacherOperationsView(assignments: _assignments);
+        return TeacherOperationsView(
+          assignments: _assignments,
+          initialTab: _operationsInitialTab,
+        );
       default:
         return const SizedBox.shrink();
     }
@@ -793,6 +817,18 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
           break;
         case 'exams':
           setState(() => _activeTab = 6);
+          break;
+        case 'leaves':
+          setState(() {
+            _activeTab = 9;
+            _operationsInitialTab = 0;
+          });
+          break;
+        case 'student_leaves':
+          setState(() {
+            _activeTab = 9;
+            _operationsInitialTab = 1;
+          });
           break;
       }
     } else if (action == 'action:draft_remarks') {

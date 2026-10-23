@@ -249,11 +249,11 @@ class ApiClient {
   Future<Map<String, Object?>> postJson(
     String path,
     Map<String, Object?> body, {
-    required AuthSession session,
+    AuthSession? session,
   }) async {
     try {
       final response = await _sendWithRetry(
-        bearerToken: session.bearerToken,
+        bearerToken: session?.bearerToken,
         request: (token) => _httpClient.post(
           Uri.parse('$apiBaseUrl$path'),
           headers: _headers(bearerToken: token, devSession: session),

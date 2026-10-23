@@ -31,7 +31,21 @@ export function createApp() {
         if (!requestOrigin) {
           return allowedOrigins[0] ?? '';
         }
-        if (allowedOrigins.includes(requestOrigin)) {
+        if (
+          allowedOrigins.some((allowed) => {
+            if (allowed === requestOrigin) return true;
+            if (allowed.startsWith('*.')) {
+              const suffix = allowed.slice(2);
+              try {
+                const parsed = new URL(requestOrigin);
+                return parsed.hostname.endsWith(suffix) || parsed.hostname === suffix;
+              } catch {
+                return false;
+              }
+            }
+            return false;
+          })
+        ) {
           return requestOrigin;
         }
         if (!isProduction && (requestOrigin.startsWith('http://localhost:') || requestOrigin.startsWith('http://127.0.0.1:'))) {

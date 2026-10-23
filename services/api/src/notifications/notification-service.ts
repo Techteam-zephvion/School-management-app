@@ -53,14 +53,13 @@ export class NotificationService {
       };
     }
 
-    // External WhatsApp / SMS Gateway Integration
-    // e.g. WHATSAPP_API_TOKEN or SMS_GATEWAY_URL if configured
+    // External WhatsApp Integration (Audit Bug #7: Dynamic phone ID path)
     const whatsappToken = (this.env as any)?.WHATSAPP_API_TOKEN;
     if (params.channel === 'whatsapp' && whatsappToken && params.recipientPhone) {
       try {
-        // e.g. Meta Graph API for WhatsApp Cloud
         const phone = params.recipientPhone.replace(/[^0-9]/g, '');
-        const response = await fetch('https://graph.facebook.com/v21.0/messages', {
+        const phoneId = (this.env as any)?.WHATSAPP_PHONE_NUMBER_ID || 'me';
+        const response = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${whatsappToken}`,
@@ -84,6 +83,84 @@ export class NotificationService {
         }
       } catch (e) {
         console.warn('Failed external WhatsApp dispatch, falling back to simulated log:', e);
+      }
+    }
+
+    // External Indian DLT SMS Gateway Integration (Audit Gap #4)
+    // Supports MSG91, Kaleyra, or custom TRAI-compliant DLT SMS HTTP Gateways
+    const smsGatewayUrl = (this.env as any)?.SMS_GATEWAY_URL || (this.env as any)?.MSG91_URL;
+    const smsAuthKey = (this.env as any)?.SMS_AUTH_KEY || (this.env as any)?.MSG91_AUTH_KEY;
+    if (params.channel === 'sms' && (smsGatewayUrl || smsAuthKey) && params.recipientPhone) {
+      try {
+        const phone = params.recipientPhone.replace(/[^0-9]/g, '');
+        const dltTemplateId = (this.env as any)?.DLT_TEMPLATE_ID || '110716000000000';
+        const dltEntityId = (this.env as any)?.DLT_ENTITY_ID || '110116000000000';
+        const senderId = (this.env as any)?.SMS_SENDER_ID || 'SCHOLC';
+
+        const endpoint = smsGatewayUrl || 'https://api.msg91.com/api/v5/flow/';
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'authkey': smsAuthKey || '',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            template_id: dltTemplateId,
+            sender: senderId,
+            short_url: '0',
+            mobiles: phone,
+            dlt_entity_id: dltEntityId,
+            message: `${params.title}: ${params.body}`,
+          }),
+        });
+
+        if (response.ok) {
+          return {
+            status: 'sent',
+            channel: 'sms',
+            sentAt: now,
+            deliveredAt: now,
+          };
+        }
+      } catch (e) {
+        console.warn('Failed DLT SMS gateway dispatch, falling back to simulation:', e);
+      }
+    }
+
+    // Mobile Push Notification Engine (FCM v1 HTTP API) (Audit Gap #4)
+    const fcmKey = (this.env as any)?.FCM_SERVER_KEY || (this.env as any)?.FIREBASE_API_KEY;
+    if (params.channel === 'push' && fcmKey) {
+      try {
+        const fcmToken = params.recipientUserId; // Token or topic
+        const response = await fetch('https://fcm.googleapis.com/fcm/send', {
+          method: 'POST',
+          headers: {
+            'Authorization': `key=${fcmKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: fcmToken,
+            notification: {
+              title: params.title,
+              body: params.body,
+              sound: 'default',
+            },
+            data: {
+              metadata: JSON.stringify(params.data || {}),
+            },
+          }),
+        });
+
+        if (response.ok) {
+          return {
+            status: 'sent',
+            channel: 'push',
+            sentAt: now,
+            deliveredAt: now,
+          };
+        }
+      } catch (e) {
+        console.warn('Failed FCM push dispatch, falling back to simulation:', e);
       }
     }
 

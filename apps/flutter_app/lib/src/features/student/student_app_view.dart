@@ -552,7 +552,7 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
         return _buildIdFeesTab();
       case 5:
         return StudentServicesView(
-          studentId: _selectedStudentId!,
+          studentId: _selectedStudentId ?? (_activeStudent?['id'] as String? ?? ''),
           timetableEntries: ((_timetable?['entries'] as List?) ?? const [])
               .whereType<Map>()
               .map((item) => item.cast<String, Object?>())

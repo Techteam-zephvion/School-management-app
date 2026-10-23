@@ -10,6 +10,8 @@ import 'package:schoolic/src/core/models.dart';
 import 'package:schoolic/src/core/providers.dart';
 import 'package:schoolic/src/core/theme.dart';
 import 'package:schoolic/src/features/admin/views/admin_operations_view.dart';
+import 'package:schoolic/src/features/public/public_admissions_view.dart';
+import 'package:schoolic/src/features/public/public_certificate_verify_view.dart';
 
 void main() {
   const testApiUrl = 'https://api.example.test';
@@ -390,6 +392,106 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Institutional Calendar Events'), findsOneWidget);
         expect(find.text('PTM Schedules & Slots'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'PublicCertificateVerifyView queries API and renders verification result',
+      (tester) async {
+        final mockHttp = MockClient((request) async {
+          if (request.url.path.contains('/public/certificates/verify/CERT-12345')) {
+            return http.Response(
+              jsonEncode({
+                'verified': true,
+                'status': 'valid',
+                'certificateNumber': 'REC-2026-0001',
+                'certificateType': 'transfer_certificate',
+                'studentName': 'Rahul Dravid',
+                'admissionNumber': 'ADM-999',
+                'schoolName': 'Bangalore National Academy',
+                'schoolCode': 'BNA-01',
+                'issueDate': '2026-10-23',
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response('{"error":"not found"}', 404);
+        });
+
+        final testClient = ApiClient(
+          httpClient: mockHttp,
+          apiBaseUrlOverride: testApiUrl,
+        );
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              apiClientProvider.overrideWithValue(testClient),
+            ],
+            child: MaterialApp(
+              theme: buildSchoolicTheme(),
+              home: const PublicCertificateVerifyView(code: 'CERT-12345'),
+            ),
+          ),
+        );
+
+        await tester.pumpAndSettle();
+
+        expect(find.text('VERIFIED GENUINE'), findsOneWidget);
+        expect(find.text('Rahul Dravid'), findsOneWidget);
+        expect(find.text('TRANSFER CERTIFICATE'), findsOneWidget);
+        expect(
+          find.text('Bangalore National Academy (BNA-01)'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'PublicAdmissionsView renders public admission application form',
+      (tester) async {
+        final mockHttp = MockClient((request) async {
+          if (request.url.path.contains('/public/schools/BNA-01')) {
+            return http.Response(
+              jsonEncode({
+                'id': 'sch_1',
+                'name': 'Bangalore National Academy',
+                'code': 'BNA-01',
+                'classes': [
+                  {'id': 'cls_1', 'name': 'Grade 1'},
+                ],
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response('{}', 200, headers: {'content-type': 'application/json'});
+        });
+
+        final testClient = ApiClient(
+          httpClient: mockHttp,
+          apiBaseUrlOverride: testApiUrl,
+        );
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              apiClientProvider.overrideWithValue(testClient),
+            ],
+            child: MaterialApp(
+              theme: buildSchoolicTheme(),
+              home: const PublicAdmissionsView(schoolCode: 'BNA-01'),
+            ),
+          ),
+        );
+
+        await tester.pumpAndSettle();
+
+        expect(find.text('Bangalore National Academy'), findsWidgets);
+        expect(find.text('Online Admission Application'), findsOneWidget);
+        expect(find.text('Student Details'), findsOneWidget);
+        expect(find.text('Submit Admission Inquiry'), findsOneWidget);
       },
     );
   });

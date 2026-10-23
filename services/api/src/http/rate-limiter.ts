@@ -38,6 +38,45 @@ export function rateLimiter(options: RateLimiterOptions): MiddlewareHandler<AppB
     const now = Date.now();
     const windowMs = windowSeconds * 1000;
 
+    // Check Cloudflare native Rate Limiting binding if configured (Audit Bug #6)
+    const cfRateLimiter = (c.env as any)?.RATE_LIMITER;
+    if (cfRateLimiter?.limit) {
+      try {
+        const { success } = await cfRateLimiter.limit({ key });
+        if (!success) {
+          c.header('Retry-After', String(windowSeconds));
+          return c.json(
+            {
+              error: 'Too many requests. Please slow down.',
+              code: 'RATE_LIMIT_EXCEEDED',
+              retryAfterSeconds: windowSeconds,
+            },
+            429,
+          );
+        }
+        return next();
+      } catch {
+        // Fall back to bounded in-memory sliding window
+      }
+    }
+
+    // Edge Memory Protection: enforce size ceiling and evict expired records
+    const MAX_STORE_SIZE = 5000;
+    if (memoryRateLimitStore.size >= MAX_STORE_SIZE) {
+      for (const [k, v] of memoryRateLimitStore.entries()) {
+        if (now >= v.resetAt) {
+          memoryRateLimitStore.delete(k);
+        }
+      }
+      if (memoryRateLimitStore.size >= MAX_STORE_SIZE) {
+        let toRemove = memoryRateLimitStore.size - Math.floor(MAX_STORE_SIZE * 0.8);
+        for (const k of memoryRateLimitStore.keys()) {
+          if (toRemove-- <= 0) break;
+          memoryRateLimitStore.delete(k);
+        }
+      }
+    }
+
     let record = memoryRateLimitStore.get(key);
     if (!record || now >= record.resetAt) {
       record = {

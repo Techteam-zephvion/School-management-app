@@ -678,6 +678,9 @@ class _StudentServicesViewState extends ConsumerState<StudentServicesView>
     final allocation =
         (_transport['allocation'] as Map?)?.cast<String, Object?>() ??
         _transport;
+    final currentLog =
+        (_transport['currentLog'] as Map?)?.cast<String, Object?>();
+
     return ListView(
       children: [
         _card(
@@ -688,6 +691,18 @@ class _StudentServicesViewState extends ConsumerState<StudentServicesView>
           body:
               'Stop: ${allocation['stopName'] ?? '—'}\nPickup: ${allocation['pickupTime'] ?? '—'} • Drop: ${allocation['dropTime'] ?? '—'}\nDriver: ${allocation['driverName'] ?? '—'} • ${allocation['driverPhone'] ?? 'No phone listed'}',
         ),
+        if (currentLog != null) ...[
+          const SizedBox(height: 12),
+          _card(
+            title:
+                'Live Transit Status • ${(currentLog['tripType'] ?? 'Regular').toString().toUpperCase()}',
+            subtitle:
+                'Current Stop: ${currentLog['currentStopName'] ?? 'En Route'}',
+            status: currentLog['status'] as String? ?? 'in_transit',
+            body:
+                '${currentLog['notes'] ?? 'Vehicle is operating on its assigned route.'}\nLast updated: ${currentLog['updatedAt'] ?? 'Today'}',
+          ),
+        ],
       ],
     );
   }

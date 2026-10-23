@@ -373,6 +373,23 @@ teacherRoutes.put(
   },
 );
 
+teacherRoutes.patch(
+  '/student-leaves/:id',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('json', updateStudentLeaveStatusSchema),
+  async (c) => {
+    const authUser = c.get('authUser');
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.updateStudentLeaveStatus(
+        authUser,
+        c.req.valid('param').id,
+        c.req.valid('json'),
+      ),
+    );
+  },
+);
+
 // Calendar & PTM
 teacherRoutes.get('/calendar', async (c) => {
   const authUser = c.get('authUser');

@@ -1,10 +1,9 @@
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
-
 import 'dart:async';
 import 'dart:convert';
-import 'dart:html';
+import 'dart:js_interop';
 
 import 'package:http/http.dart' as http;
+import 'package:web/web.dart' as web;
 
 void clearAuthCookies() {
   // Browser manages cookie store automatically
@@ -15,22 +14,22 @@ Future<Map<String, Object?>> postAuthJson(
   Map<String, Object?> body, {
   http.Client? httpClient,
 }) async {
-  final completer = Completer<HttpRequest>();
-  final xhr = HttpRequest();
-  xhr.open('POST', uri.toString(), async: true);
+  final completer = Completer<web.XMLHttpRequest>();
+  final xhr = web.XMLHttpRequest();
+  xhr.open('POST', uri.toString(), true);
   xhr.withCredentials = true;
   xhr.setRequestHeader('content-type', 'application/json');
   xhr.setRequestHeader('accept', 'application/json');
-  xhr.onLoad.listen((_) => completer.complete(xhr));
-  xhr.onError.listen((_) {
+  xhr.onload = ((web.Event _) => completer.complete(xhr)).toJS;
+  xhr.onerror = ((web.Event _) {
     completer.completeError(
       AuthTransportException(
         'Unable to connect to authentication service. Please check your network.',
         503,
       ),
     );
-  });
-  xhr.send(jsonEncode(body));
+  }).toJS;
+  xhr.send(jsonEncode(body).toJS);
   final request = await completer.future.timeout(
     const Duration(seconds: 6),
     onTimeout: () => throw AuthTransportException(
@@ -38,24 +37,24 @@ Future<Map<String, Object?>> postAuthJson(
       408,
     ),
   );
-  return _decode(request.status ?? 0, request.responseText ?? '');
+  return _decode(request.status, request.responseText);
 }
 
 Future<Map<String, Object?>> getAuthJson(Uri uri, {http.Client? httpClient}) async {
-  final completer = Completer<HttpRequest>();
-  final xhr = HttpRequest();
-  xhr.open('GET', uri.toString(), async: true);
+  final completer = Completer<web.XMLHttpRequest>();
+  final xhr = web.XMLHttpRequest();
+  xhr.open('GET', uri.toString(), true);
   xhr.withCredentials = true;
   xhr.setRequestHeader('accept', 'application/json');
-  xhr.onLoad.listen((_) => completer.complete(xhr));
-  xhr.onError.listen((_) {
+  xhr.onload = ((web.Event _) => completer.complete(xhr)).toJS;
+  xhr.onerror = ((web.Event _) {
     completer.completeError(
       AuthTransportException(
         'Unable to connect to authentication service. Please check your network.',
         503,
       ),
     );
-  });
+  }).toJS;
   xhr.send();
   final request = await completer.future.timeout(
     const Duration(seconds: 6),
@@ -64,24 +63,24 @@ Future<Map<String, Object?>> getAuthJson(Uri uri, {http.Client? httpClient}) asy
       408,
     ),
   );
-  return _decode(request.status ?? 0, request.responseText ?? '');
+  return _decode(request.status, request.responseText);
 }
 
 Future<void> postAuth(Uri uri, {http.Client? httpClient}) async {
-  final completer = Completer<HttpRequest>();
-  final xhr = HttpRequest();
-  xhr.open('POST', uri.toString(), async: true);
+  final completer = Completer<web.XMLHttpRequest>();
+  final xhr = web.XMLHttpRequest();
+  xhr.open('POST', uri.toString(), true);
   xhr.withCredentials = true;
   xhr.setRequestHeader('accept', 'application/json');
-  xhr.onLoad.listen((_) => completer.complete(xhr));
-  xhr.onError.listen((_) {
+  xhr.onload = ((web.Event _) => completer.complete(xhr)).toJS;
+  xhr.onerror = ((web.Event _) {
     completer.completeError(
       AuthTransportException(
         'Unable to connect to authentication service. Please check your network.',
         503,
       ),
     );
-  });
+  }).toJS;
   xhr.send();
   final request = await completer.future.timeout(
     const Duration(seconds: 6),
@@ -90,7 +89,7 @@ Future<void> postAuth(Uri uri, {http.Client? httpClient}) async {
       408,
     ),
   );
-  final status = request.status ?? 0;
+  final status = request.status;
   if (status < 200 || status >= 300) {
     throw AuthTransportException('Authentication request failed', status);
   }

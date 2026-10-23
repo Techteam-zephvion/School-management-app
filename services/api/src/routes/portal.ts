@@ -179,6 +179,20 @@ portalRoutes.get('/transport', zValidator('query', portalStudentQuerySchema), as
   return c.json(await repo.getStudentTransportOverview(authUser, studentId));
 });
 
+portalRoutes.get('/transport/track', zValidator('query', portalStudentQuerySchema), async (c) => {
+  const authUser = c.get('authUser');
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  let studentId = c.req.valid('query').studentId;
+  if (!studentId) {
+    const profile = await repo.portalProfile(authUser);
+    studentId = profile.students[0]?.id;
+  }
+  if (!studentId) {
+    return c.json({ isAllocated: false });
+  }
+  return c.json(await repo.getStudentTransportOverview(authUser, studentId));
+});
+
 // 3. Certificates
 portalRoutes.get('/certificates', zValidator('query', portalStudentQuerySchema), async (c) => {
   const authUser = c.get('authUser');

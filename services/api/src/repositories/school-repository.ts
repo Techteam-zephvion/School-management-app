@@ -758,8 +758,50 @@ export function createSchoolRepository(db: Db) {
     },
 
     async createStaff(user: AuthUser, input: z.infer<typeof createStaffSchema>) {
-      const [created] = await db.insert(staff).values({ ...input, schoolId: user.schoolId }).returning();
-      return created;
+      return db.transaction(async (tx) => {
+        let assignedUserId = input.userId;
+        if (!assignedUserId) {
+          const emailLower = input.email.toLowerCase().trim();
+          const [existingUser] = await tx
+            .select()
+            .from(appUsers)
+            .where(and(eq(appUsers.schoolId, user.schoolId), eq(appUsers.email, emailLower)))
+            .limit(1);
+
+          if (existingUser) {
+            assignedUserId = existingUser.id;
+          } else {
+            const tempNeonUserId = `invite_${crypto.randomUUID()}`;
+            const [newUser] = await tx
+              .insert(appUsers)
+              .values({
+                schoolId: user.schoolId,
+                neonUserId: tempNeonUserId,
+                email: emailLower,
+                displayName: input.fullName,
+              })
+              .returning();
+            if (newUser) {
+              assignedUserId = newUser.id;
+              await tx.insert(userRoles).values({
+                userId: newUser.id,
+                role: input.isTeacher ? 'teacher' : 'admin',
+              });
+            }
+          }
+        }
+
+        const [created] = await tx
+          .insert(staff)
+          .values({
+            ...input,
+            email: input.email.toLowerCase().trim(),
+            userId: assignedUserId ?? null,
+            schoolId: user.schoolId,
+          })
+          .returning();
+        return created;
+      });
     },
 
     async listStudents(user: AuthUser) {
@@ -801,29 +843,87 @@ export function createSchoolRepository(db: Db) {
     },
 
     async createStudent(user: AuthUser, input: z.infer<typeof createStudentSchema>) {
-      const [created] = await db
-        .insert(students)
-        .values({
+      return db.transaction(async (tx) => {
+        let admissionNumber = input.admissionNumber;
+        if (!admissionNumber) {
+          const year = new Date().getFullYear();
+          try {
+            const seqRes: any = await tx.execute(
+              sql`SELECT coalesce(max(substring(admission_number from '[0-9]+$')::int), 0) + 1 AS next_val FROM students WHERE school_id = ${user.schoolId}`
+            );
+            const row = seqRes?.rows?.[0] ?? seqRes?.[0];
+            const nextVal = Number(row?.next_val) || 1;
+            admissionNumber = `ADM-${year}-${String(nextVal).padStart(5, '0')}`;
+          } catch {
+            admissionNumber = `ADM-${year}-${Date.now().toString().slice(-5)}`;
+          }
+        }
+
+        const [created] = await tx
+          .insert(students)
+          .values({
+            schoolId: user.schoolId,
+            userId: input.userId ?? null,
+            admissionNumber,
+            fullName: input.fullName,
+            guardianName: input.guardianName,
+            guardianPhone: input.guardianPhone,
+          })
+          .returning();
+        if (!created) throw new ApiError(500, 'Unable to create student');
+
+        await tx.insert(studentEnrollments).values({
           schoolId: user.schoolId,
-          userId: input.userId ?? null,
-          admissionNumber: input.admissionNumber,
-          fullName: input.fullName,
-          guardianName: input.guardianName,
-          guardianPhone: input.guardianPhone,
-        })
-        .returning();
-      if (!created) throw new ApiError(500, 'Unable to create student');
+          studentId: created.id,
+          academicYearId: input.academicYearId,
+          classId: input.classId,
+          sectionId: input.sectionId,
+          rollNumber: input.rollNumber,
+        });
 
-      await db.insert(studentEnrollments).values({
-        schoolId: user.schoolId,
-        studentId: created.id,
-        academicYearId: input.academicYearId,
-        classId: input.classId,
-        sectionId: input.sectionId,
-        rollNumber: input.rollNumber,
+        // Dynamic Guardian Account Creation & Linking (Audit Gap #2)
+        if (input.guardianEmail) {
+          const parentEmail = input.guardianEmail.toLowerCase().trim();
+          let [guardianUser] = await tx
+            .select()
+            .from(appUsers)
+            .where(and(eq(appUsers.schoolId, user.schoolId), eq(appUsers.email, parentEmail)))
+            .limit(1);
+
+          if (!guardianUser) {
+            const [newParent] = await tx
+              .insert(appUsers)
+              .values({
+                schoolId: user.schoolId,
+                neonUserId: `parent_${crypto.randomUUID()}`,
+                email: parentEmail,
+                displayName: input.guardianName || 'Parent',
+              })
+              .returning();
+            if (newParent) {
+              guardianUser = newParent;
+              await tx.insert(userRoles).values({
+                userId: newParent.id,
+                role: 'parent',
+              });
+            }
+          }
+
+          if (guardianUser) {
+            await tx
+              .insert(studentGuardians)
+              .values({
+                schoolId: user.schoolId,
+                studentId: created.id,
+                appUserId: guardianUser.id,
+                relationship: 'parent',
+              })
+              .onConflictDoNothing();
+          }
+        }
+
+        return created;
       });
-
-      return created;
     },
 
     async createStudentGuardianLink(user: AuthUser, input: z.infer<typeof createStudentGuardianLinkSchema>) {
@@ -1771,77 +1871,94 @@ export function createSchoolRepository(db: Db) {
         };
       }
 
-      const year = new Date().getFullYear();
-      const countRes = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(feePayments)
-        .where(eq(feePayments.schoolId, user.schoolId));
-      const nextSeq = (countRes[0]?.count ?? 0) + 1;
-      const receiptNumber = `REC-${year}-${String(nextSeq).padStart(5, '0')}`;
+      return await db.transaction(async (tx) => {
+        const year = new Date().getFullYear();
+        let nextSeq: number;
+        try {
+          const seqRes: any = await tx.execute(sql`SELECT nextval('fee_receipt_seq') AS num`);
+          const row = seqRes?.rows?.[0] ?? seqRes?.[0];
+          nextSeq = Number(row?.num);
+          if (isNaN(nextSeq)) throw new Error('Invalid sequence return');
+        } catch {
+          try {
+            await tx.execute(sql`CREATE SEQUENCE IF NOT EXISTS fee_receipt_seq START WITH 1000`);
+            const seqRes: any = await tx.execute(sql`SELECT nextval('fee_receipt_seq') AS num`);
+            const row = seqRes?.rows?.[0] ?? seqRes?.[0];
+            nextSeq = Number(row?.num) || 1001;
+          } catch {
+            const countRes = await tx
+              .select({ count: sql<number>`count(*)::int` })
+              .from(feePayments)
+              .where(eq(feePayments.schoolId, user.schoolId));
+            nextSeq = (countRes[0]?.count ?? 0) + 1;
+          }
+        }
+        const receiptNumber = `REC-${year}-${String(nextSeq).padStart(6, '0')}`;
 
-      await db
-        .update(paymentOrders)
-        .set({
+        await tx
+          .update(paymentOrders)
+          .set({
+            status: 'PAID',
+            cfPaymentId: successPayment.cfPaymentId,
+            paymentMethod: successPayment.paymentMethod,
+            updatedAt: new Date(),
+          })
+          .where(eq(paymentOrders.id, order.id));
+
+        let method: 'cash' | 'upi' | 'card' | 'bank_transfer' | 'cheque' = 'upi';
+        const mStr = (successPayment.paymentMethod || '').toLowerCase();
+        if (mStr.includes('card')) method = 'card';
+        else if (mStr.includes('netbanking') || mStr.includes('bank')) method = 'bank_transfer';
+        else method = 'upi';
+
+        const [payment] = await tx
+          .insert(feePayments)
+          .values({
+            schoolId: user.schoolId,
+            allocationId: order.allocationId,
+            studentId: order.studentId,
+            receiptNumber,
+            amountPaid: order.amount,
+            paymentMethod: method,
+            transactionReference: order.gatewayOrderId,
+            paidAt: new Date(successPayment.paymentTime || Date.now()),
+            notes: `Online payment via Cashfree (${successPayment.cfPaymentId})`,
+          })
+          .returning();
+
+        if (!payment) {
+          throw new ApiError(500, 'Failed to persist fee payment record');
+        }
+
+        const [alloc] = await tx
+          .select()
+          .from(studentFeeAllocations)
+          .where(eq(studentFeeAllocations.id, order.allocationId))
+          .limit(1);
+
+        if (alloc) {
+          const allPayments = await tx
+            .select({ amount: feePayments.amountPaid })
+            .from(feePayments)
+            .where(eq(feePayments.allocationId, alloc.id));
+          const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
+          const newStatus = totalPaid >= alloc.amount ? 'paid' : (totalPaid > 0 ? 'partial' : 'pending');
+
+          await tx
+            .update(studentFeeAllocations)
+            .set({ status: newStatus, updatedAt: new Date() })
+            .where(eq(studentFeeAllocations.id, alloc.id));
+        }
+
+        return {
+          success: true,
           status: 'PAID',
-          cfPaymentId: successPayment.cfPaymentId,
-          paymentMethod: successPayment.paymentMethod,
-          updatedAt: new Date(),
-        })
-        .where(eq(paymentOrders.id, order.id));
-
-      let method: 'cash' | 'upi' | 'card' | 'bank_transfer' | 'cheque' = 'upi';
-      const mStr = (successPayment.paymentMethod || '').toLowerCase();
-      if (mStr.includes('card')) method = 'card';
-      else if (mStr.includes('netbanking') || mStr.includes('bank')) method = 'bank_transfer';
-      else method = 'upi';
-
-      const [payment] = await db
-        .insert(feePayments)
-        .values({
-          schoolId: user.schoolId,
-          allocationId: order.allocationId,
-          studentId: order.studentId,
-          receiptNumber,
-          amountPaid: order.amount,
-          paymentMethod: method,
-          transactionReference: order.gatewayOrderId,
-          paidAt: new Date(successPayment.paymentTime || Date.now()),
-          notes: `Online payment via Cashfree (${successPayment.cfPaymentId})`,
-        })
-        .returning();
-
-      if (!payment) {
-        throw new ApiError(500, 'Failed to persist fee payment record');
-      }
-
-      const [alloc] = await db
-        .select()
-        .from(studentFeeAllocations)
-        .where(eq(studentFeeAllocations.id, order.allocationId))
-        .limit(1);
-
-      if (alloc) {
-        const allPayments = await db
-          .select({ amount: feePayments.amountPaid })
-          .from(feePayments)
-          .where(eq(feePayments.allocationId, alloc.id));
-        const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
-        const newStatus = totalPaid >= alloc.amount ? 'paid' : (totalPaid > 0 ? 'partial' : 'pending');
-
-        await db
-          .update(studentFeeAllocations)
-          .set({ status: newStatus, updatedAt: new Date() })
-          .where(eq(studentFeeAllocations.id, alloc.id));
-      }
-
-      return {
-        success: true,
-        status: 'PAID',
-        receiptNumber: payment.receiptNumber,
-        amountPaid: payment.amountPaid,
-        paidAt: payment.paidAt,
-        paymentMethod: payment.paymentMethod,
-      };
+          receiptNumber: payment.receiptNumber,
+          amountPaid: payment.amountPaid,
+          paidAt: payment.paidAt,
+          paymentMethod: payment.paymentMethod,
+        };
+      });
     },
 
     async handleCashfreeWebhook(payload: Record<string, unknown>, env: Env) {
@@ -1880,63 +1997,80 @@ export function createSchoolRepository(db: Db) {
       });
 
       if (paymentStatus === 'SUCCESS') {
-        const [ord] = await db
-          .select()
-          .from(paymentOrders)
-          .where(eq(paymentOrders.gatewayOrderId, orderId))
-          .limit(1);
-
-        if (ord && ord.status !== 'PAID') {
-          const year = new Date().getFullYear();
-          const countRes = await db
-            .select({ count: sql<number>`count(*)::int` })
-            .from(feePayments)
-            .where(eq(feePayments.schoolId, ord.schoolId));
-          const nextSeq = (countRes[0]?.count ?? 0) + 1;
-          const receiptNumber = `REC-${year}-${String(nextSeq).padStart(5, '0')}`;
-
-          await db
-            .update(paymentOrders)
-            .set({
-              status: 'PAID',
-              cfPaymentId: cfPaymentId || 'WEBHOOK',
-              paymentMethod: 'upi',
-              updatedAt: new Date(),
-            })
-            .where(eq(paymentOrders.id, ord.id));
-
-          await db.insert(feePayments).values({
-            schoolId: ord.schoolId,
-            allocationId: ord.allocationId,
-            studentId: ord.studentId,
-            receiptNumber,
-            amountPaid: ord.amount,
-            paymentMethod: 'upi',
-            transactionReference: ord.gatewayOrderId,
-            paidAt: new Date(),
-            notes: `Online payment reconciled via Cashfree Webhook (${cfPaymentId || ''})`,
-          });
-
-          const [alloc] = await db
+        await db.transaction(async (tx) => {
+          const [ord] = await tx
             .select()
-            .from(studentFeeAllocations)
-            .where(eq(studentFeeAllocations.id, ord.allocationId))
+            .from(paymentOrders)
+            .where(eq(paymentOrders.gatewayOrderId, orderId))
             .limit(1);
 
-          if (alloc) {
-            const allPayments = await db
-              .select({ amount: feePayments.amountPaid })
-              .from(feePayments)
-              .where(eq(feePayments.allocationId, alloc.id));
-            const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
-            const newStatus = totalPaid >= alloc.amount ? 'paid' : (totalPaid > 0 ? 'partial' : 'pending');
+          if (ord && ord.status !== 'PAID') {
+            const year = new Date().getFullYear();
+            let nextSeq: number;
+            try {
+              const seqRes: any = await tx.execute(sql`SELECT nextval('fee_receipt_seq') AS num`);
+              const row = seqRes?.rows?.[0] ?? seqRes?.[0];
+              nextSeq = Number(row?.num);
+              if (isNaN(nextSeq)) throw new Error('Invalid sequence return');
+            } catch {
+              try {
+                await tx.execute(sql`CREATE SEQUENCE IF NOT EXISTS fee_receipt_seq START WITH 1000`);
+                const seqRes: any = await tx.execute(sql`SELECT nextval('fee_receipt_seq') AS num`);
+                const row = seqRes?.rows?.[0] ?? seqRes?.[0];
+                nextSeq = Number(row?.num) || 1001;
+              } catch {
+                const countRes = await tx
+                  .select({ count: sql<number>`count(*)::int` })
+                  .from(feePayments)
+                  .where(eq(feePayments.schoolId, ord.schoolId));
+                nextSeq = (countRes[0]?.count ?? 0) + 1;
+              }
+            }
+            const receiptNumber = `REC-${year}-${String(nextSeq).padStart(6, '0')}`;
 
-            await db
-              .update(studentFeeAllocations)
-              .set({ status: newStatus, updatedAt: new Date() })
-              .where(eq(studentFeeAllocations.id, alloc.id));
+            await tx
+              .update(paymentOrders)
+              .set({
+                status: 'PAID',
+                cfPaymentId: cfPaymentId || 'WEBHOOK',
+                paymentMethod: 'upi',
+                updatedAt: new Date(),
+              })
+              .where(eq(paymentOrders.id, ord.id));
+
+            await tx.insert(feePayments).values({
+              schoolId: ord.schoolId,
+              allocationId: ord.allocationId,
+              studentId: ord.studentId,
+              receiptNumber,
+              amountPaid: ord.amount,
+              paymentMethod: 'upi',
+              transactionReference: ord.gatewayOrderId,
+              paidAt: new Date(),
+              notes: `Online payment reconciled via Cashfree Webhook (${cfPaymentId || ''})`,
+            });
+
+            const [alloc] = await tx
+              .select()
+              .from(studentFeeAllocations)
+              .where(eq(studentFeeAllocations.id, ord.allocationId))
+              .limit(1);
+
+            if (alloc) {
+              const allPayments = await tx
+                .select({ amount: feePayments.amountPaid })
+                .from(feePayments)
+                .where(eq(feePayments.allocationId, alloc.id));
+              const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
+              const newStatus = totalPaid >= alloc.amount ? 'paid' : (totalPaid > 0 ? 'partial' : 'pending');
+
+              await tx
+                .update(studentFeeAllocations)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(studentFeeAllocations.id, alloc.id));
+            }
           }
-        }
+        });
       }
 
       return { handled: true };
@@ -2289,76 +2423,130 @@ export function createSchoolRepository(db: Db) {
     },
 
     async enrollApplicant(user: AuthUser, id: string, input: EnrollApplicantInput) {
-      const [app] = await db
-        .select()
-        .from(admissionApplications)
-        .where(and(eq(admissionApplications.schoolId, user.schoolId), eq(admissionApplications.id, id)))
-        .limit(1);
+      return db.transaction(async (tx) => {
+        const [app] = await tx
+          .select()
+          .from(admissionApplications)
+          .where(and(eq(admissionApplications.schoolId, user.schoolId), eq(admissionApplications.id, id)))
+          .limit(1);
 
-      if (!app) throw new ApiError(404, 'Admission application not found');
+        if (!app) throw new ApiError(404, 'Admission application not found');
 
-      if (app.status === 'enrolled' || app.enrolledStudentId) {
-        throw new ApiError(409, 'Applicant is already enrolled');
-      }
+        if (app.status === 'enrolled' || app.enrolledStudentId) {
+          throw new ApiError(409, 'Applicant is already enrolled');
+        }
 
-      const [targetSection] = await db
-        .select()
-        .from(sections)
-        .where(
-          and(
-            eq(sections.schoolId, user.schoolId),
-            eq(sections.id, input.sectionId),
-            eq(sections.classId, app.applyingForClassId),
-          ),
-        )
-        .limit(1);
+        const [targetSection] = await tx
+          .select()
+          .from(sections)
+          .where(
+            and(
+              eq(sections.schoolId, user.schoolId),
+              eq(sections.id, input.sectionId),
+              eq(sections.classId, app.applyingForClassId),
+            ),
+          )
+          .limit(1);
 
-      if (!targetSection) {
-        throw new ApiError(422, 'Selected section does not belong to the target class');
-      }
+        if (!targetSection) {
+          throw new ApiError(422, 'Selected section does not belong to the target class');
+        }
 
-      const admissionNumber =
-        input.admissionNumber ||
-        `ADM-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+        let admissionNumber = input.admissionNumber;
+        if (!admissionNumber) {
+          const year = new Date().getFullYear();
+          try {
+            const seqRes: any = await tx.execute(
+              sql`SELECT coalesce(max(substring(admission_number from '[0-9]+$')::int), 0) + 1 AS next_val FROM students WHERE school_id = ${user.schoolId}`
+            );
+            const row = seqRes?.rows?.[0] ?? seqRes?.[0];
+            const nextVal = Number(row?.next_val) || 1;
+            admissionNumber = `ADM-${year}-${String(nextVal).padStart(5, '0')}`;
+          } catch {
+            admissionNumber = `ADM-${year}-${Date.now().toString().slice(-5)}`;
+          }
+        }
 
-      const [student] = await db
-        .insert(students)
-        .values({
+        const [student] = await tx
+          .insert(students)
+          .values({
+            schoolId: user.schoolId,
+            admissionNumber,
+            fullName: app.applicantName,
+            guardianName: app.parentName,
+            guardianPhone: app.parentPhone,
+            isActive: true,
+          })
+          .returning();
+
+        if (!student) throw new ApiError(500, 'Unable to create student profile');
+
+        await tx.insert(studentEnrollments).values({
           schoolId: user.schoolId,
-          admissionNumber,
-          fullName: app.applicantName,
-          guardianName: app.parentName,
-          guardianPhone: app.parentPhone,
-          isActive: true,
-        })
-        .returning();
+          studentId: student.id,
+          academicYearId: app.academicYearId,
+          classId: app.applyingForClassId,
+          sectionId: input.sectionId,
+          rollNumber: input.rollNumber ?? null,
+        });
 
-      if (!student) throw new ApiError(500, 'Unable to create student profile');
+        // Link guardian account if parent email exists
+        if (app.parentEmail) {
+          const pEmail = app.parentEmail.toLowerCase().trim();
+          let [parentUser] = await tx
+            .select()
+            .from(appUsers)
+            .where(and(eq(appUsers.schoolId, user.schoolId), eq(appUsers.email, pEmail)))
+            .limit(1);
 
-      await db.insert(studentEnrollments).values({
-        schoolId: user.schoolId,
-        studentId: student.id,
-        academicYearId: app.academicYearId,
-        classId: app.applyingForClassId,
-        sectionId: input.sectionId,
-        rollNumber: input.rollNumber ?? null,
+          if (!parentUser) {
+            const [createdParent] = await tx
+              .insert(appUsers)
+              .values({
+                schoolId: user.schoolId,
+                neonUserId: `parent_${crypto.randomUUID()}`,
+                email: pEmail,
+                displayName: app.parentName,
+              })
+              .returning();
+            if (createdParent) {
+              parentUser = createdParent;
+              await tx.insert(userRoles).values({
+                userId: createdParent.id,
+                role: 'parent',
+              });
+            }
+          }
+
+          if (parentUser) {
+            await tx
+              .insert(studentGuardians)
+              .values({
+                schoolId: user.schoolId,
+                studentId: student.id,
+                appUserId: parentUser.id,
+                relationship: 'parent',
+              })
+              .onConflictDoNothing();
+          }
+        }
+
+        const [updatedApp] = await tx
+          .update(admissionApplications)
+          .set({
+            status: 'enrolled',
+            enrolledStudentId: student.id,
+            decisionDate: new Date().toISOString().slice(0, 10),
+            updatedAt: new Date(),
+          })
+          .where(eq(admissionApplications.id, id))
+          .returning();
+
+        return {
+          application: updatedApp,
+          student,
+        };
       });
-
-      const [updatedApp] = await db
-        .update(admissionApplications)
-        .set({
-          status: 'enrolled',
-          enrolledStudentId: student.id,
-          decisionDate: new Date().toISOString().slice(0, 10),
-          updatedAt: new Date(),
-        })
-        .where(eq(admissionApplications.id, id))
-        .returning();
-
-      return {
-        application: updatedApp,
-        student,
-      };
     },
 
     async listAdmissionDocuments(user: AuthUser, applicationId: string) {
@@ -3200,7 +3388,7 @@ export function createSchoolRepository(db: Db) {
               .insert(appUsers)
               .values({
                 schoolId: user.schoolId,
-                neonUserId: `usr_${Math.random().toString(36).substring(2, 10)}`,
+                neonUserId: `invite_${crypto.randomUUID()}`,
                 email,
                 displayName: fullName,
               })
@@ -3315,7 +3503,7 @@ export function createSchoolRepository(db: Db) {
                 .insert(appUsers)
                 .values({
                   schoolId: user.schoolId,
-                  neonUserId: `parent_${Math.random().toString(36).substring(2, 10)}`,
+                  neonUserId: `parent_${crypto.randomUUID()}`,
                   email: parentEmailStr,
                   displayName: item.parentName ? String(item.parentName).trim() : 'Parent',
                 })
@@ -4224,6 +4412,75 @@ export function createSchoolRepository(db: Db) {
       });
 
       return { success: true, studentId };
+    },
+
+    async processDsrDataExport(user: AuthUser, dsrId: string, bucket?: R2Bucket | undefined) {
+      const [req] = await db
+        .select()
+        .from(dataSubjectRequests)
+        .where(and(eq(dataSubjectRequests.id, dsrId), eq(dataSubjectRequests.schoolId, user.schoolId)))
+        .limit(1);
+
+      if (!req) throw new ApiError(404, 'Data subject request not found');
+      if (!req.studentId) throw new ApiError(422, 'DSR request has no associated student record');
+
+      const [student] = await db
+        .select()
+        .from(students)
+        .where(and(eq(students.id, req.studentId), eq(students.schoolId, user.schoolId)))
+        .limit(1);
+
+      const enrollments = await db
+        .select()
+        .from(studentEnrollments)
+        .where(and(eq(studentEnrollments.studentId, req.studentId), eq(studentEnrollments.schoolId, user.schoolId)));
+
+      const attendance = await db
+        .select()
+        .from(attendanceRecords)
+        .where(and(eq(attendanceRecords.studentId, req.studentId), eq(attendanceRecords.schoolId, user.schoolId)))
+        .limit(500);
+
+      const payments = await db
+        .select()
+        .from(feePayments)
+        .where(and(eq(feePayments.studentId, req.studentId), eq(feePayments.schoolId, user.schoolId)))
+        .limit(200);
+
+      const bundle = {
+        exportVersion: '1.0.0',
+        exportedAt: new Date().toISOString(),
+        dpdpCompliance: 'India Digital Personal Data Protection Act 2023',
+        dsrRequestId: req.id,
+        student,
+        enrollments,
+        attendanceHistory: attendance,
+        feePaymentHistory: payments,
+      };
+
+      const fileKey = `dpdp-exports/${user.schoolId}/${req.id}.json`;
+      if (bucket) {
+        await bucket.put(fileKey, JSON.stringify(bundle, null, 2), {
+          httpMetadata: { contentType: 'application/json' },
+        });
+      }
+
+      await db
+        .update(dataSubjectRequests)
+        .set({
+          status: 'fulfilled',
+          resolutionNotes: `DPDP export bundle compiled successfully (${fileKey})`,
+          resolvedAt: new Date(),
+          resolvedByUserId: user.appUserId,
+          updatedAt: new Date(),
+        })
+        .where(eq(dataSubjectRequests.id, req.id));
+
+      return {
+        success: true,
+        fileKey,
+        dataBundle: bundle,
+      };
     },
 
     // Phase 11: Enterprise Roles & Class Teacher Assignment
@@ -6545,38 +6802,27 @@ export function createSchoolRepository(db: Db) {
           }
 
           let batchSyncedCount = 0;
-          for (const rec of batch.records) {
-            const [existingRec] = await db
-              .select()
-              .from(attendanceRecords)
-              .where(
-                and(
-                  eq(attendanceRecords.schoolId, user.schoolId),
-                  eq(attendanceRecords.sessionId, session.id),
-                  eq(attendanceRecords.studentId, rec.studentId),
-                ),
-              )
-              .limit(1);
+          if (batch.records.length > 0) {
+            const batchRecords = batch.records.map((rec) => ({
+              schoolId: user.schoolId,
+              sessionId: session.id,
+              studentId: rec.studentId,
+              status: rec.status,
+              remarks: rec.remarks ?? null,
+            }));
 
-            if (existingRec) {
-              await db
-                .update(attendanceRecords)
-                .set({
-                  status: rec.status,
-                  remarks: rec.remarks ?? null,
+            await db
+              .insert(attendanceRecords)
+              .values(batchRecords)
+              .onConflictDoUpdate({
+                target: [attendanceRecords.sessionId, attendanceRecords.studentId],
+                set: {
+                  status: sql`excluded.status`,
+                  remarks: sql`excluded.remarks`,
                   updatedAt: new Date(),
-                })
-                .where(eq(attendanceRecords.id, existingRec.id));
-            } else {
-              await db.insert(attendanceRecords).values({
-                schoolId: user.schoolId,
-                sessionId: session.id,
-                studentId: rec.studentId,
-                status: rec.status,
-                remarks: rec.remarks ?? null,
+                },
               });
-            }
-            batchSyncedCount++;
+            batchSyncedCount = batch.records.length;
           }
 
           totalSynced += batchSyncedCount;

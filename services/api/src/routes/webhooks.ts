@@ -11,7 +11,11 @@ webhookRoutes.post('/cashfree', async (c) => {
   const timestamp = c.req.header('x-webhook-timestamp');
   const rawBody = await c.req.text();
 
-  if (c.env.CASHFREE_SECRET_KEY) {
+  const isProduction = c.env.APP_ENV === 'production';
+  if (isProduction || c.env.CASHFREE_SECRET_KEY) {
+    if (isProduction && !c.env.CASHFREE_SECRET_KEY) {
+      return c.json({ error: 'Cashfree webhook secret is not configured on production server' }, 500);
+    }
     if (!signature || !timestamp) {
       return c.json({ error: 'Missing webhook signature headers' }, 400);
     }
@@ -19,7 +23,7 @@ webhookRoutes.post('/cashfree', async (c) => {
       signature,
       rawBody,
       timestamp,
-      secretKey: c.env.CASHFREE_SECRET_KEY,
+      secretKey: c.env.CASHFREE_SECRET_KEY || '',
       maxSkewMs: 5 * 60 * 1000,
     });
     if (!isValid) {

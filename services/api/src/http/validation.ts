@@ -32,11 +32,12 @@ export const createSubjectSchema = z.object({
 });
 
 export const createStudentSchema = z.object({
-  admissionNumber: z.string().min(1).max(64),
+  admissionNumber: z.string().min(1).max(64).optional(),
   fullName: z.string().min(2),
   userId: z.uuid().optional(),
   guardianName: z.string().optional(),
   guardianPhone: z.string().optional(),
+  guardianEmail: z.string().email().optional(),
   academicYearId: z.uuid(),
   classId: z.uuid(),
   sectionId: z.uuid(),

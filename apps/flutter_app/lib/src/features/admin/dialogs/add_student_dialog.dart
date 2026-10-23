@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/providers.dart';
+import '../../../core/theme.dart';
 import '../../shared/components/app_dialog.dart';
 import '../../shared/components/feedback_banner.dart';
 
@@ -29,6 +30,9 @@ class _AddStudentDialogState extends ConsumerState<AddStudentDialog> {
   final _admissionNo = TextEditingController();
   final _fullName = TextEditingController();
   final _rollNo = TextEditingController();
+  final _guardianName = TextEditingController();
+  final _guardianEmail = TextEditingController();
+  final _guardianPhone = TextEditingController();
 
   String? _yearId;
   String? _classId;
@@ -63,6 +67,9 @@ class _AddStudentDialogState extends ConsumerState<AddStudentDialog> {
     _admissionNo.dispose();
     _fullName.dispose();
     _rollNo.dispose();
+    _guardianName.dispose();
+    _guardianEmail.dispose();
+    _guardianPhone.dispose();
     super.dispose();
   }
 
@@ -82,13 +89,17 @@ class _AddStudentDialogState extends ConsumerState<AddStudentDialog> {
     });
 
     try {
-      final body = {
-        'admissionNumber': _admissionNo.text.trim(),
+      final adm = _admissionNo.text.trim();
+      final body = <String, Object?>{
+        if (adm.isNotEmpty) 'admissionNumber': adm,
         'fullName': _fullName.text.trim(),
         'academicYearId': _yearId,
         'classId': _classId,
         'sectionId': _sectionId,
-        'rollNumber': _rollNo.text.trim().isEmpty ? null : _rollNo.text.trim(),
+        if (_rollNo.text.trim().isNotEmpty) 'rollNumber': _rollNo.text.trim(),
+        if (_guardianName.text.trim().isNotEmpty) 'guardianName': _guardianName.text.trim(),
+        if (_guardianEmail.text.trim().isNotEmpty) 'guardianEmail': _guardianEmail.text.trim(),
+        if (_guardianPhone.text.trim().isNotEmpty) 'guardianPhone': _guardianPhone.text.trim(),
       };
       await ref.read(apiClientProvider).postJson('/api/v1/admin/students', body, session: session);
       await widget.reload();
@@ -108,7 +119,7 @@ class _AddStudentDialogState extends ConsumerState<AddStudentDialog> {
 
     return AppDialog(
       title: 'Add New Student',
-      subtitle: 'Enroll a student into an active academic year and cohort.',
+      subtitle: 'Enroll a student into an active cohort and link parent account.',
       actions: [
         OutlinedButton(
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
@@ -127,74 +138,132 @@ class _AddStudentDialogState extends ConsumerState<AddStudentDialog> {
       ],
       child: Form(
         key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_error != null)
-              FeedbackBanner(
-                message: _error!,
-                tone: FeedbackTone.error,
-                onDismiss: () => setState(() => _error = null),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: FeedbackBanner(
+                    message: _error!,
+                    tone: FeedbackTone.error,
+                    onDismiss: () => setState(() => _error = null),
+                  ),
+                ),
+              TextFormField(
+                controller: _fullName,
+                decoration: const InputDecoration(
+                  labelText: 'Student Full Name *',
+                  hintText: 'e.g. Aarav Sharma',
+                ),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Full name is required' : null,
               ),
-            TextFormField(
-              controller: _admissionNo,
-              decoration: const InputDecoration(
-                labelText: 'Admission Number',
-                hintText: 'e.g. STU-2026-001',
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _admissionNo,
+                decoration: const InputDecoration(
+                  labelText: 'Admission Number (Optional)',
+                  hintText: 'Leave empty to auto-generate sequentially',
+                ),
               ),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Admission number is required' : null,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _fullName,
-              decoration: const InputDecoration(
-                labelText: 'Full Name',
-                hintText: 'e.g. Jane Doe',
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _yearId,
+                decoration: const InputDecoration(labelText: 'Academic Year *'),
+                items: widget.years
+                    .map((y) => DropdownMenuItem(
+                          value: y['id'] as String,
+                          child: Text('${y['name']}'),
+                        ))
+                    .toList(),
+                onChanged: (val) => setState(() => _yearId = val),
               ),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Full name is required' : null,
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _yearId,
-              decoration: const InputDecoration(labelText: 'Academic Year'),
-              items: widget.years
-                  .map((y) => DropdownMenuItem(value: y['id'] as String, child: Text('${y['name']}')))
-                  .toList(),
-              onChanged: (val) => setState(() => _yearId = val),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _classId,
-              decoration: const InputDecoration(labelText: 'Class'),
-              items: widget.classes
-                  .map((c) => DropdownMenuItem(value: c['id'] as String, child: Text('${c['name']}')))
-                  .toList(),
-              onChanged: (val) {
-                setState(() {
-                  _classId = val;
-                  _updateDefaultSection();
-                });
-              },
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              key: ValueKey('sec_$_classId'),
-              initialValue: _sectionId,
-              decoration: const InputDecoration(labelText: 'Section'),
-              items: availableSections
-                  .map((s) => DropdownMenuItem(value: s['id'] as String, child: Text('${s['name']}')))
-                  .toList(),
-              onChanged: (val) => setState(() => _sectionId = val),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _rollNo,
-              decoration: const InputDecoration(
-                labelText: 'Roll Number (optional)',
-                hintText: 'e.g. 14',
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _classId,
+                decoration: const InputDecoration(labelText: 'Class *'),
+                items: widget.classes
+                    .map((c) => DropdownMenuItem(
+                          value: c['id'] as String,
+                          child: Text('${c['name']}'),
+                        ))
+                    .toList(),
+                onChanged: (val) {
+                  setState(() {
+                    _classId = val;
+                    _updateDefaultSection();
+                  });
+                },
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                key: ValueKey('sec_$_classId'),
+                initialValue: _sectionId,
+                decoration: const InputDecoration(labelText: 'Section *'),
+                items: availableSections
+                    .map((s) => DropdownMenuItem(
+                          value: s['id'] as String,
+                          child: Text('${s['name']}'),
+                        ))
+                    .toList(),
+                onChanged: (val) => setState(() => _sectionId = val),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _rollNo,
+                decoration: const InputDecoration(
+                  labelText: 'Roll Number (optional)',
+                  hintText: 'e.g. 14',
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Row(
+                children: [
+                  Expanded(child: Divider()),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Text(
+                      'Parent / Guardian Linking',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.secondaryText,
+                      ),
+                    ),
+                  ),
+                  Expanded(child: Divider()),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _guardianName,
+                decoration: const InputDecoration(
+                  labelText: 'Guardian / Parent Name (optional)',
+                  hintText: 'e.g. Rajesh Sharma',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _guardianEmail,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Guardian Email (Auto-provisions parent portal login)',
+                  hintText: 'e.g. parent@example.com',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _guardianPhone,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Guardian Phone Number',
+                  hintText: 'e.g. +91 9876543210',
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

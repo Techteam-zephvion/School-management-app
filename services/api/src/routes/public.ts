@@ -29,6 +29,11 @@ publicRoutes.post('/inquiries', zValidator('json', publicInquirySchema), async (
   return c.json(await repo.createPublicInquiry(c.req.valid('json')), 201);
 });
 
+publicRoutes.post('/admissions/apply', zValidator('json', publicInquirySchema), async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(await repo.createPublicInquiry(c.req.valid('json')), 201);
+});
+
 // Public digital certificate verification
 publicRoutes.get(
   '/certificates/verify/:code',

@@ -52,20 +52,24 @@ bootstrapRoutes.post('/school', zValidator('json', bootstrapSchema), async (c) =
 
   const input = c.req.valid('json');
   const db = createDb(c.env.DATABASE_URL);
-  const [school] = await db.insert(schools).values(input.school).returning();
-  if (!school) throw new ApiError(500, 'Unable to create school');
+  const result = await db.transaction(async (tx) => {
+    const [school] = await tx.insert(schools).values(input.school).returning();
+    if (!school) throw new ApiError(500, 'Unable to create school');
 
-  const [admin] = await db
-    .insert(appUsers)
-    .values({
-      schoolId: school.id,
-      neonUserId: input.admin.neonUserId,
-      email: input.admin.email,
-      displayName: input.admin.displayName,
-    })
-    .returning();
-  if (!admin) throw new ApiError(500, 'Unable to create admin');
+    const [admin] = await tx
+      .insert(appUsers)
+      .values({
+        schoolId: school.id,
+        neonUserId: input.admin.neonUserId,
+        email: input.admin.email,
+        displayName: input.admin.displayName,
+      })
+      .returning();
+    if (!admin) throw new ApiError(500, 'Unable to create admin');
 
-  await db.insert(userRoles).values({ userId: admin.id, role: 'admin' });
-  return c.json({ school, admin: { ...admin, roles: ['admin'] } }, 201);
+    await tx.insert(userRoles).values({ userId: admin.id, role: 'admin' });
+    return { school, admin: { ...admin, roles: ['admin'] } };
+  });
+
+  return c.json(result, 201);
 });

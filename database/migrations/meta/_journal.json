@@ -141,6 +141,13 @@
       "when": 1792501009485,
       "tag": "0019_steep_risque",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792700000000,
+      "tag": "0020_fee_receipt_sequence",
+      "breakpoints": true
     }
   ]
 }

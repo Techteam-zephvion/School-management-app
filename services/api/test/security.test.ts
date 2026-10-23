@@ -17,34 +17,38 @@ let mockUserRows: any[] = [];
 // Mock database layer
 vi.mock('../src/db/client', () => {
   return {
-    createDb: vi.fn(() => ({
-      select: vi.fn(() => ({
-        from: vi.fn(() => ({
-          leftJoin: vi.fn(() => ({
+    createDb: vi.fn(() => {
+      const dbMock: any = {
+        select: vi.fn(() => ({
+          from: vi.fn(() => ({
             leftJoin: vi.fn(() => ({
-              where: vi.fn(() => {
-                return {
-                  then: (resolve: (rows: any[]) => void) => {
-                    resolve(mockUserRows);
-                  },
-                };
-              }),
+              leftJoin: vi.fn(() => ({
+                where: vi.fn(() => {
+                  return {
+                    then: (resolve: (rows: any[]) => void) => {
+                      resolve(mockUserRows);
+                    },
+                  };
+                }),
+              })),
+            })),
+            where: vi.fn(() => ({
+              limit: vi.fn().mockResolvedValue([]),
             })),
           })),
-          where: vi.fn(() => ({
-            limit: vi.fn().mockResolvedValue([]),
+        })),
+        insert: vi.fn(() => ({
+          values: vi.fn(() => ({
+            returning: vi.fn().mockResolvedValue([{ id: 'mock-id' }]),
+            onConflictDoUpdate: vi.fn(() => ({
+              returning: vi.fn().mockResolvedValue([{ id: 'mock-id' }]),
+            })),
           })),
         })),
-      })),
-      insert: vi.fn(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn().mockResolvedValue([]),
-          onConflictDoUpdate: vi.fn(() => ({
-            returning: vi.fn().mockResolvedValue([]),
-          })),
-        })),
-      })),
-    })),
+        transaction: vi.fn(async (cb: any) => cb(dbMock)),
+      };
+      return dbMock;
+    }),
   };
 });
 

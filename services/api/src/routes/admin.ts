@@ -532,6 +532,19 @@ adminRoutes
       const authUser = c.get('authUser');
       const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
 
+      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+      const ALLOWED_MIME_TYPES = new Set([
+        'application/pdf',
+        'image/png',
+        'image/jpeg',
+        'image/webp',
+      ]);
+
+      const contentLength = Number(c.req.header('content-length'));
+      if (contentLength && contentLength > MAX_FILE_SIZE) {
+        throw new ApiError(413, 'File size exceeds maximum allowed 10MB limit');
+      }
+
       const body = await c.req.parseBody();
       const file = body['file'];
 
@@ -557,18 +570,44 @@ adminRoutes
         if (headerName) fileName = headerName;
       }
 
+      if (bytes.byteLength > MAX_FILE_SIZE) {
+        throw new ApiError(413, 'File size exceeds maximum allowed 10MB limit');
+      }
+
+      const mimePart = (contentType || '').split(';')[0];
+      const normalizedMime = (mimePart ?? '').trim().toLowerCase();
+      if (!ALLOWED_MIME_TYPES.has(normalizedMime)) {
+        throw new ApiError(415, `Unsupported file type: ${contentType}. Allowed types: application/pdf, image/png, image/jpeg, image/webp`);
+      }
+
       const storage = new DocumentStorage(c.env.DOCUMENTS_BUCKET);
       const stored = await storage.uploadFile({
         schoolId: authUser.schoolId,
         applicationId,
         documentId: docId,
         fileName,
-        contentType,
+        contentType: normalizedMime,
         data: bytes,
       });
 
       const updated = await repo.attachAdmissionDocumentFile(authUser, applicationId, docId, stored);
       return c.json(updated, 201);
+    },
+  )
+  .post(
+    '/admissions/applications/:id/documents/:docId/upload-url',
+    zValidator('param', z.object({ id: z.string().uuid(), docId: z.string().uuid() })),
+    async (c) => {
+      const { id: applicationId, docId } = c.req.valid('param');
+      const authUser = c.get('authUser');
+      const fileKey = `schools/${authUser.schoolId}/applications/${applicationId}/documents/${docId}/upload.bin`;
+      return c.json({
+        uploadUrl: `/api/v1/admin/admissions/applications/${applicationId}/documents/${docId}/file`,
+        fileKey,
+        maxSizeBytes: 10 * 1024 * 1024,
+        allowedMimes: ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'],
+        expiresInSeconds: 900,
+      });
     },
   )
   .get(
@@ -590,9 +629,11 @@ adminRoutes
         throw new ApiError(404, 'Attached file was not found in storage');
       }
 
-      c.header('Content-Type', file.contentType);
+      const safeFileName = (doc.fileName || file.fileName || 'document.pdf').replace(/[\r\n"\\/]/g, '_');
+      c.header('Content-Type', file.contentType || 'application/octet-stream');
       c.header('Content-Length', String(file.contentLength));
-      c.header('Content-Disposition', `inline; filename="${doc.fileName || file.fileName}"`);
+      c.header('Content-Disposition', `attachment; filename="${safeFileName}"`);
+      c.header('X-Content-Type-Options', 'nosniff');
       c.header('Cache-Control', 'private, max-age=3600');
 
       return c.body(file.body as any);
@@ -847,6 +888,17 @@ adminRoutes.put(
     const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
     return c.json(
       await repo.resolveDsrRequest(c.get('authUser'), c.req.valid('param').id, c.req.valid('json')),
+    );
+  },
+);
+
+adminRoutes.post(
+  '/dpdp/dsr/:id/export',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.processDsrDataExport(c.get('authUser'), c.req.valid('param').id, c.env.DOCUMENTS_BUCKET),
     );
   },
 );

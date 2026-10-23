@@ -198,7 +198,7 @@ export const authenticate = createMiddleware<AppBindings>(async (c, next) => {
   }
 
   const db = createDb(c.env.DATABASE_URL);
-  const rows = await db
+  let rows = await db
     .select({
       appUserId: appUsers.id,
       schoolId: appUsers.schoolId,
@@ -213,6 +213,38 @@ export const authenticate = createMiddleware<AppBindings>(async (c, next) => {
     .leftJoin(userRoles, eq(userRoles.userId, appUsers.id))
     .leftJoin(staff, eq(staff.userId, appUsers.id))
     .where(and(eq(appUsers.neonUserId, sessionUser.id), eq(appUsers.isActive, true)));
+
+  if (rows.length === 0 && sessionUser.email) {
+    const userEmailLower = sessionUser.email.toLowerCase().trim();
+    const [matchingByEmail] = await db
+      .select({ id: appUsers.id })
+      .from(appUsers)
+      .where(and(eq(appUsers.email, userEmailLower), eq(appUsers.isActive, true)))
+      .limit(1);
+
+    if (matchingByEmail) {
+      await db
+        .update(appUsers)
+        .set({ neonUserId: sessionUser.id, updatedAt: new Date() })
+        .where(eq(appUsers.id, matchingByEmail.id));
+
+      rows = await db
+        .select({
+          appUserId: appUsers.id,
+          schoolId: appUsers.schoolId,
+          email: appUsers.email,
+          displayName: appUsers.displayName,
+          isActive: appUsers.isActive,
+          role: userRoles.role,
+          staffId: staff.id,
+          staffName: staff.fullName,
+        })
+        .from(appUsers)
+        .leftJoin(userRoles, eq(userRoles.userId, appUsers.id))
+        .leftJoin(staff, eq(staff.userId, appUsers.id))
+        .where(and(eq(appUsers.neonUserId, sessionUser.id), eq(appUsers.isActive, true)));
+    }
+  }
 
   if (rows.length === 0) {
     throw new ApiError(403, 'User is not provisioned for this pilot');
