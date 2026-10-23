@@ -11,6 +11,9 @@ apps/flutter_app/build/
 .dev.vars
 *.zip
 *.aab
+*.jks
+*.keystore
+key.properties
 build_artifacts/
 .ignore/
 .agents/
