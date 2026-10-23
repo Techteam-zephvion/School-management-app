@@ -91,9 +91,9 @@ class _AnnouncementsViewState extends ConsumerState<AnnouncementsView> {
       final rows = await ref
           .read(apiClientProvider)
           .getList(widget.endpoint, session: session);
-      setState(() => _announcements = rows);
+      if (mounted) setState(() => _announcements = rows);
     } on ApiException catch (exception) {
-      setState(() => _error = exception.message);
+      if (mounted) setState(() => _error = exception.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -131,9 +131,9 @@ class _AnnouncementsViewState extends ConsumerState<AnnouncementsView> {
       _title.clear();
       _body.clear();
       await _load();
-      setState(() => _notice = 'Announcement published.');
+      if (mounted) setState(() => _notice = 'Announcement published.');
     } on ApiException catch (exception) {
-      setState(() => _error = exception.message);
+      if (mounted) setState(() => _error = exception.message);
     } finally {
       if (mounted) setState(() => _publishing = false);
     }

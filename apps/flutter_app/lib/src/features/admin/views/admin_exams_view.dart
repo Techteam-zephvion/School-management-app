@@ -36,7 +36,7 @@ class AdminExamsView extends ConsumerStatefulWidget {
 }
 
 class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
-  int _selectedTab = 0; // 0: Exams, 1: Grading Schemes, 2: Report Cards
+  int _selectedTab = 0; // 0: Exams, 1: Grading, 2: Reports, 3: Sync logs
 
   // Exams Composer State
   final _name = TextEditingController();
@@ -55,6 +55,8 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
   // Grading Schemes State
   List<Map<String, Object?>> _schemes = [];
   bool _loadingSchemes = false;
+  List<Map<String, Object?>> _syncLogs = [];
+  bool _loadingSyncLogs = false;
 
   // Report Cards State
   List<Map<String, Object?>> _reportCards = [];
@@ -108,9 +110,12 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
     if (session == null) return;
     setState(() => _loadingSchemes = true);
     try {
-      final list = await ref.read(apiClientProvider).getGradingSchemes(session: session);
+      final list = await ref
+          .read(apiClientProvider)
+          .getGradingSchemes(session: session);
       if (mounted) setState(() => _schemes = list);
-    } catch (_) {} finally {
+    } catch (_) {
+    } finally {
       if (mounted) setState(() => _loadingSchemes = false);
     }
   }
@@ -120,15 +125,289 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
     if (session == null) return;
     setState(() => _loadingReportCards = true);
     try {
-      final list = await ref.read(apiClientProvider).getReportCards(
+      final list = await ref
+          .read(apiClientProvider)
+          .getReportCards(
             session: session,
             classId: _filterClassId,
             sectionId: _filterSectionId,
             term: _filterTerm == 'all' ? null : _filterTerm,
           );
       if (mounted) setState(() => _reportCards = list);
-    } catch (_) {} finally {
+    } catch (_) {
+    } finally {
       if (mounted) setState(() => _loadingReportCards = false);
+    }
+  }
+
+  Future<void> _loadSyncLogs() async {
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+    setState(() => _loadingSyncLogs = true);
+    try {
+      final logs = await ref
+          .read(apiClientProvider)
+          .getOfflineSyncLogs(session: session);
+      if (mounted) setState(() => _syncLogs = logs);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Could not load sync history: $e');
+    } finally {
+      if (mounted) setState(() => _loadingSyncLogs = false);
+    }
+  }
+
+  Future<void> _createSchemeDialog() async {
+    final name = TextEditingController();
+    final description = TextEditingController();
+    final passing = TextEditingController(text: '33');
+    var board = 'custom';
+    var makeDefault = false;
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AppDialog(
+          title: 'Create grading scheme',
+          subtitle:
+              'Define the framework first, then add scales and components.',
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Create scheme'),
+            ),
+          ],
+          child: Column(
+            children: [
+              TextField(
+                controller: name,
+                decoration: const InputDecoration(labelText: 'Scheme name'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: board,
+                decoration: const InputDecoration(labelText: 'Board'),
+                items: const [
+                  DropdownMenuItem(value: 'custom', child: Text('Custom')),
+                  DropdownMenuItem(value: 'cbse', child: Text('CBSE')),
+                  DropdownMenuItem(value: 'icse', child: Text('ICSE')),
+                  DropdownMenuItem(value: 'state', child: Text('State board')),
+                ],
+                onChanged: (value) => board = value ?? 'custom',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passing,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Passing percentage',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: description,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Description (optional)',
+                ),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Use as the default scheme'),
+                value: makeDefault,
+                onChanged: (value) =>
+                    setDialogState(() => makeDefault = value ?? false),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (save != true || name.text.trim().isEmpty) return;
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+    try {
+      await ref
+          .read(apiClientProvider)
+          .createGradingScheme(
+            session: session,
+            name: name.text.trim(),
+            board: board,
+            description: description.text.trim(),
+            passingPercentage: int.tryParse(passing.text.trim()) ?? 33,
+            isDefault: makeDefault,
+          );
+      setState(() => _notice = 'Grading scheme created.');
+      await _loadSchemes();
+    } catch (e) {
+      setState(() => _error = 'Could not create grading scheme: $e');
+    }
+  }
+
+  Future<void> _addScaleDialog(Map<String, Object?> scheme) async {
+    final grade = TextEditingController();
+    final min = TextEditingController();
+    final max = TextEditingController(text: '100');
+    final point = TextEditingController();
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (context) => AppDialog(
+        title: 'Add grading scale',
+        subtitle: scheme['name'] as String? ?? 'Grading scheme',
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Add scale'),
+          ),
+        ],
+        child: Column(
+          children: [
+            TextField(
+              controller: grade,
+              decoration: const InputDecoration(
+                labelText: 'Grade, for example A1',
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: min,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Minimum %'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: max,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Maximum %'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: point,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Grade point'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (save != true || grade.text.trim().isEmpty) return;
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+    try {
+      await ref
+          .read(apiClientProvider)
+          .createGradingScale(
+            session: session,
+            schemeId: scheme['id'] as String,
+            grade: grade.text.trim(),
+            minScore: int.tryParse(min.text) ?? 0,
+            maxScore: int.tryParse(max.text) ?? 100,
+            gradePoint: point.text.trim().isEmpty ? '0' : point.text.trim(),
+          );
+      await _loadSchemes();
+    } catch (e) {
+      setState(() => _error = 'Could not add grading scale: $e');
+    }
+  }
+
+  Future<void> _addComponentDialog(Map<String, Object?> scheme) async {
+    final name = TextEditingController();
+    final weight = TextEditingController();
+    final marks = TextEditingController(text: '100');
+    var type = 'exam';
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (context) => AppDialog(
+        title: 'Add evaluation component',
+        subtitle: scheme['name'] as String? ?? 'Grading scheme',
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Add component'),
+          ),
+        ],
+        child: Column(
+          children: [
+            TextField(
+              controller: name,
+              decoration: const InputDecoration(labelText: 'Component name'),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: type,
+              decoration: const InputDecoration(labelText: 'Component type'),
+              items: const [
+                DropdownMenuItem(value: 'exam', child: Text('Exam')),
+                DropdownMenuItem(
+                  value: 'internal',
+                  child: Text('Internal assessment'),
+                ),
+                DropdownMenuItem(value: 'project', child: Text('Project')),
+                DropdownMenuItem(value: 'practical', child: Text('Practical')),
+              ],
+              onChanged: (value) => type = value ?? 'exam',
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: weight,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Weight %'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: marks,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Maximum marks',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+    if (save != true || name.text.trim().isEmpty) return;
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+    try {
+      await ref
+          .read(apiClientProvider)
+          .createEvaluationComponent(
+            session: session,
+            schemeId: scheme['id'] as String,
+            name: name.text.trim(),
+            componentType: type,
+            weightagePercentage: int.tryParse(weight.text) ?? 0,
+            maxMarks: int.tryParse(marks.text) ?? 100,
+          );
+      await _loadSchemes();
+    } catch (e) {
+      setState(() => _error = 'Could not add evaluation component: $e');
     }
   }
 
@@ -137,7 +416,9 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
     if (session == null) return;
     setState(() => _loadingSchemes = true);
     try {
-      final list = await ref.read(apiClientProvider).seedDefaultBoardSchemes(session: session);
+      final list = await ref
+          .read(apiClientProvider)
+          .seedDefaultBoardSchemes(session: session);
       setState(() {
         _schemes = list;
         _notice = 'Standard CBSE, ICSE, and State Board CCE schemes seeded successfully.';
@@ -188,7 +469,9 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
             .postJson('/api/v1/admin/exams', body, session: session);
         _notice = 'Exam created.';
       } else {
-        await ref.read(apiClientProvider).putJson(
+        await ref
+            .read(apiClientProvider)
+            .patchJson(
               '/api/v1/admin/exams/${_editing!['id']}',
               body,
               session: session,
@@ -255,9 +538,7 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
         PageHeader(
           title: loc.text('academics'),
           description: 'Board-specific grading schemes (CBSE/ICSE/State), evaluation weightages, exams, and printable report cards.',
-          secondaryActions: const [
-            LanguagePickerDropdown(isCompact: true),
-          ],
+          secondaryActions: const [LanguagePickerDropdown(isCompact: true)],
           primaryAction: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -337,8 +618,10 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
             ...widget.exams.map(_examCard),
         ] else if (_selectedTab == 1) ...[
           _buildGradingSchemesTab(),
-        ] else ...[
+        ] else if (_selectedTab == 2) ...[
           _buildReportCardsTab(),
+        ] else ...[
+          _buildSyncLogsTab(),
         ],
       ],
     );
@@ -353,9 +636,26 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _buildTabButton(0, 'Exams Schedule (${widget.exams.length})', Icons.assignment),
-            _buildTabButton(1, 'Board Schemes & Scales (${_schemes.length})', Icons.grade),
-            _buildTabButton(2, 'Official Report Cards (${_reportCards.length})', Icons.receipt_long),
+            _buildTabButton(
+              0,
+              'Exams Schedule (${widget.exams.length})',
+              Icons.assignment,
+            ),
+            _buildTabButton(
+              1,
+              'Board Schemes & Scales (${_schemes.length})',
+              Icons.grade,
+            ),
+            _buildTabButton(
+              2,
+              'Official Report Cards (${_reportCards.length})',
+              Icons.receipt_long,
+            ),
+            _buildTabButton(
+              3,
+              'Offline Sync Logs (${_syncLogs.length})',
+              Icons.sync_problem_rounded,
+            ),
           ],
         ),
       ),
@@ -390,7 +690,9 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
               style: TextStyle(
                 fontFamily: 'Switzer',
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? AppColors.primaryText : AppColors.secondaryText,
+                color: isSelected
+                    ? AppColors.primaryText
+                    : AppColors.secondaryText,
                 fontSize: 14,
               ),
             ),
@@ -423,7 +725,27 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: _schemes.map(_buildSchemeCard).toList(),
+      children: [
+        Wrap(
+          alignment: WrapAlignment.end,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              onPressed: _seedDefaultSchemes,
+              icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+              label: const Text('Seed board presets'),
+            ),
+            FilledButton.icon(
+              onPressed: _createSchemeDialog,
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: const Text('Create custom scheme'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ..._schemes.map(_buildSchemeCard),
+      ],
     );
   }
 
@@ -441,7 +763,9 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
       decoration: BoxDecoration(
         color: AppColors.secondaryBackground,
         border: Border.all(
-          color: isDefault ? AppColors.accent.withValues(alpha: 0.5) : AppColors.primaryBorder,
+          color: isDefault
+              ? AppColors.accent.withValues(alpha: 0.5)
+              : AppColors.primaryBorder,
         ),
         borderRadius: AppRadii.rLg,
       ),
@@ -512,7 +836,10 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
                 final compName = c['name'] ?? '';
                 final wt = c['weightagePercentage'] ?? 0;
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.mainBackground,
                     borderRadius: BorderRadius.circular(6),
@@ -550,7 +877,10 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
                 final max = s['maxScore'] ?? 100;
                 final gp = s['gradePoint'] ?? '';
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.secondaryBackground,
                     borderRadius: BorderRadius.circular(6),
@@ -558,14 +888,118 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
                   ),
                   child: Text(
                     '$grade: $min-$max% ($gp GP)',
-                    style: const TextStyle(fontFamily: 'Switzer', fontSize: 11, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontFamily: 'Switzer',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 );
               }).toList(),
             ),
           ],
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _addScaleDialog(scheme),
+                icon: const Icon(Icons.add_chart_rounded, size: 16),
+                label: const Text('Add scale'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _addComponentDialog(scheme),
+                icon: const Icon(Icons.playlist_add_rounded, size: 16),
+                label: const Text('Add component'),
+              ),
+            ],
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSyncLogsTab() {
+    if (_syncLogs.isEmpty && !_loadingSyncLogs) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _selectedTab == 3) _loadSyncLogs();
+      });
+    }
+    if (_loadingSyncLogs) {
+      return const Padding(
+        padding: EdgeInsets.all(40),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Align(
+          alignment: Alignment.centerRight,
+          child: OutlinedButton.icon(
+            onPressed: _loadSyncLogs,
+            icon: const Icon(Icons.refresh_rounded, size: 16),
+            label: const Text('Refresh logs'),
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_syncLogs.isEmpty)
+          const EmptyStateView(
+            title: 'No offline attendance syncs',
+            description:
+                'Teacher device sync attempts and conflicts will appear here.',
+            icon: Icons.cloud_done_outlined,
+          )
+        else
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columns: const [
+                DataColumn(label: Text('Teacher')),
+                DataColumn(label: Text('Device batch')),
+                DataColumn(label: Text('Records')),
+                DataColumn(label: Text('Conflicts')),
+                DataColumn(label: Text('Status')),
+                DataColumn(label: Text('Synced at')),
+              ],
+              rows: _syncLogs.map((log) {
+                final conflicts = log['conflictCount'] ?? log['conflicts'] ?? 0;
+                final status = log['status']?.toString() ?? 'completed';
+                return DataRow(
+                  cells: [
+                    DataCell(
+                      Text(
+                        log['staffName']?.toString() ??
+                            log['teacherName']?.toString() ??
+                            'Teacher',
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        log['batchId']?.toString() ??
+                            log['deviceBatchId']?.toString() ??
+                            '—',
+                      ),
+                    ),
+                    DataCell(
+                      Text('${log['recordCount'] ?? log['recordsCount'] ?? 0}'),
+                    ),
+                    DataCell(Text('$conflicts')),
+                    DataCell(StatusBadge.fromStatusString(status)),
+                    DataCell(
+                      Text(
+                        log['syncedAt']?.toString() ??
+                            log['createdAt']?.toString() ??
+                            '—',
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+      ],
     );
   }
 
@@ -591,7 +1025,10 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
                   initialValue: _filterClassId,
                   decoration: const InputDecoration(labelText: 'Filter Class'),
                   items: [
-                    const DropdownMenuItem(value: null, child: Text('All Classes')),
+                    const DropdownMenuItem(
+                      value: null,
+                      child: Text('All Classes'),
+                    ),
                     ...widget.classes.map((c) {
                       return DropdownMenuItem(
                         value: c['id'] as String?,
@@ -615,7 +1052,10 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
                   decoration: const InputDecoration(labelText: 'Term'),
                   items: const [
                     DropdownMenuItem(value: 'all', child: Text('All Terms')),
-                    DropdownMenuItem(value: 'annual', child: Text('Annual Term')),
+                    DropdownMenuItem(
+                      value: 'annual',
+                      child: Text('Annual Term'),
+                    ),
                     DropdownMenuItem(value: 'term_1', child: Text('Term 1')),
                     DropdownMenuItem(value: 'term_2', child: Text('Term 2')),
                   ],
@@ -680,7 +1120,10 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
           CircleAvatar(
             backgroundColor: AppColors.accent.withValues(alpha: 0.12),
             foregroundColor: AppColors.accent,
-            child: Text(grade, style: const TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(
+              grade,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -700,20 +1143,28 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.primaryBorder,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         board,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     StatusBadge(
                       label: resultStatus.toUpperCase(),
-                      tone: resultStatus.toLowerCase().contains('fail') ? BadgeTone.error : BadgeTone.success,
+                      tone: resultStatus.toLowerCase().contains('fail')
+                          ? BadgeTone.error
+                          : BadgeTone.success,
                     ),
                   ],
                 ),
@@ -737,7 +1188,9 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
           ),
           const SizedBox(width: 12),
           IconButton(
-            tooltip: isPublished ? 'Unpublish from Portal' : 'Publish to Student/Parent Portal',
+            tooltip: isPublished
+                ? 'Unpublish from Portal'
+                : 'Publish to Student/Parent Portal',
             icon: Icon(
               isPublished ? Icons.visibility : Icons.visibility_off,
               color: isPublished ? AppColors.accent : AppColors.secondaryText,
@@ -745,7 +1198,9 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
             onPressed: () async {
               final session = ref.read(authControllerProvider).session;
               if (session == null) return;
-              await ref.read(apiClientProvider).publishReportCard(
+              await ref
+                  .read(apiClientProvider)
+                  .publishReportCard(
                     reportCardId: id,
                     isPublished: !isPublished,
                     session: session,
@@ -764,9 +1219,13 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
   }
 
   Future<void> _printReportCard(Map<String, Object?> rc) async {
-    final scholasticData = (rc['scholasticParsed'] as List<dynamic>?)?.cast<Map<String, Object?>>() ??
+    final scholasticData =
+        (rc['scholasticParsed'] as List<dynamic>?)
+            ?.cast<Map<String, Object?>>() ??
         const [];
-    final coScholasticData = (rc['coScholasticParsed'] as List<dynamic>?)?.cast<Map<String, Object?>>() ??
+    final coScholasticData =
+        (rc['coScholasticParsed'] as List<dynamic>?)
+            ?.cast<Map<String, Object?>>() ??
         const [];
 
     final pdfData = ReportCardPdfData(
@@ -884,7 +1343,9 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
                     setState(() {
                       _classId = val;
                       final secs = _sectionsForClass();
-                      _sectionId = secs.isEmpty ? null : secs.first['id'] as String?;
+                      _sectionId = secs.isEmpty
+                          ? null
+                          : secs.first['id'] as String?;
                     });
                   },
                 ),
@@ -909,9 +1370,14 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
                 child: DropdownButtonFormField<String?>(
                   isExpanded: true,
                   initialValue: _subjectId,
-                  decoration: const InputDecoration(labelText: 'Subject (optional)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Subject (optional)',
+                  ),
                   items: [
-                    const DropdownMenuItem(value: null, child: Text('General / All')),
+                    const DropdownMenuItem(
+                      value: null,
+                      child: Text('General / All'),
+                    ),
                     ...widget.subjects.map((sub) {
                       return DropdownMenuItem(
                         value: sub['id'] as String?,
@@ -965,8 +1431,14 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
                   decoration: const InputDecoration(labelText: 'Status'),
                   items: const [
                     DropdownMenuItem(value: 'draft', child: Text('Draft')),
-                    DropdownMenuItem(value: 'published', child: Text('Published')),
-                    DropdownMenuItem(value: 'archived', child: Text('Archived')),
+                    DropdownMenuItem(
+                      value: 'published',
+                      child: Text('Published'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'archived',
+                      child: Text('Archived'),
+                    ),
                   ],
                   onChanged: (val) {
                     if (val != null) setState(() => _status = val);
@@ -1034,8 +1506,8 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
                       tone: status == 'published'
                           ? BadgeTone.success
                           : status == 'archived'
-                              ? BadgeTone.neutral
-                              : BadgeTone.warning,
+                          ? BadgeTone.neutral
+                          : BadgeTone.warning,
                     ),
                   ],
                 ),
@@ -1054,7 +1526,11 @@ class _AdminExamsViewState extends ConsumerState<AdminExamsView> {
           ),
           IconButton(
             tooltip: 'Delete exam',
-            icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.statusError),
+            icon: const Icon(
+              Icons.delete_outline,
+              size: 18,
+              color: AppColors.statusError,
+            ),
             onPressed: () => _delete(exam),
           ),
         ],
@@ -1108,10 +1584,12 @@ class _GenerateReportCardsDialogState
   void initState() {
     super.initState();
     if (widget.years.isNotEmpty) _yearId = widget.years.first['id'] as String?;
-    if (widget.classes.isNotEmpty) _classId = widget.classes.first['id'] as String?;
+    if (widget.classes.isNotEmpty)
+      _classId = widget.classes.first['id'] as String?;
     final secs = _sectionsForClass();
     if (secs.isNotEmpty) _sectionId = secs.first['id'] as String?;
-    if (widget.schemes.isNotEmpty) _schemeId = widget.schemes.first['id'] as String?;
+    if (widget.schemes.isNotEmpty)
+      _schemeId = widget.schemes.first['id'] as String?;
   }
 
   List<Map<String, Object?>> _sectionsForClass() {
@@ -1129,8 +1607,14 @@ class _GenerateReportCardsDialogState
   Future<void> _submit() async {
     final session = ref.read(authControllerProvider).session;
     if (session == null || _generating) return;
-    if (_yearId == null || _classId == null || _sectionId == null || _schemeId == null) {
-      setState(() => _error = 'Please select academic year, class, section, and grading scheme.');
+    if (_yearId == null ||
+        _classId == null ||
+        _sectionId == null ||
+        _schemeId == null) {
+      setState(
+        () => _error =
+            'Please select academic year, class, section, and grading scheme.',
+      );
       return;
     }
 
@@ -1140,7 +1624,9 @@ class _GenerateReportCardsDialogState
     });
 
     try {
-      await ref.read(apiClientProvider).generateReportCards(
+      await ref
+          .read(apiClientProvider)
+          .generateReportCards(
             session: session,
             academicYearId: _yearId!,
             classId: _classId!,
@@ -1221,7 +1707,9 @@ class _GenerateReportCardsDialogState
                     setState(() {
                       _classId = val;
                       final secs = _sectionsForClass();
-                      _sectionId = secs.isEmpty ? null : secs.first['id'] as String?;
+                      _sectionId = secs.isEmpty
+                          ? null
+                          : secs.first['id'] as String?;
                     });
                   },
                 ),
@@ -1245,7 +1733,9 @@ class _GenerateReportCardsDialogState
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: _schemeId,
-            decoration: const InputDecoration(labelText: 'Grading Scheme & Board'),
+            decoration: const InputDecoration(
+              labelText: 'Grading Scheme & Board',
+            ),
             items: widget.schemes.map((s) {
               final b = (s['board'] ?? 'CBSE').toString().toUpperCase();
               return DropdownMenuItem(
@@ -1260,8 +1750,14 @@ class _GenerateReportCardsDialogState
             initialValue: _term,
             decoration: const InputDecoration(labelText: 'Academic Term'),
             items: const [
-              DropdownMenuItem(value: 'annual', child: Text('Annual Term (Full Year)')),
-              DropdownMenuItem(value: 'term_1', child: Text('Term 1 (Half Yearly)')),
+              DropdownMenuItem(
+                value: 'annual',
+                child: Text('Annual Term (Full Year)'),
+              ),
+              DropdownMenuItem(
+                value: 'term_1',
+                child: Text('Term 1 (Half Yearly)'),
+              ),
               DropdownMenuItem(value: 'term_2', child: Text('Term 2')),
             ],
             onChanged: (val) {

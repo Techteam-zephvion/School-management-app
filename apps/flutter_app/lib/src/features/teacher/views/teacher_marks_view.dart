@@ -56,13 +56,15 @@ class _TeacherMarksViewState extends ConsumerState<TeacherMarksView> {
       final exams = await ref
           .read(apiClientProvider)
           .getList('/api/v1/teacher/exams', session: session);
-      setState(() {
-        _exams = exams;
-        _selectedExam = exams.isEmpty ? null : exams.first;
-      });
+      if (mounted) {
+        setState(() {
+          _exams = exams;
+          _selectedExam = exams.isEmpty ? null : exams.first;
+        });
+      }
       if (exams.isNotEmpty) await _loadRoster(exams.first['id'] as String);
     } on ApiException catch (exception) {
-      setState(() => _error = exception.message);
+      if (mounted) setState(() => _error = exception.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -98,9 +100,9 @@ class _TeacherMarksViewState extends ConsumerState<TeacherMarksView> {
           text: student['remarks'] as String? ?? '',
         );
       }
-      setState(() => _students = students);
+      if (mounted) setState(() => _students = students);
     } on ApiException catch (exception) {
-      setState(() => _error = exception.message);
+      if (mounted) setState(() => _error = exception.message);
     }
   }
 
@@ -140,9 +142,9 @@ class _TeacherMarksViewState extends ConsumerState<TeacherMarksView> {
         'records': records,
       }, session: session);
       await _loadRoster(exam['id'] as String);
-      setState(() => _notice = 'Marks saved.');
+      if (mounted) setState(() => _notice = 'Marks saved.');
     } on ApiException catch (exception) {
-      setState(() => _error = exception.message);
+      if (mounted) setState(() => _error = exception.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }

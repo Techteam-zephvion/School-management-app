@@ -29,7 +29,8 @@ class AdminAssignmentsView extends ConsumerStatefulWidget {
   final Future<void> Function() reload;
 
   @override
-  ConsumerState<AdminAssignmentsView> createState() => _AdminAssignmentsViewState();
+  ConsumerState<AdminAssignmentsView> createState() =>
+      _AdminAssignmentsViewState();
 }
 
 class _AdminAssignmentsViewState extends ConsumerState<AdminAssignmentsView> {
@@ -50,7 +51,8 @@ class _AdminAssignmentsViewState extends ConsumerState<AdminAssignmentsView> {
   void _initDefaults() {
     if (widget.staff.isNotEmpty) _staffId = widget.staff.first['id'] as String?;
     if (widget.years.isNotEmpty) _yearId = widget.years.first['id'] as String?;
-    if (widget.classes.isNotEmpty) _classId = widget.classes.first['id'] as String?;
+    if (widget.classes.isNotEmpty)
+      _classId = widget.classes.first['id'] as String?;
     _updateSectionDefault();
   }
 
@@ -69,8 +71,14 @@ class _AdminAssignmentsViewState extends ConsumerState<AdminAssignmentsView> {
   }
 
   Future<void> _submit() async {
-    if (_staffId == null || _yearId == null || _classId == null || _sectionId == null) {
-      setState(() => _error = 'Please select Teacher, Academic Year, Class, and Section.');
+    if (_staffId == null ||
+        _yearId == null ||
+        _classId == null ||
+        _sectionId == null) {
+      setState(
+        () => _error =
+            'Please select Teacher, Academic Year, Class, and Section.',
+      );
       return;
     }
 
@@ -91,12 +99,45 @@ class _AdminAssignmentsViewState extends ConsumerState<AdminAssignmentsView> {
         'subjectId': _subjectId,
         'canTakeDailyAttendance': true,
       };
-      await ref.read(apiClientProvider).postJson('/api/v1/admin/teacher-assignments', body, session: session);
+      await ref
+          .read(apiClientProvider)
+          .postJson(
+            '/api/v1/admin/teacher-assignments',
+            body,
+            session: session,
+          );
       await widget.reload();
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
       setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _assignClassTeacher() async {
+    if (_staffId == null || _sectionId == null) {
+      setState(() => _error = 'Select a teacher and section first.');
+      return;
+    }
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(apiClientProvider)
+          .assignSectionClassTeacher(
+            session: session,
+            sectionId: _sectionId!,
+            classTeacherStaffId: _staffId,
+          );
+      await widget.reload();
+    } on ApiException catch (exception) {
+      setState(() => _error = exception.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -126,7 +167,10 @@ class _AdminAssignmentsViewState extends ConsumerState<AdminAssignmentsView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Create Teacher Assignment', style: AppTypography.subsectionHeading),
+              const Text(
+                'Create Teacher Assignment',
+                style: AppTypography.subsectionHeading,
+              ),
               const SizedBox(height: 16),
               if (_error != null)
                 FeedbackBanner(
@@ -144,7 +188,12 @@ class _AdminAssignmentsViewState extends ConsumerState<AdminAssignmentsView> {
                       initialValue: _staffId,
                       decoration: const InputDecoration(labelText: 'Teacher'),
                       items: widget.staff
-                          .map((s) => DropdownMenuItem(value: s['id'] as String?, child: Text('${s['fullName']}')))
+                          .map(
+                            (s) => DropdownMenuItem(
+                              value: s['id'] as String?,
+                              child: Text('${s['fullName']}'),
+                            ),
+                          )
                           .toList(),
                       onChanged: (val) => setState(() => _staffId = val),
                     ),
@@ -153,9 +202,16 @@ class _AdminAssignmentsViewState extends ConsumerState<AdminAssignmentsView> {
                     width: 180,
                     child: DropdownButtonFormField<String?>(
                       initialValue: _yearId,
-                      decoration: const InputDecoration(labelText: 'Academic Year'),
+                      decoration: const InputDecoration(
+                        labelText: 'Academic Year',
+                      ),
                       items: widget.years
-                          .map((y) => DropdownMenuItem(value: y['id'] as String?, child: Text('${y['name']}')))
+                          .map(
+                            (y) => DropdownMenuItem(
+                              value: y['id'] as String?,
+                              child: Text('${y['name']}'),
+                            ),
+                          )
                           .toList(),
                       onChanged: (val) => setState(() => _yearId = val),
                     ),
@@ -166,7 +222,12 @@ class _AdminAssignmentsViewState extends ConsumerState<AdminAssignmentsView> {
                       initialValue: _classId,
                       decoration: const InputDecoration(labelText: 'Class'),
                       items: widget.classes
-                          .map((c) => DropdownMenuItem(value: c['id'] as String?, child: Text('${c['name']}')))
+                          .map(
+                            (c) => DropdownMenuItem(
+                              value: c['id'] as String?,
+                              child: Text('${c['name']}'),
+                            ),
+                          )
                           .toList(),
                       onChanged: (val) {
                         setState(() {
@@ -183,7 +244,12 @@ class _AdminAssignmentsViewState extends ConsumerState<AdminAssignmentsView> {
                       initialValue: _sectionId,
                       decoration: const InputDecoration(labelText: 'Section'),
                       items: availableSections
-                          .map((s) => DropdownMenuItem(value: s['id'] as String?, child: Text('${s['name']}')))
+                          .map(
+                            (s) => DropdownMenuItem(
+                              value: s['id'] as String?,
+                              child: Text('${s['name']}'),
+                            ),
+                          )
                           .toList(),
                       onChanged: (val) => setState(() => _sectionId = val),
                     ),
@@ -192,11 +258,19 @@ class _AdminAssignmentsViewState extends ConsumerState<AdminAssignmentsView> {
                     width: 180,
                     child: DropdownButtonFormField<String?>(
                       initialValue: _subjectId,
-                      decoration: const InputDecoration(labelText: 'Subject (optional)'),
+                      decoration: const InputDecoration(
+                        labelText: 'Subject (optional)',
+                      ),
                       items: [
-                        const DropdownMenuItem<String?>(value: null, child: Text('All / General')),
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('All / General'),
+                        ),
                         ...widget.subjects.map(
-                          (sub) => DropdownMenuItem(value: sub['id'] as String?, child: Text('${sub['name']}')),
+                          (sub) => DropdownMenuItem(
+                            value: sub['id'] as String?,
+                            child: Text('${sub['name']}'),
+                          ),
                         ),
                       ],
                       onChanged: (val) => setState(() => _subjectId = val),
@@ -207,16 +281,30 @@ class _AdminAssignmentsViewState extends ConsumerState<AdminAssignmentsView> {
               const SizedBox(height: 16),
               Align(
                 alignment: Alignment.centerLeft,
-                child: FilledButton.icon(
-                  onPressed: _saving ? null : _submit,
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.add, size: 16),
-                  label: const Text('Assign teacher to section'),
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: _saving ? null : _submit,
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.add, size: 16),
+                      label: const Text('Assign teacher to section'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _saving ? null : _assignClassTeacher,
+                      icon: const Icon(Icons.star_outline, size: 16),
+                      label: const Text('Set as class teacher'),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -236,24 +324,36 @@ class _AdminAssignmentsViewState extends ConsumerState<AdminAssignmentsView> {
             final cls = '${a['className'] ?? ''}'.toLowerCase();
             final sec = '${a['sectionName'] ?? ''}'.toLowerCase();
             final sub = '${a['subjectName'] ?? ''}'.toLowerCase();
-            return teacher.contains(query) || cls.contains(query) || sec.contains(query) || sub.contains(query);
+            return teacher.contains(query) ||
+                cls.contains(query) ||
+                sec.contains(query) ||
+                sub.contains(query);
           },
           searchHint: 'Filter by teacher or class...',
           columns: [
             AppTableColumn(
               header: 'Teacher',
               flex: 2,
-              cellBuilder: (context, a) => Text('${a['staffName'] ?? '—'}', style: AppTypography.compactTableMedium),
+              cellBuilder: (context, a) => Text(
+                '${a['staffName'] ?? '—'}',
+                style: AppTypography.compactTableMedium,
+              ),
             ),
             AppTableColumn(
               header: 'Class',
               flex: 2,
-              cellBuilder: (context, a) => Text('${a['className'] ?? '—'}', style: AppTypography.compactTable),
+              cellBuilder: (context, a) => Text(
+                '${a['className'] ?? '—'}',
+                style: AppTypography.compactTable,
+              ),
             ),
             AppTableColumn(
               header: 'Section',
               flex: 2,
-              cellBuilder: (context, a) => Text('${a['sectionName'] ?? '—'}', style: AppTypography.compactTable),
+              cellBuilder: (context, a) => Text(
+                '${a['sectionName'] ?? '—'}',
+                style: AppTypography.compactTable,
+              ),
             ),
             AppTableColumn(
               header: 'Subject',

@@ -6,9 +6,11 @@ import 'package:intl/intl.dart';
 
 import '../../core/api_client.dart';
 import '../../core/csv_exporter.dart';
+import '../../core/fluid_ui.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../shared/components/app_dialog.dart';
+import '../shared/components/brand_deck_dialog.dart';
 import '../shared/components/command_palette.dart';
 import '../shared/components/feedback_banner.dart';
 import '../shared/components/schoolic_logo.dart';
@@ -38,6 +40,7 @@ import 'views/admin_compliance_view.dart';
 import 'views/admin_operations_view.dart';
 import 'views/admin_campus_view.dart';
 import 'views/admin_federation_view.dart';
+import '../docs/docs_page.dart';
 
 enum AdminNavSection {
   overview,
@@ -60,6 +63,7 @@ enum AdminNavSection {
   compliance,
   reports,
   settings,
+  docs,
 }
 
 
@@ -429,29 +433,9 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
               ),
               child: (!isDrawer && _sidebarCollapsed)
                   ? const Center(child: SchoolicLogo.compact(size: 20))
-                  : Row(
+                  : const Row(
                       children: [
-                        const SchoolicLogo(size: 20),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.secondaryBackground,
-                            borderRadius: AppRadii.rSm,
-                            border: Border.all(color: AppColors.primaryBorder),
-                          ),
-                          child: const Text(
-                            'ADMIN',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.secondaryText,
-                            ),
-                          ),
-                        ),
+                        SchoolicLogo(size: 20),
                       ],
                     ),
             ),
@@ -576,6 +560,12 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
                   ),
 
                   _sidebarItem(
+                    AdminNavSection.docs,
+                    Icons.menu_book_outlined,
+                    'Docs & Guides',
+                    isDrawer: isDrawer,
+                  ),
+                  _sidebarItem(
                     AdminNavSection.settings,
                     Icons.settings_outlined,
                     'Settings',
@@ -584,6 +574,15 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                     child: Divider(height: 1, color: AppColors.primaryBorder),
+                  ),
+                  _sidebarActionItem(
+                    icon: Icons.palette_outlined,
+                    label: 'Brand Deck',
+                    isDrawer: isDrawer,
+                    onTap: () {
+                      if (isDrawer) Navigator.of(context).pop();
+                      BrandDeckDialog.show(context);
+                    },
                   ),
                   _sidebarActionItem(
                     icon: Icons.explore_outlined,
@@ -685,7 +684,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
     final collapsed = !isDrawer && _sidebarCollapsed;
     return Tooltip(
       message: collapsed ? label : '',
-      child: InkWell(
+      child: FluidPressable(
+        scaleDown: 0.98,
         onTap: () {
           setState(() => _activeSection = section);
           if (isDrawer) Navigator.of(context).pop();
@@ -746,9 +746,9 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
     final collapsed = !isDrawer && _sidebarCollapsed;
     return Tooltip(
       message: collapsed ? label : '',
-      child: InkWell(
+      child: FluidPressable(
+        scaleDown: 0.98,
         onTap: onTap,
-        borderRadius: AppRadii.rMd,
         child: Container(
           height: 38,
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
@@ -961,6 +961,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
               ),
               const SizedBox(width: 8),
             ],
+            const FluidMascotInsignia(size: 26),
+            const SizedBox(width: 6),
             IconButton(
               tooltip: 'Sign out',
               iconSize: 16,
@@ -1015,6 +1017,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
         return 'Reports & Export';
       case AdminNavSection.settings:
         return 'Settings';
+      case AdminNavSection.docs:
+        return 'Documentation & Guides';
     }
   }
 
@@ -1189,6 +1193,11 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
         );
       case AdminNavSection.settings:
         return AdminSettingsView(years: _years, schoolName: _schoolName);
+      case AdminNavSection.docs:
+        return DocsPage(
+          isEmbedded: true,
+          onBack: () => setState(() => _activeSection = AdminNavSection.overview),
+        );
     }
   }
 
@@ -1198,6 +1207,9 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
       switch (dest) {
         case 'overview':
           setState(() => _activeSection = AdminNavSection.overview);
+          break;
+        case 'docs':
+          setState(() => _activeSection = AdminNavSection.docs);
           break;
         case 'students':
           setState(() => _activeSection = AdminNavSection.students);

@@ -20,6 +20,7 @@ Future<Map<String, Object?>> postAuthJson(
     uri,
     headers: {
       'content-type': 'application/json',
+      'origin': 'http://localhost:8080',
       if (_cookieHeader().isNotEmpty) 'cookie': _cookieHeader(),
     },
     body: jsonEncode(body),
@@ -37,6 +38,7 @@ Future<Map<String, Object?>> getAuthJson(
     uri,
     headers: {
       'accept': 'application/json',
+      'origin': 'http://localhost:8080',
       if (_cookieHeader().isNotEmpty) 'cookie': _cookieHeader(),
     },
   );
@@ -48,7 +50,10 @@ Future<void> postAuth(Uri uri, {http.Client? httpClient}) async {
   final client = httpClient ?? http.Client();
   final response = await client.post(
     uri,
-    headers: {if (_cookieHeader().isNotEmpty) 'cookie': _cookieHeader()},
+    headers: {
+      'origin': 'http://localhost:8080',
+      if (_cookieHeader().isNotEmpty) 'cookie': _cookieHeader(),
+    },
   );
   _storeCookies(response);
   if (response.statusCode < 200 || response.statusCode >= 300) {

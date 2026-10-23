@@ -45,6 +45,7 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
 
   // 2. Inventory State
   List<Map<String, Object?>> _inventoryItems = [];
+  List<Map<String, Object?>> _inventoryAllocations = [];
   List<Map<String, Object?>> _purchaseRequests = [];
   String _inventoryCategoryFilter = 'all';
   String _inventoryConditionFilter = 'all';
@@ -121,20 +122,30 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
         case 1:
           final items = await api.getInventoryItems(
             session: session,
-            category: _inventoryCategoryFilter != 'all' ? _inventoryCategoryFilter : null,
-            condition: _inventoryConditionFilter != 'all' ? _inventoryConditionFilter : null,
+            category: _inventoryCategoryFilter != 'all'
+                ? _inventoryCategoryFilter
+                : null,
+            condition: _inventoryConditionFilter != 'all'
+                ? _inventoryConditionFilter
+                : null,
           );
           final reqs = await api.getInventoryPurchaseRequests(session: session);
+          final allocations = await api.getInventoryAllocations(
+            session: session,
+          );
           if (mounted) {
             setState(() {
               _inventoryItems = items;
               _purchaseRequests = reqs;
+              _inventoryAllocations = allocations;
             });
           }
           break;
 
         case 2:
-          final structures = await api.getStaffSalaryStructures(session: session);
+          final structures = await api.getStaffSalaryStructures(
+            session: session,
+          );
           final records = await api.getStaffPayrollRecords(
             session: session,
             month: _selectedPayrollMonth,
@@ -226,7 +237,9 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                     payload: {
                       'title': title,
                       'author': author,
-                      'isbn': isbnCtrl.text.trim().isNotEmpty ? isbnCtrl.text.trim() : null,
+                      'isbn': isbnCtrl.text.trim().isNotEmpty
+                          ? isbnCtrl.text.trim()
+                          : null,
                       'category': category,
                       'shelfLocation': location,
                       'totalCopies': copies,
@@ -278,15 +291,38 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       initialValue: category,
-                      decoration: const InputDecoration(labelText: 'Category *'),
+                      decoration: const InputDecoration(
+                        labelText: 'Category *',
+                      ),
                       items: const [
-                        DropdownMenuItem(value: 'general', child: Text('General')),
-                        DropdownMenuItem(value: 'science', child: Text('Science')),
-                        DropdownMenuItem(value: 'mathematics', child: Text('Mathematics')),
-                        DropdownMenuItem(value: 'literature', child: Text('Literature')),
-                        DropdownMenuItem(value: 'history', child: Text('History')),
-                        DropdownMenuItem(value: 'reference', child: Text('Reference')),
-                        DropdownMenuItem(value: 'periodical', child: Text('Periodical')),
+                        DropdownMenuItem(
+                          value: 'general',
+                          child: Text('General'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'science',
+                          child: Text('Science'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'mathematics',
+                          child: Text('Mathematics'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'literature',
+                          child: Text('Literature'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'history',
+                          child: Text('History'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'reference',
+                          child: Text('Reference'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'periodical',
+                          child: Text('Periodical'),
+                        ),
                       ],
                       onChanged: (val) {
                         if (val != null) setDialogState(() => category = val);
@@ -344,7 +380,8 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
         ? widget.students.first['id'] as String?
         : null;
     final dueDateCtrl = TextEditingController(
-      text: DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 14))),
+      text: DateFormat('yyyy-MM-dd')
+          .format(DateTime.now().add(const Duration(days: 14))),
     );
 
     final result = await showDialog<bool>(
@@ -412,9 +449,14 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       initialValue: memberType,
-                      decoration: const InputDecoration(labelText: 'Member Type *'),
+                      decoration: const InputDecoration(
+                        labelText: 'Member Type *',
+                      ),
                       items: const [
-                        DropdownMenuItem(value: 'student', child: Text('Student')),
+                        DropdownMenuItem(
+                          value: 'student',
+                          child: Text('Student'),
+                        ),
                         DropdownMenuItem(value: 'staff', child: Text('Staff')),
                       ],
                       onChanged: (val) {
@@ -422,8 +464,12 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                           setDialogState(() {
                             memberType = val;
                             selectedMemberId = val == 'student'
-                                ? (widget.students.isNotEmpty ? widget.students.first['id'] as String? : null)
-                                : (widget.staff.isNotEmpty ? widget.staff.first['id'] as String? : null);
+                                ? (widget.students.isNotEmpty
+                                      ? widget.students.first['id'] as String?
+                                      : null)
+                                : (widget.staff.isNotEmpty
+                                      ? widget.staff.first['id'] as String?
+                                      : null);
                           });
                         }
                       },
@@ -446,7 +492,9 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                 initialValue: selectedMemberId,
                 isExpanded: true,
                 decoration: InputDecoration(
-                  labelText: memberType == 'student' ? 'Select Student *' : 'Select Staff *',
+                  labelText: memberType == 'student'
+                      ? 'Select Student *'
+                      : 'Select Staff *',
                 ),
                 items: memberType == 'student'
                     ? widget.students.map((s) {
@@ -464,7 +512,8 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                           child: Text(name),
                         );
                       }).toList(),
-                onChanged: (val) => setDialogState(() => selectedMemberId = val),
+                onChanged: (val) =>
+                    setDialogState(() => selectedMemberId = val),
               ),
             ],
           ),
@@ -579,14 +628,34 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       initialValue: category,
-                      decoration: const InputDecoration(labelText: 'Category *'),
+                      decoration: const InputDecoration(
+                        labelText: 'Category *',
+                      ),
                       items: const [
-                        DropdownMenuItem(value: 'lab_equipment', child: Text('Lab Equipment')),
-                        DropdownMenuItem(value: 'sports_gear', child: Text('Sports Gear')),
-                        DropdownMenuItem(value: 'classroom', child: Text('Classroom')),
-                        DropdownMenuItem(value: 'it_hardware', child: Text('IT Hardware')),
-                        DropdownMenuItem(value: 'furniture', child: Text('Furniture')),
-                        DropdownMenuItem(value: 'consumables', child: Text('Consumables')),
+                        DropdownMenuItem(
+                          value: 'lab_equipment',
+                          child: Text('Lab Equipment'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'sports_gear',
+                          child: Text('Sports Gear'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'classroom',
+                          child: Text('Classroom'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'it_hardware',
+                          child: Text('IT Hardware'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'furniture',
+                          child: Text('Furniture'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'consumables',
+                          child: Text('Consumables'),
+                        ),
                       ],
                       onChanged: (val) {
                         if (val != null) setDialogState(() => category = val);
@@ -610,19 +679,29 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                     child: TextField(
                       controller: quantityCtrl,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Quantity *'),
+                      decoration: const InputDecoration(
+                        labelText: 'Quantity *',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       initialValue: condition,
-                      decoration: const InputDecoration(labelText: 'Condition *'),
+                      decoration: const InputDecoration(
+                        labelText: 'Condition *',
+                      ),
                       items: const [
                         DropdownMenuItem(value: 'good', child: Text('Good')),
                         DropdownMenuItem(value: 'fair', child: Text('Fair')),
-                        DropdownMenuItem(value: 'maintenance_required', child: Text('Maintenance Req')),
-                        DropdownMenuItem(value: 'damaged', child: Text('Damaged')),
+                        DropdownMenuItem(
+                          value: 'maintenance_required',
+                          child: Text('Maintenance Req'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'damaged',
+                          child: Text('Damaged'),
+                        ),
                       ],
                       onChanged: (val) {
                         if (val != null) setDialogState(() => condition = val);
@@ -668,11 +747,244 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
     }
   }
 
+  Future<void> _showAllocateInventoryDialog(Map<String, Object?> item) async {
+    if (widget.staff.isEmpty) {
+      setState(() => _error = 'Add a staff member before allocating an asset.');
+      return;
+    }
+    var staffId = widget.staff.first['id'] as String;
+    final purpose = TextEditingController();
+    final quantity = TextEditingController(text: '1');
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AppDialog(
+          title: 'Allocate ${item['name']}',
+          subtitle: '${item['availableQuantity'] ?? 0} available',
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Allocate'),
+            ),
+          ],
+          child: Column(
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: staffId,
+                decoration: const InputDecoration(
+                  labelText: 'Allocate to staff member',
+                ),
+                items: widget.staff
+                    .map(
+                      (member) => DropdownMenuItem(
+                        value: member['id'] as String,
+                        child: Text(
+                          member['fullName']?.toString() ??
+                              member['name']?.toString() ??
+                              'Staff member',
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) =>
+                    setDialogState(() => staffId = value ?? staffId),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: purpose,
+                decoration: const InputDecoration(labelText: 'Purpose'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: quantity,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Quantity'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (save != true || purpose.text.trim().length < 2) return;
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+    try {
+      await ref
+          .read(apiClientProvider)
+          .allocateInventoryItem(
+            session: session,
+            itemId: item['id'] as String,
+            payload: {
+              'allocatedToStaffId': staffId,
+              'purpose': purpose.text.trim(),
+              'quantity': int.tryParse(quantity.text) ?? 1,
+            },
+          );
+      setState(() => _success = 'Asset allocated successfully.');
+      await _loadCurrentTabData();
+    } catch (e) {
+      setState(() => _error = 'Could not allocate asset: $e');
+    }
+  }
+
+  Future<void> _returnInventoryAllocation(String allocationId) async {
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+    try {
+      await ref
+          .read(apiClientProvider)
+          .returnInventoryAllocation(
+            session: session,
+            allocationId: allocationId,
+          );
+      setState(() => _success = 'Asset return recorded.');
+      await _loadCurrentTabData();
+    } catch (e) {
+      setState(() => _error = 'Could not return asset: $e');
+    }
+  }
+
+  Future<void> _showPurchaseRequestDialog() async {
+    final name = TextEditingController();
+    final quantity = TextEditingController(text: '1');
+    final cost = TextEditingController();
+    var category = 'classroom';
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AppDialog(
+          title: 'New purchase requisition',
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Submit requisition'),
+            ),
+          ],
+          child: Column(
+            children: [
+              TextField(
+                controller: name,
+                decoration: const InputDecoration(labelText: 'Item name'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: category,
+                decoration: const InputDecoration(labelText: 'Category'),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'lab_equipment',
+                    child: Text('Lab equipment'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'sports_gear',
+                    child: Text('Sports gear'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'classroom',
+                    child: Text('Classroom'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'it_hardware',
+                    child: Text('IT hardware'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'furniture',
+                    child: Text('Furniture'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'consumables',
+                    child: Text('Consumables'),
+                  ),
+                ],
+                onChanged: (value) =>
+                    setDialogState(() => category = value ?? category),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: quantity,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Quantity'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: cost,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Estimated cost (₹)',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (save != true || name.text.trim().length < 2) return;
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+    try {
+      await ref
+          .read(apiClientProvider)
+          .createInventoryPurchaseRequest(
+            session: session,
+            payload: {
+              'itemName': name.text.trim(),
+              'category': category,
+              'quantity': int.tryParse(quantity.text) ?? 1,
+              'estimatedCost': (int.tryParse(cost.text) ?? 0) * 100,
+            },
+          );
+      setState(() => _success = 'Purchase requisition submitted.');
+      await _loadCurrentTabData();
+    } catch (e) {
+      setState(() => _error = 'Could not submit requisition: $e');
+    }
+  }
+
+  Future<void> _reviewPurchaseRequest(
+    Map<String, Object?> request,
+    String status,
+  ) async {
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+    try {
+      await ref
+          .read(apiClientProvider)
+          .reviewInventoryPurchaseRequest(
+            session: session,
+            requestId: request['id'] as String,
+            payload: {'status': status},
+          );
+      setState(() => _success = 'Requisition marked $status.');
+      await _loadCurrentTabData();
+    } catch (e) {
+      setState(() => _error = 'Could not update requisition: $e');
+    }
+  }
+
   // ==========================================
   // 3. Payroll Handlers & Dialogs
   // ==========================================
-  Future<void> _showConfigureSalaryDialog(Map<String, Object?>? staffMember) async {
-    final staffId = staffMember?['id'] as String? ??
+  Future<void> _showConfigureSalaryDialog(
+    Map<String, Object?>? staffMember,
+  ) async {
+    final staffId =
+        staffMember?['id'] as String? ??
         (widget.staff.isNotEmpty ? widget.staff.first['id'] as String? : null);
     if (staffId == null) return;
 
@@ -715,7 +1027,8 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                     'pfDeduction': pf * 100,
                     'esiDeduction': 0,
                     'tdsDeduction': tds * 100,
-                    'effectiveFrom': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+                    'effectiveFrom': DateFormat('yyyy-MM-dd')
+                        .format(DateTime.now()),
                   },
                 );
                 if (ctx.mounted) Navigator.of(ctx).pop(true);
@@ -812,14 +1125,12 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
     try {
       final res = await api.generateMonthlyPayroll(
         session: session,
-        payload: {
-          'month': _selectedPayrollMonth,
-          'year': _selectedPayrollYear,
-        },
+        payload: {'month': _selectedPayrollMonth, 'year': _selectedPayrollYear},
       );
       _loadCurrentTabData();
       setState(() {
-        _success = 'Batch payroll generated (${res['generatedCount']} records generated for ${_monthName(_selectedPayrollMonth)} $_selectedPayrollYear)';
+        _success =
+            'Batch payroll generated (${res['generatedCount']} records generated for ${_monthName(_selectedPayrollMonth)} $_selectedPayrollYear)';
       });
     } catch (e) {
       setState(() => _error = 'Payroll generation failed: $e');
@@ -837,7 +1148,8 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
         recordId: recordId,
         payload: {
           'paidOn': DateFormat('yyyy-MM-dd').format(DateTime.now()),
-          'paymentReference': 'BANK-TRANS-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+          'paymentReference':
+              'BANK-TRANS-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
         },
       );
       _loadCurrentTabData();
@@ -912,14 +1224,18 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                   Expanded(
                     child: TextField(
                       controller: blockCtrl,
-                      decoration: const InputDecoration(labelText: 'Block Name *'),
+                      decoration: const InputDecoration(
+                        labelText: 'Block Name *',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextField(
                       controller: roomCtrl,
-                      decoration: const InputDecoration(labelText: 'Room Number *'),
+                      decoration: const InputDecoration(
+                        labelText: 'Room Number *',
+                      ),
                     ),
                   ),
                 ],
@@ -930,11 +1246,22 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       initialValue: roomType,
-                      decoration: const InputDecoration(labelText: 'Room Type *'),
+                      decoration: const InputDecoration(
+                        labelText: 'Room Type *',
+                      ),
                       items: const [
-                        DropdownMenuItem(value: 'boys', child: Text('Boys Hostel')),
-                        DropdownMenuItem(value: 'girls', child: Text('Girls Hostel')),
-                        DropdownMenuItem(value: 'staff', child: Text('Staff Quarters')),
+                        DropdownMenuItem(
+                          value: 'boys',
+                          child: Text('Boys Hostel'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'girls',
+                          child: Text('Girls Hostel'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'staff',
+                          child: Text('Staff Quarters'),
+                        ),
                       ],
                       onChanged: (val) {
                         if (val != null) setDialogState(() => roomType = val);
@@ -946,7 +1273,9 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                     child: TextField(
                       controller: capCtrl,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Capacity (Beds) *'),
+                      decoration: const InputDecoration(
+                        labelText: 'Capacity (Beds) *',
+                      ),
                     ),
                   ),
                 ],
@@ -969,12 +1298,127 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
     }
   }
 
+  Future<void> _showAllocateHostelDialog() async {
+    final availableRooms = _hostelRooms
+        .where(
+          (room) =>
+              (room['occupiedCount'] as int? ?? 0) <
+              (room['capacity'] as int? ?? 0),
+        )
+        .toList();
+    if (widget.students.isEmpty || availableRooms.isEmpty) {
+      setState(
+        () => _error = 'A student and an available hostel room are required.',
+      );
+      return;
+    }
+    var studentId = widget.students.first['id'] as String;
+    var roomId = availableRooms.first['id'] as String;
+    final bed = TextEditingController();
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AppDialog(
+          title: 'Allocate hostel bed',
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Allocate bed'),
+            ),
+          ],
+          child: Column(
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: studentId,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Student'),
+                items: widget.students
+                    .map(
+                      (student) => DropdownMenuItem(
+                        value: student['id'] as String,
+                        child: Text(
+                          student['fullName']?.toString() ?? 'Student',
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) =>
+                    setDialogState(() => studentId = value ?? studentId),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: roomId,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Room'),
+                items: availableRooms
+                    .map(
+                      (room) => DropdownMenuItem(
+                        value: room['id'] as String,
+                        child: Text(
+                          '${room['blockName']} · ${room['roomNumber']}',
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) =>
+                    setDialogState(() => roomId = value ?? roomId),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: bed,
+                decoration: const InputDecoration(labelText: 'Bed number'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (save != true || bed.text.trim().isEmpty) return;
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+    try {
+      await ref
+          .read(apiClientProvider)
+          .allocateHostelBed(
+            session: session,
+            payload: {
+              'studentId': studentId,
+              'roomId': roomId,
+              'bedNumber': bed.text.trim(),
+            },
+          );
+      setState(() => _success = 'Hostel bed allocated.');
+      await _loadCurrentTabData();
+    } catch (e) {
+      setState(() => _error = 'Could not allocate hostel bed: $e');
+    }
+  }
+
+  Future<void> _vacateHostelAllocation(String allocationId) async {
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+    try {
+      await ref
+          .read(apiClientProvider)
+          .vacateHostelBed(session: session, allocationId: allocationId);
+      setState(() => _success = 'Hostel bed vacated.');
+      await _loadCurrentTabData();
+    } catch (e) {
+      setState(() => _error = 'Could not vacate bed: $e');
+    }
+  }
+
   Future<void> _showIssueGatePassDialog() async {
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
     final purposeCtrl = TextEditingController();
     final badgeCtrl = TextEditingController(
-      text: 'PASS-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+      text:
+          'PASS-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
     );
     final vehicleCtrl = TextEditingController();
     String visitType = 'admin';
@@ -997,7 +1441,11 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                 final purpose = purposeCtrl.text.trim();
                 final badge = badgeCtrl.text.trim();
 
-                if (name.isEmpty || phone.isEmpty || purpose.isEmpty || badge.isEmpty) return;
+                if (name.isEmpty ||
+                    phone.isEmpty ||
+                    purpose.isEmpty ||
+                    badge.isEmpty)
+                  return;
 
                 final session = ref.read(authControllerProvider).session;
                 if (session == null) return;
@@ -1012,7 +1460,9 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                       'purpose': purpose,
                       'personToVisitType': visitType,
                       'badgeNumber': badge,
-                      'vehicleNumber': vehicleCtrl.text.trim().isNotEmpty ? vehicleCtrl.text.trim() : null,
+                      'vehicleNumber': vehicleCtrl.text.trim().isNotEmpty
+                          ? vehicleCtrl.text.trim()
+                          : null,
                     },
                   );
                   if (ctx.mounted) Navigator.of(ctx).pop(true);
@@ -1056,9 +1506,18 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                       initialValue: visitType,
                       decoration: const InputDecoration(labelText: 'Meeting *'),
                       items: const [
-                        DropdownMenuItem(value: 'admin', child: Text('Administration / Principal')),
-                        DropdownMenuItem(value: 'staff', child: Text('Faculty Member')),
-                        DropdownMenuItem(value: 'student', child: Text('Student Guardian Visit')),
+                        DropdownMenuItem(
+                          value: 'admin',
+                          child: Text('Administration / Principal'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'staff',
+                          child: Text('Faculty Member'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'student',
+                          child: Text('Student Guardian Visit'),
+                        ),
                       ],
                       onChanged: (val) {
                         if (val != null) setDialogState(() => visitType = val);
@@ -1081,7 +1540,9 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                   Expanded(
                     child: TextField(
                       controller: badgeCtrl,
-                      decoration: const InputDecoration(labelText: 'Badge Number *'),
+                      decoration: const InputDecoration(
+                        labelText: 'Badge Number *',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1125,6 +1586,155 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
   // ==========================================
   // 5. Health & Infirmary Handlers & Dialogs
   // ==========================================
+  Future<void> _showHealthProfileDialog() async {
+    if (widget.students.isEmpty) {
+      setState(
+        () => _error = 'Add a student before creating a health profile.',
+      );
+      return;
+    }
+    var studentId = widget.students.first['id'] as String;
+    final blood = TextEditingController();
+    final allergies = TextEditingController();
+    final conditions = TextEditingController();
+    final contact = TextEditingController();
+    final phone = TextEditingController();
+    final notes = TextEditingController();
+    Future<void> loadProfile(String id) async {
+      final session = ref.read(authControllerProvider).session;
+      if (session == null) return;
+      try {
+        final profile = await ref
+            .read(apiClientProvider)
+            .getStudentHealthProfile(session: session, studentId: id);
+        blood.text = profile['bloodGroup']?.toString() ?? '';
+        allergies.text = profile['allergies']?.toString() ?? '';
+        conditions.text = profile['chronicConditions']?.toString() ?? '';
+        contact.text = profile['emergencyContactName']?.toString() ?? '';
+        phone.text = profile['emergencyContactPhone']?.toString() ?? '';
+        notes.text = profile['doctorNotes']?.toString() ?? '';
+      } catch (_) {
+        blood.clear();
+        allergies.clear();
+        conditions.clear();
+        contact.clear();
+        phone.clear();
+        notes.clear();
+      }
+    }
+
+    await loadProfile(studentId);
+    if (!mounted) return;
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AppDialog(
+          title: 'Student health profile',
+          subtitle: 'Emergency medical details available to authorised staff.',
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Save profile'),
+            ),
+          ],
+          child: Column(
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: studentId,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Student'),
+                items: widget.students
+                    .map(
+                      (student) => DropdownMenuItem(
+                        value: student['id'] as String,
+                        child: Text(
+                          student['fullName']?.toString() ?? 'Student',
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) async {
+                  if (value == null) return;
+                  studentId = value;
+                  await loadProfile(value);
+                  setDialogState(() {});
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: blood,
+                decoration: const InputDecoration(labelText: 'Blood group'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: allergies,
+                decoration: const InputDecoration(labelText: 'Allergies'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: conditions,
+                decoration: const InputDecoration(
+                  labelText: 'Chronic conditions',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: contact,
+                decoration: const InputDecoration(
+                  labelText: 'Emergency contact name',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phone,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Emergency contact phone',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: notes,
+                maxLines: 2,
+                decoration: const InputDecoration(labelText: 'Doctor notes'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (save != true ||
+        blood.text.trim().length < 2 ||
+        contact.text.trim().length < 2 ||
+        phone.text.trim().length < 7)
+      return;
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+    try {
+      await ref
+          .read(apiClientProvider)
+          .upsertStudentHealthProfile(
+            session: session,
+            payload: {
+              'studentId': studentId,
+              'bloodGroup': blood.text.trim(),
+              'allergies': allergies.text.trim(),
+              'chronicConditions': conditions.text.trim(),
+              'emergencyContactName': contact.text.trim(),
+              'emergencyContactPhone': phone.text.trim(),
+              'doctorNotes': notes.text.trim(),
+            },
+          );
+      setState(() => _success = 'Health profile saved.');
+    } catch (e) {
+      setState(() => _error = 'Could not save health profile: $e');
+    }
+  }
+
   Future<void> _showLogInfirmaryVisitDialog() async {
     if (widget.students.isEmpty) {
       setState(() => _error = 'No students registered to log infirmary visit.');
@@ -1143,7 +1753,8 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AppDialog(
           title: 'Record Campus Infirmary Visit',
-          subtitle: 'Log student medical triage, treatments, and parental notice',
+          subtitle:
+              'Log student medical triage, treatments, and parental notice',
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
@@ -1168,7 +1779,9 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                       'treatmentGiven': treatment,
                       'parentNotified': parentNotified,
                       'followUpNeeded': followUpNeeded,
-                      'notes': notesCtrl.text.trim().isNotEmpty ? notesCtrl.text.trim() : null,
+                      'notes': notesCtrl.text.trim().isNotEmpty
+                          ? notesCtrl.text.trim()
+                          : null,
                     },
                   );
                   if (ctx.mounted) Navigator.of(ctx).pop(true);
@@ -1199,7 +1812,8 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                   );
                 }).toList(),
                 onChanged: (val) {
-                  if (val != null) setDialogState(() => selectedStudentId = val);
+                  if (val != null)
+                    setDialogState(() => selectedStudentId = val);
                 },
               ),
               const SizedBox(height: 12),
@@ -1231,15 +1845,23 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                 children: [
                   Checkbox(
                     value: parentNotified,
-                    onChanged: (v) => setDialogState(() => parentNotified = v ?? false),
+                    onChanged: (v) =>
+                        setDialogState(() => parentNotified = v ?? false),
                   ),
-                  const Text('Parent Notified via Call/SMS', style: TextStyle(fontSize: 13)),
+                  const Text(
+                    'Parent Notified via Call/SMS',
+                    style: TextStyle(fontSize: 13),
+                  ),
                   const Spacer(),
                   Checkbox(
                     value: followUpNeeded,
-                    onChanged: (v) => setDialogState(() => followUpNeeded = v ?? false),
+                    onChanged: (v) =>
+                        setDialogState(() => followUpNeeded = v ?? false),
                   ),
-                  const Text('Follow-Up Needed', style: TextStyle(fontSize: 13)),
+                  const Text(
+                    'Follow-Up Needed',
+                    style: TextStyle(fontSize: 13),
+                  ),
                 ],
               ),
             ],
@@ -1260,8 +1882,19 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
   String _monthName(int m) {
     if (m >= 1 && m <= 12) {
       const months = [
-        '', 'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
+        '',
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
       ];
       return months[m];
     }
@@ -1284,8 +1917,7 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
       children: [
         PageHeader(
           title: 'Campus Operations Ecosystem',
-          description:
-              'Enterprise physical campus management: library circulation, assets, staff payroll, hostels, and infirmary.',
+          description: 'Enterprise physical campus management: library circulation, assets, staff payroll, hostels, and infirmary.',
           primaryAction: _tabController.index == 0
               ? ElevatedButton.icon(
                   onPressed: _showAddBookDialog,
@@ -1293,28 +1925,28 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                   label: const Text('Add Book'),
                 )
               : _tabController.index == 1
-                  ? ElevatedButton.icon(
-                      onPressed: _showAddInventoryItemDialog,
-                      icon: const Icon(Icons.add_box_rounded, size: 16),
-                      label: const Text('Register Asset'),
-                    )
-                  : _tabController.index == 2
-                      ? ElevatedButton.icon(
-                          onPressed: _generateMonthlyPayrollRun,
-                          icon: const Icon(Icons.payments_rounded, size: 16),
-                          label: const Text('Generate Payroll Run'),
-                        )
-                      : _tabController.index == 3
-                          ? ElevatedButton.icon(
-                              onPressed: _showIssueGatePassDialog,
-                              icon: const Icon(Icons.badge_rounded, size: 16),
-                              label: const Text('Issue Gate Pass'),
-                            )
-                          : ElevatedButton.icon(
-                              onPressed: _showLogInfirmaryVisitDialog,
-                              icon: const Icon(Icons.medical_services_rounded, size: 16),
-                              label: const Text('Log Visit'),
-                            ),
+              ? ElevatedButton.icon(
+                  onPressed: _showAddInventoryItemDialog,
+                  icon: const Icon(Icons.add_box_rounded, size: 16),
+                  label: const Text('Register Asset'),
+                )
+              : _tabController.index == 2
+              ? ElevatedButton.icon(
+                  onPressed: _generateMonthlyPayrollRun,
+                  icon: const Icon(Icons.payments_rounded, size: 16),
+                  label: const Text('Generate Payroll Run'),
+                )
+              : _tabController.index == 3
+              ? ElevatedButton.icon(
+                  onPressed: _showIssueGatePassDialog,
+                  icon: const Icon(Icons.badge_rounded, size: 16),
+                  label: const Text('Issue Gate Pass'),
+                )
+              : ElevatedButton.icon(
+                  onPressed: _showLogInfirmaryVisitDialog,
+                  icon: const Icon(Icons.medical_services_rounded, size: 16),
+                  label: const Text('Log Visit'),
+                ),
           secondaryActions: [
             IconButton(
               icon: const Icon(Icons.refresh_rounded),
@@ -1353,18 +1985,38 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
               fontSize: 13,
             ),
             tabs: const [
-              Tab(icon: Icon(Icons.local_library_rounded, size: 18), text: 'Library Hub'),
-              Tab(icon: Icon(Icons.inventory_2_rounded, size: 18), text: 'Inventory & Assets'),
-              Tab(icon: Icon(Icons.account_balance_wallet_rounded, size: 18), text: 'Staff Payroll'),
-              Tab(icon: Icon(Icons.apartment_rounded, size: 18), text: 'Hostel & Gate Passes'),
-              Tab(icon: Icon(Icons.health_and_safety_rounded, size: 18), text: 'Student Health & Infirmary'),
+              Tab(
+                icon: Icon(Icons.local_library_rounded, size: 18),
+                text: 'Library Hub',
+              ),
+              Tab(
+                icon: Icon(Icons.inventory_2_rounded, size: 18),
+                text: 'Inventory & Assets',
+              ),
+              Tab(
+                icon: Icon(Icons.account_balance_wallet_rounded, size: 18),
+                text: 'Staff Payroll',
+              ),
+              Tab(
+                icon: Icon(Icons.apartment_rounded, size: 18),
+                text: 'Hostel & Gate Passes',
+              ),
+              Tab(
+                icon: Icon(Icons.health_and_safety_rounded, size: 18),
+                text: 'Student Health & Infirmary',
+              ),
             ],
           ),
         ),
         const SizedBox(height: 20),
 
         if (_loading)
-          const Center(child: Padding(padding: EdgeInsets.all(48), child: CircularProgressIndicator()))
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(48),
+              child: CircularProgressIndicator(),
+            ),
+          )
         else
           Expanded(
             child: TabBarView(
@@ -1386,10 +2038,12 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
   // TAB 1: Library Hub
   // ==========================================
   Widget _buildLibraryTab() {
-    final titles = _libraryStats?['totalTitles'] as int? ?? _libraryBooks.length;
+    final titles =
+        _libraryStats?['totalTitles'] as int? ?? _libraryBooks.length;
     final totalInv = _libraryStats?['totalInventory'] as int? ?? 0;
     final avail = _libraryStats?['totalAvailable'] as int? ?? 0;
-    final activeLoans = _libraryStats?['activeLoans'] as int? ?? _libraryLoans.length;
+    final activeLoans =
+        _libraryStats?['activeLoans'] as int? ?? _libraryLoans.length;
     final fines = _libraryStats?['totalFinesPaise'] as int? ?? 0;
 
     return SingleChildScrollView(
@@ -1400,9 +2054,18 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
             items: [
               StatItemData(label: 'Total Titles', value: titles.toString()),
               StatItemData(label: 'Total Copies', value: totalInv.toString()),
-              StatItemData(label: 'Available on Shelf', value: avail.toString()),
-              StatItemData(label: 'Active Loans', value: activeLoans.toString()),
-              StatItemData(label: 'Outstanding Fines', value: _formatCurrency(fines)),
+              StatItemData(
+                label: 'Available on Shelf',
+                value: avail.toString(),
+              ),
+              StatItemData(
+                label: 'Active Loans',
+                value: activeLoans.toString(),
+              ),
+              StatItemData(
+                label: 'Outstanding Fines',
+                value: _formatCurrency(fines),
+              ),
             ],
           ),
           const SizedBox(height: 18),
@@ -1415,7 +2078,10 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.search, size: 18),
                     hintText: 'Search books by title, author, or ISBN...',
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                   ),
                   onChanged: (val) {
                     _bookSearch = val;
@@ -1429,10 +2095,19 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                 items: const [
                   DropdownMenuItem(value: 'all', child: Text('All Categories')),
                   DropdownMenuItem(value: 'science', child: Text('Science')),
-                  DropdownMenuItem(value: 'mathematics', child: Text('Mathematics')),
-                  DropdownMenuItem(value: 'literature', child: Text('Literature')),
+                  DropdownMenuItem(
+                    value: 'mathematics',
+                    child: Text('Mathematics'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'literature',
+                    child: Text('Literature'),
+                  ),
                   DropdownMenuItem(value: 'history', child: Text('History')),
-                  DropdownMenuItem(value: 'reference', child: Text('Reference')),
+                  DropdownMenuItem(
+                    value: 'reference',
+                    child: Text('Reference'),
+                  ),
                 ],
                 onChanged: (val) {
                   if (val != null) {
@@ -1500,9 +2175,21 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
 
                           return DataRow(
                             cells: [
-                              DataCell(Text(title, style: const TextStyle(fontWeight: FontWeight.w600))),
+                              DataCell(
+                                Text(
+                                  title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
                               DataCell(Text(author)),
-                              DataCell(StatusBadge(label: cat.toUpperCase(), tone: BadgeTone.info)),
+                              DataCell(
+                                StatusBadge(
+                                  label: cat.toUpperCase(),
+                                  tone: BadgeTone.info,
+                                ),
+                              ),
                               DataCell(Text(shelf)),
                               DataCell(Text('$av / $total')),
                               DataCell(Text(isbn)),
@@ -1553,22 +2240,38 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                         ],
                         rows: _libraryLoans.map((loan) {
                           final loanId = loan['id'] as String;
-                          final bookTitle = loan['bookTitle'] as String? ?? 'Book';
-                          final memberType = (loan['memberType'] as String? ?? 'student').toUpperCase();
+                          final bookTitle =
+                              loan['bookTitle'] as String? ?? 'Book';
+                          final memberType =
+                              (loan['memberType'] as String? ?? 'student')
+                                  .toUpperCase();
                           final issuedAt = loan['issuedAt'] as String? ?? '';
                           final dueDate = loan['dueDate'] as String? ?? '';
                           final status = loan['status'] as String? ?? 'issued';
 
                           return DataRow(
                             cells: [
-                              DataCell(Text(bookTitle, style: const TextStyle(fontWeight: FontWeight.w600))),
+                              DataCell(
+                                Text(
+                                  bookTitle,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
                               DataCell(Text(memberType)),
                               DataCell(Text(issuedAt)),
                               DataCell(Text(dueDate)),
                               DataCell(
                                 status == 'issued'
-                                    ? const StatusBadge(label: 'ISSUED', tone: BadgeTone.warning)
-                                    : const StatusBadge(label: 'RETURNED', tone: BadgeTone.success),
+                                    ? const StatusBadge(
+                                        label: 'ISSUED',
+                                        tone: BadgeTone.warning,
+                                      )
+                                    : const StatusBadge(
+                                        label: 'RETURNED',
+                                        tone: BadgeTone.success,
+                                      ),
                               ),
                               DataCell(
                                 status == 'issued'
@@ -1597,9 +2300,15 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
   // ==========================================
   Widget _buildInventoryTab() {
     final totalAssets = _inventoryItems.length;
-    final goodCondition = _inventoryItems.where((i) => i['condition'] == 'good').length;
-    final maintenance = _inventoryItems.where((i) => i['condition'] == 'maintenance_required').length;
-    final pendingReqs = _purchaseRequests.where((p) => p['status'] == 'pending').length;
+    final goodCondition = _inventoryItems
+        .where((i) => i['condition'] == 'good')
+        .length;
+    final maintenance = _inventoryItems
+        .where((i) => i['condition'] == 'maintenance_required')
+        .length;
+    final pendingReqs = _purchaseRequests
+        .where((p) => p['status'] == 'pending')
+        .length;
 
     return SingleChildScrollView(
       child: Column(
@@ -1607,10 +2316,22 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
         children: [
           StatStrip(
             items: [
-              StatItemData(label: 'Total Asset Types', value: totalAssets.toString()),
-              StatItemData(label: 'In Good Condition', value: goodCondition.toString()),
-              StatItemData(label: 'Requires Maintenance', value: maintenance.toString()),
-              StatItemData(label: 'Pending Requisitions', value: pendingReqs.toString()),
+              StatItemData(
+                label: 'Total Asset Types',
+                value: totalAssets.toString(),
+              ),
+              StatItemData(
+                label: 'In Good Condition',
+                value: goodCondition.toString(),
+              ),
+              StatItemData(
+                label: 'Requires Maintenance',
+                value: maintenance.toString(),
+              ),
+              StatItemData(
+                label: 'Pending Requisitions',
+                value: pendingReqs.toString(),
+              ),
             ],
           ),
           const SizedBox(height: 18),
@@ -1641,12 +2362,30 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                         DropdownButton<String>(
                           value: _inventoryCategoryFilter,
                           items: const [
-                            DropdownMenuItem(value: 'all', child: Text('All Categories')),
-                            DropdownMenuItem(value: 'lab_equipment', child: Text('Lab Equipment')),
-                            DropdownMenuItem(value: 'sports_gear', child: Text('Sports')),
-                            DropdownMenuItem(value: 'classroom', child: Text('Classroom')),
-                            DropdownMenuItem(value: 'it_hardware', child: Text('IT Hardware')),
-                            DropdownMenuItem(value: 'furniture', child: Text('Furniture')),
+                            DropdownMenuItem(
+                              value: 'all',
+                              child: Text('All Categories'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'lab_equipment',
+                              child: Text('Lab Equipment'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'sports_gear',
+                              child: Text('Sports'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'classroom',
+                              child: Text('Classroom'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'it_hardware',
+                              child: Text('IT Hardware'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'furniture',
+                              child: Text('Furniture'),
+                            ),
                           ],
                           onChanged: (val) {
                             if (val != null) {
@@ -1659,11 +2398,26 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                         DropdownButton<String>(
                           value: _inventoryConditionFilter,
                           items: const [
-                            DropdownMenuItem(value: 'all', child: Text('All Conditions')),
-                            DropdownMenuItem(value: 'good', child: Text('Good')),
-                            DropdownMenuItem(value: 'fair', child: Text('Fair')),
-                            DropdownMenuItem(value: 'maintenance_required', child: Text('Maintenance')),
-                            DropdownMenuItem(value: 'damaged', child: Text('Damaged')),
+                            DropdownMenuItem(
+                              value: 'all',
+                              child: Text('All Conditions'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'good',
+                              child: Text('Good'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'fair',
+                              child: Text('Fair'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'maintenance_required',
+                              child: Text('Maintenance'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'damaged',
+                              child: Text('Damaged'),
+                            ),
                           ],
                           onChanged: (val) {
                             if (val != null) {
@@ -1671,6 +2425,12 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                               _loadCurrentTabData();
                             }
                           },
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: _showAddInventoryItemDialog,
+                          icon: const Icon(Icons.add_rounded, size: 16),
+                          label: const Text('Register asset'),
                         ),
                       ],
                     ),
@@ -1694,6 +2454,7 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                           DataColumn(label: Text('Condition')),
                           DataColumn(label: Text('Location')),
                           DataColumn(label: Text('Cost')),
+                          DataColumn(label: Text('Action')),
                         ],
                         rows: _inventoryItems.map((item) {
                           final code = item['itemCode'] as String? ?? '';
@@ -1702,24 +2463,99 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                           final qty = item['quantity'] as int? ?? 1;
                           final avail = item['availableQuantity'] as int? ?? 0;
                           final unit = item['unit'] as String? ?? 'pcs';
-                          final condition = item['condition'] as String? ?? 'good';
+                          final condition =
+                              item['condition'] as String? ?? 'good';
                           final loc = item['roomLocation'] as String? ?? '';
                           final cost = item['purchaseCost'] as int?;
 
                           return DataRow(
                             cells: [
-                              DataCell(Text(code, style: const TextStyle(fontWeight: FontWeight.w700))),
-                              DataCell(Text(name, style: const TextStyle(fontWeight: FontWeight.w600))),
-                              DataCell(StatusBadge(label: cat.toUpperCase(), tone: BadgeTone.info)),
+                              DataCell(
+                                Text(
+                                  code,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Text(
+                                  name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                StatusBadge(
+                                  label: cat.toUpperCase(),
+                                  tone: BadgeTone.info,
+                                ),
+                              ),
                               DataCell(Text('$avail / $qty $unit')),
-                              DataCell(StatusBadge.inventoryCondition(condition)),
+                              DataCell(
+                                StatusBadge.inventoryCondition(condition),
+                              ),
                               DataCell(Text(loc)),
-                              DataCell(Text(cost != null ? _formatCurrency(cost) : '—')),
+                              DataCell(
+                                Text(
+                                  cost != null ? _formatCurrency(cost) : '—',
+                                ),
+                              ),
+                              DataCell(
+                                OutlinedButton(
+                                  onPressed: avail > 0
+                                      ? () => _showAllocateInventoryDialog(item)
+                                      : null,
+                                  child: const Text('Allocate'),
+                                ),
+                              ),
                             ],
                           );
                         }).toList(),
                       ),
                     ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Active asset allocations',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 10),
+                  if (_inventoryAllocations
+                      .where((a) => a['status'] == 'active')
+                      .isEmpty)
+                    const Text('No assets are currently allocated.')
+                  else
+                    ..._inventoryAllocations
+                        .where((a) => a['status'] == 'active')
+                        .map(
+                          (allocation) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              '${allocation['itemName'] ?? 'Asset'} · ${allocation['staffName'] ?? 'Staff'}',
+                            ),
+                            subtitle: Text(
+                              '${allocation['quantity'] ?? 1} · ${allocation['purpose'] ?? ''}',
+                            ),
+                            trailing: OutlinedButton(
+                              onPressed: () => _returnInventoryAllocation(
+                                allocation['id'] as String,
+                              ),
+                              child: const Text('Record return'),
+                            ),
+                          ),
+                        ),
                 ],
               ),
             ),
@@ -1737,13 +2573,24 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Procurement & Purchase Requisitions',
-                    style: TextStyle(
-                      fontFamily: AppTypography.fontFamily,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Procurement & Purchase Requisitions',
+                          style: TextStyle(
+                            fontFamily: AppTypography.fontFamily,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      FilledButton.icon(
+                        onPressed: _showPurchaseRequestDialog,
+                        icon: const Icon(Icons.add_rounded, size: 16),
+                        label: const Text('New requisition'),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   if (_purchaseRequests.isEmpty)
@@ -1759,18 +2606,28 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                           DataColumn(label: Text('Est. Cost')),
                           DataColumn(label: Text('Requested By')),
                           DataColumn(label: Text('Status')),
+                          DataColumn(label: Text('Action')),
                         ],
                         rows: _purchaseRequests.map((req) {
                           final name = req['itemName'] as String? ?? '';
                           final cat = req['category'] as String? ?? '';
                           final qty = req['quantity'] as int? ?? 1;
                           final cost = req['estimatedCost'] as int? ?? 0;
-                          final staffName = req['requestedByStaffName'] as String? ?? 'Faculty';
+                          final staffName =
+                              req['requestedByStaffName'] as String? ??
+                              'Faculty';
                           final status = req['status'] as String? ?? 'pending';
 
                           return DataRow(
                             cells: [
-                              DataCell(Text(name, style: const TextStyle(fontWeight: FontWeight.w600))),
+                              DataCell(
+                                Text(
+                                  name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
                               DataCell(Text(cat.toUpperCase())),
                               DataCell(Text(qty.toString())),
                               DataCell(Text(_formatCurrency(cost))),
@@ -1781,8 +2638,33 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                                   tone: status == 'approved'
                                       ? BadgeTone.success
                                       : status == 'rejected'
-                                          ? BadgeTone.error
-                                          : BadgeTone.warning,
+                                      ? BadgeTone.error
+                                      : BadgeTone.warning,
+                                ),
+                              ),
+                              DataCell(
+                                PopupMenuButton<String>(
+                                  tooltip: 'Update requisition status',
+                                  onSelected: (value) =>
+                                      _reviewPurchaseRequest(req, value),
+                                  itemBuilder: (_) => const [
+                                    PopupMenuItem(
+                                      value: 'approved',
+                                      child: Text('Approve'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'ordered',
+                                      child: Text('Mark ordered'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'received',
+                                      child: Text('Mark received'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'rejected',
+                                      child: Text('Reject'),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
@@ -1808,8 +2690,12 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
       0,
       (acc, r) => acc + ((r['netSalary'] as int?) ?? 0),
     );
-    final paidCount = _payrollRecords.where((r) => r['status'] == 'paid').length;
-    final draftCount = _payrollRecords.where((r) => r['status'] != 'paid').length;
+    final paidCount = _payrollRecords
+        .where((r) => r['status'] == 'paid')
+        .length;
+    final draftCount = _payrollRecords
+        .where((r) => r['status'] != 'paid')
+        .length;
 
     return SingleChildScrollView(
       child: Column(
@@ -1817,10 +2703,22 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
         children: [
           StatStrip(
             items: [
-              StatItemData(label: 'Configured Staff', value: totalStructures.toString()),
-              StatItemData(label: 'Monthly Net Payroll', value: _formatCurrency(totalNetPaise)),
-              StatItemData(label: 'Disbursed (Paid)', value: paidCount.toString()),
-              StatItemData(label: 'Pending Payout', value: draftCount.toString()),
+              StatItemData(
+                label: 'Configured Staff',
+                value: totalStructures.toString(),
+              ),
+              StatItemData(
+                label: 'Monthly Net Payroll',
+                value: _formatCurrency(totalNetPaise),
+              ),
+              StatItemData(
+                label: 'Disbursed (Paid)',
+                value: paidCount.toString(),
+              ),
+              StatItemData(
+                label: 'Pending Payout',
+                value: draftCount.toString(),
+              ),
             ],
           ),
           const SizedBox(height: 18),
@@ -1843,7 +2741,10 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                   value: _selectedPayrollMonth,
                   items: List.generate(
                     12,
-                    (i) => DropdownMenuItem(value: i + 1, child: Text(_monthName(i + 1))),
+                    (i) => DropdownMenuItem(
+                      value: i + 1,
+                      child: Text(_monthName(i + 1)),
+                    ),
                   ),
                   onChanged: (val) {
                     if (val != null) {
@@ -1855,7 +2756,9 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                 const SizedBox(width: 8),
                 DropdownButton<int>(
                   value: _selectedPayrollYear,
-                  items: [2025, 2026, 2027].map((y) => DropdownMenuItem(value: y, child: Text('$y'))).toList(),
+                  items: [2025, 2026, 2027]
+                      .map((y) => DropdownMenuItem(value: y, child: Text('$y')))
+                      .toList(),
                   onChanged: (val) {
                     if (val != null) {
                       setState(() => _selectedPayrollYear = val);
@@ -1926,20 +2829,39 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
 
                           return DataRow(
                             cells: [
-                              DataCell(Text(name, style: const TextStyle(fontWeight: FontWeight.w600))),
+                              DataCell(
+                                Text(
+                                  name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
                               DataCell(Text(role)),
                               DataCell(Text(_formatCurrency(basic))),
                               DataCell(Text(_formatCurrency(allow))),
                               DataCell(Text(_formatCurrency(ded))),
-                              DataCell(Text(_formatCurrency(net), style: const TextStyle(fontWeight: FontWeight.w700))),
+                              DataCell(
+                                Text(
+                                  _formatCurrency(net),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
                               DataCell(StatusBadge.payrollStatus(status)),
                               DataCell(
                                 status != 'paid'
                                     ? ElevatedButton(
-                                        onPressed: () => _markPayrollPaid(recordId),
+                                        onPressed: () =>
+                                            _markPayrollPaid(recordId),
                                         child: const Text('Mark Paid'),
                                       )
-                                    : const Icon(Icons.verified_rounded, size: 20, color: AppColors.statusSuccess),
+                                    : const Icon(
+                                        Icons.verified_rounded,
+                                        size: 20,
+                                        color: AppColors.statusSuccess,
+                                      ),
                               ),
                             ],
                           );
@@ -1960,9 +2882,17 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
   // ==========================================
   Widget _buildHostelTab() {
     final totalRooms = _hostelRooms.length;
-    final totalCapacity = _hostelRooms.fold<int>(0, (acc, r) => acc + ((r['capacity'] as int?) ?? 0));
-    final totalOccupied = _hostelRooms.fold<int>(0, (acc, r) => acc + ((r['occupiedCount'] as int?) ?? 0));
-    final activeVisitors = _visitorPasses.where((v) => v['status'] == 'active').length;
+    final totalCapacity = _hostelRooms.fold<int>(
+      0,
+      (acc, r) => acc + ((r['capacity'] as int?) ?? 0),
+    );
+    final totalOccupied = _hostelRooms.fold<int>(
+      0,
+      (acc, r) => acc + ((r['occupiedCount'] as int?) ?? 0),
+    );
+    final activeVisitors = _visitorPasses
+        .where((v) => v['status'] == 'active')
+        .length;
 
     return SingleChildScrollView(
       child: Column(
@@ -1970,11 +2900,26 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
         children: [
           StatStrip(
             items: [
-              StatItemData(label: 'Total Hostel Rooms', value: totalRooms.toString()),
-              StatItemData(label: 'Total Bed Capacity', value: totalCapacity.toString()),
-              StatItemData(label: 'Occupied Beds', value: totalOccupied.toString()),
-              StatItemData(label: 'Active Allocations', value: _hostelAllocations.length.toString()),
-              StatItemData(label: 'Active Visitors On-Campus', value: activeVisitors.toString()),
+              StatItemData(
+                label: 'Total Hostel Rooms',
+                value: totalRooms.toString(),
+              ),
+              StatItemData(
+                label: 'Total Bed Capacity',
+                value: totalCapacity.toString(),
+              ),
+              StatItemData(
+                label: 'Occupied Beds',
+                value: totalOccupied.toString(),
+              ),
+              StatItemData(
+                label: 'Active Allocations',
+                value: _hostelAllocations.length.toString(),
+              ),
+              StatItemData(
+                label: 'Active Visitors On-Campus',
+                value: activeVisitors.toString(),
+              ),
             ],
           ),
           const SizedBox(height: 18),
@@ -1990,7 +2935,11 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       const Text(
                         'Hostel Blocks & Bed Availability',
@@ -2000,11 +2949,16 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const Spacer(),
                       OutlinedButton.icon(
                         onPressed: _showAddHostelRoomDialog,
                         icon: const Icon(Icons.add, size: 16),
                         label: const Text('Add Room'),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: _showAllocateHostelDialog,
+                        icon: const Icon(Icons.bed_rounded, size: 16),
+                        label: const Text('Allocate bed'),
                       ),
                     ],
                   ),
@@ -2013,7 +2967,8 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                     const EmptyStateView(
                       icon: Icons.apartment_rounded,
                       title: 'No hostel rooms registered',
-                      description: 'Add hostel blocks, room types, and bed capacities.',
+                      description:
+                          'Add hostel blocks, room types, and bed capacities.',
                     )
                   else
                     SingleChildScrollView(
@@ -2029,16 +2984,26 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                         rows: _hostelRooms.map((room) {
                           final block = room['blockName'] as String? ?? '';
                           final roomNum = room['roomNumber'] as String? ?? '';
-                          final type = (room['roomType'] as String? ?? 'boys').toUpperCase();
+                          final type = (room['roomType'] as String? ?? 'boys')
+                              .toUpperCase();
                           final cap = room['capacity'] as int? ?? 2;
                           final occ = room['occupiedCount'] as int? ?? 0;
                           final fee = room['termFee'] as int? ?? 0;
 
                           return DataRow(
                             cells: [
-                              DataCell(Text(block, style: const TextStyle(fontWeight: FontWeight.w600))),
+                              DataCell(
+                                Text(
+                                  block,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
                               DataCell(Text(roomNum)),
-                              DataCell(StatusBadge(label: type, tone: BadgeTone.info)),
+                              DataCell(
+                                StatusBadge(label: type, tone: BadgeTone.info),
+                              ),
                               DataCell(Text('$occ / $cap beds')),
                               DataCell(Text(_formatCurrency(fee))),
                             ],
@@ -2046,6 +3011,48 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                         }).toList(),
                       ),
                     ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Active hostel allocations',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 10),
+                  if (_hostelAllocations
+                      .where((a) => a['status'] == 'active')
+                      .isEmpty)
+                    const Text('No active hostel allocations.')
+                  else
+                    ..._hostelAllocations
+                        .where((a) => a['status'] == 'active')
+                        .map(
+                          (allocation) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              allocation['studentName']?.toString() ??
+                                  'Student',
+                            ),
+                            subtitle: Text(
+                              '${allocation['blockName'] ?? ''} ${allocation['roomNumber'] ?? ''} · Bed ${allocation['bedNumber'] ?? ''}',
+                            ),
+                            trailing: OutlinedButton(
+                              onPressed: () => _vacateHostelAllocation(
+                                allocation['id'] as String,
+                              ),
+                              child: const Text('Vacate'),
+                            ),
+                          ),
+                        ),
                 ],
               ),
             ),
@@ -2107,26 +3114,49 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                           final phone = pass['phone'] as String? ?? '';
                           final purpose = pass['purpose'] as String? ?? '';
                           final checkIn = pass['checkInAt'] != null
-                              ? DateFormat('HH:mm dd MMM').format(DateTime.parse(pass['checkInAt'] as String))
+                              ? DateFormat('HH:mm dd MMM').format(
+                                  DateTime.parse(pass['checkInAt'] as String),
+                                )
                               : '';
                           final status = pass['status'] as String? ?? 'active';
 
                           return DataRow(
                             cells: [
-                              DataCell(Text(badge, style: const TextStyle(fontWeight: FontWeight.w700))),
-                              DataCell(Text(name, style: const TextStyle(fontWeight: FontWeight.w600))),
+                              DataCell(
+                                Text(
+                                  badge,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Text(
+                                  name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
                               DataCell(Text(phone)),
                               DataCell(Text(purpose)),
                               DataCell(Text(checkIn)),
                               DataCell(
                                 status == 'active'
-                                    ? const StatusBadge(label: 'ON CAMPUS', tone: BadgeTone.warning)
-                                    : const StatusBadge(label: 'CHECKED OUT', tone: BadgeTone.success),
+                                    ? const StatusBadge(
+                                        label: 'ON CAMPUS',
+                                        tone: BadgeTone.warning,
+                                      )
+                                    : const StatusBadge(
+                                        label: 'CHECKED OUT',
+                                        tone: BadgeTone.success,
+                                      ),
                               ),
                               DataCell(
                                 status == 'active'
                                     ? OutlinedButton(
-                                        onPressed: () => _checkoutVisitor(passId),
+                                        onPressed: () =>
+                                            _checkoutVisitor(passId),
                                         child: const Text('Check Out'),
                                       )
                                     : const Text('—'),
@@ -2150,8 +3180,12 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
   // ==========================================
   Widget _buildHealthTab() {
     final visitsToday = _infirmaryVisits.length;
-    final parentNotifiedCount = _infirmaryVisits.where((v) => v['parentNotified'] == true).length;
-    final followUpCount = _infirmaryVisits.where((v) => v['followUpNeeded'] == true).length;
+    final parentNotifiedCount = _infirmaryVisits
+        .where((v) => v['parentNotified'] == true)
+        .length;
+    final followUpCount = _infirmaryVisits
+        .where((v) => v['followUpNeeded'] == true)
+        .length;
 
     return SingleChildScrollView(
       child: Column(
@@ -2159,10 +3193,22 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
         children: [
           StatStrip(
             items: [
-              StatItemData(label: 'Total Infirmary Visits', value: visitsToday.toString()),
-              StatItemData(label: 'Parents Notified', value: parentNotifiedCount.toString()),
-              StatItemData(label: 'Follow-ups Required', value: followUpCount.toString()),
-              StatItemData(label: 'Emergency Directory', value: '${widget.students.length} Students'),
+              StatItemData(
+                label: 'Total Infirmary Visits',
+                value: visitsToday.toString(),
+              ),
+              StatItemData(
+                label: 'Parents Notified',
+                value: parentNotifiedCount.toString(),
+              ),
+              StatItemData(
+                label: 'Follow-ups Required',
+                value: followUpCount.toString(),
+              ),
+              StatItemData(
+                label: 'Emergency Directory',
+                value: '${widget.students.length} Students',
+              ),
             ],
           ),
           const SizedBox(height: 18),
@@ -2178,7 +3224,11 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       const Text(
                         'Campus Infirmary Daily Log',
@@ -2188,11 +3238,22 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const Spacer(),
                       ElevatedButton.icon(
                         onPressed: _showLogInfirmaryVisitDialog,
-                        icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                        icon: const Icon(
+                          Icons.add_circle_outline_rounded,
+                          size: 16,
+                        ),
                         label: const Text('Log Visit'),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        onPressed: _showHealthProfileDialog,
+                        icon: const Icon(
+                          Icons.medical_information_outlined,
+                          size: 16,
+                        ),
+                        label: const Text('Health profiles'),
                       ),
                     ],
                   ),
@@ -2216,24 +3277,41 @@ class _AdminCampusViewState extends ConsumerState<AdminCampusView>
                           DataColumn(label: Text('Parent Notified')),
                         ],
                         rows: _infirmaryVisits.map((visit) {
-                          final name = visit['studentName'] as String? ?? 'Student';
+                          final name =
+                              visit['studentName'] as String? ?? 'Student';
                           final adm = visit['admissionNumber'] as String? ?? '';
                           final sym = visit['symptoms'] as String? ?? '';
                           final trt = visit['treatmentGiven'] as String? ?? '';
-                          final staff = visit['attendedByStaffName'] as String? ?? 'Nurse';
-                          final notified = visit['parentNotified'] as bool? ?? false;
+                          final staff =
+                              visit['attendedByStaffName'] as String? ??
+                              'Nurse';
+                          final notified =
+                              visit['parentNotified'] as bool? ?? false;
 
                           return DataRow(
                             cells: [
-                              DataCell(Text(name, style: const TextStyle(fontWeight: FontWeight.w600))),
+                              DataCell(
+                                Text(
+                                  name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
                               DataCell(Text(adm)),
                               DataCell(Text(sym)),
                               DataCell(Text(trt)),
                               DataCell(Text(staff)),
                               DataCell(
                                 notified
-                                    ? const StatusBadge(label: 'NOTIFIED', tone: BadgeTone.success)
-                                    : const StatusBadge(label: 'NOT NOTIFIED', tone: BadgeTone.neutral),
+                                    ? const StatusBadge(
+                                        label: 'NOTIFIED',
+                                        tone: BadgeTone.success,
+                                      )
+                                    : const StatusBadge(
+                                        label: 'NOT NOTIFIED',
+                                        tone: BadgeTone.neutral,
+                                      ),
                               ),
                             ],
                           );

@@ -57,6 +57,7 @@ import {
   updateStudentLeaveStatusSchema,
   createStaffLeaveSchema,
   updateStaffLeaveStatusSchema,
+  assignStaffLeaveSubstituteSchema,
   createTransportVehicleSchema,
   createTransportDriverSchema,
   createTransportRouteSchema,
@@ -1040,6 +1041,23 @@ adminRoutes.get(
   },
 );
 
+adminRoutes.post(
+  '/leaves/staff/:id/substitutes',
+  zValidator('param', z.object({ id: z.string().uuid() })),
+  zValidator('json', assignStaffLeaveSubstituteSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.assignStaffLeaveSubstitute(
+        c.get('authUser'),
+        c.req.valid('param').id,
+        c.req.valid('json'),
+      ),
+      201,
+    );
+  },
+);
+
 // 2. Transport
 adminRoutes.get('/transport/vehicles', async (c) => {
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
@@ -1422,6 +1440,13 @@ adminRoutes.post(
     );
   },
 );
+
+adminRoutes.get('/operations/inventory/allocations', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(
+    await repo.listInventoryAllocations(c.get('authUser'), c.req.query('status')),
+  );
+});
 
 adminRoutes.post(
   '/operations/inventory/allocations/:allocationId/return',
@@ -1869,6 +1894,4 @@ adminRoutes.put(
     );
   },
 );
-
-
 

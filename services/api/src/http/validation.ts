@@ -582,6 +582,11 @@ export const updateStaffLeaveStatusSchema = z.object({
   reviewerNotes: z.string().trim().max(300).nullable().optional(),
 });
 
+export const assignStaffLeaveSubstituteSchema = z.object({
+  timetableEntryId: z.uuid(),
+  substituteStaffId: z.uuid(),
+});
+
 export const createTransportVehicleSchema = z.object({
   vehicleNumber: z.string().trim().min(2).max(30),
   model: z.string().trim().min(2).max(60),
@@ -1112,4 +1117,3 @@ export const updateTranscriptRequestStatusSchema = z.object({
   issuedDocumentKey: z.string().trim().max(255).optional().nullable(),
   notes: z.string().trim().max(500).optional().nullable(),
 });
-

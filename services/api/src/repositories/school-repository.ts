@@ -43,6 +43,7 @@ import {
   feeRefunds,
   studentLeaves,
   staffLeaves,
+  staffLeaveSubstitutions,
   transportVehicles,
   transportDrivers,
   transportRoutes,
@@ -137,6 +138,7 @@ import type {
   updateStudentLeaveStatusSchema,
   createStaffLeaveSchema,
   updateStaffLeaveStatusSchema,
+  assignStaffLeaveSubstituteSchema,
   createTransportVehicleSchema,
   createTransportDriverSchema,
   createTransportRouteSchema,
@@ -4768,6 +4770,22 @@ export function createSchoolRepository(db: Db) {
 
       if (!leave) throw new ApiError(404, 'Staff leave request not found');
 
+      const existingAssignments = await db
+        .select({
+          timetableEntryId: staffLeaveSubstitutions.timetableEntryId,
+          substituteStaffId: staffLeaveSubstitutions.substituteStaffId,
+          substituteName: staff.fullName,
+          notifiedAt: staffLeaveSubstitutions.notifiedAt,
+        })
+        .from(staffLeaveSubstitutions)
+        .innerJoin(staff, eq(staff.id, staffLeaveSubstitutions.substituteStaffId))
+        .where(
+          and(
+            eq(staffLeaveSubstitutions.schoolId, user.schoolId),
+            eq(staffLeaveSubstitutions.staffLeaveId, leaveId),
+          ),
+        );
+
       const start = new Date(leave.startDate);
       const end = new Date(leave.endDate);
       const daysOfWeekSet = new Set<number>();
@@ -4872,6 +4890,7 @@ export function createSchoolRepository(db: Db) {
           subjectName: lesson.subjectName,
           subjectId: lesson.subjectId,
           availableSubstitutes,
+          assignment: existingAssignments.find((assignment) => assignment.timetableEntryId === lesson.id) ?? null,
         };
       });
 
@@ -4883,6 +4902,78 @@ export function createSchoolRepository(db: Db) {
         totalLessonsRequiringCoverage: relevantLessons.length,
         periodSubstitutions,
       };
+    },
+
+    async assignStaffLeaveSubstitute(
+      user: AuthUser,
+      leaveId: string,
+      input: z.infer<typeof assignStaffLeaveSubstituteSchema>,
+    ) {
+      const [leave] = await db
+        .select()
+        .from(staffLeaves)
+        .where(and(eq(staffLeaves.id, leaveId), eq(staffLeaves.schoolId, user.schoolId)))
+        .limit(1);
+      if (!leave) throw new ApiError(404, 'Staff leave request not found');
+
+      const [lesson] = await db
+        .select()
+        .from(timetableEntries)
+        .where(and(eq(timetableEntries.id, input.timetableEntryId), eq(timetableEntries.schoolId, user.schoolId)))
+        .limit(1);
+      if (!lesson || lesson.staffId !== leave.staffId) {
+        throw new ApiError(400, 'Timetable lesson does not belong to the absent staff member');
+      }
+
+      const [substitute] = await db
+        .select()
+        .from(staff)
+        .where(and(eq(staff.id, input.substituteStaffId), eq(staff.schoolId, user.schoolId), eq(staff.isTeacher, true)))
+        .limit(1);
+      if (!substitute) throw new ApiError(404, 'Substitute teacher not found');
+
+      const now = new Date();
+      const [assignment] = await db
+        .insert(staffLeaveSubstitutions)
+        .values({
+          schoolId: user.schoolId,
+          staffLeaveId: leaveId,
+          timetableEntryId: lesson.id,
+          substituteStaffId: substitute.id,
+          assignedByUserId: user.appUserId,
+          notifiedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [staffLeaveSubstitutions.staffLeaveId, staffLeaveSubstitutions.timetableEntryId],
+          set: { substituteStaffId: substitute.id, assignedByUserId: user.appUserId, notifiedAt: now, updatedAt: now },
+        })
+        .returning();
+
+      if (substitute.userId) {
+        await db.insert(notifications).values({
+          schoolId: user.schoolId,
+          recipientUserId: substitute.userId,
+          channel: 'in_app',
+          title: 'Substitute class assigned',
+          body: `You have been assigned substitute coverage for period ${lesson.periodNumber ?? ''} on the approved leave schedule.`,
+          data: { staffLeaveId: leaveId, timetableEntryId: lesson.id },
+          status: 'delivered',
+          sentAt: now,
+          deliveredAt: now,
+        });
+      }
+
+      await this.createAuditLog({
+        schoolId: user.schoolId,
+        userId: user.appUserId,
+        userEmail: user.email,
+        userRole: user.roles[0] ?? 'admin',
+        action: 'assign_staff_leave_substitute',
+        resourceType: 'staff_leave',
+        resourceId: leaveId,
+        details: { timetableEntryId: lesson.id, substituteStaffId: substitute.id },
+      });
+      return { ...assignment, substituteName: substitute.fullName };
     },
 
     // 3. School Transport Management
@@ -6326,6 +6417,33 @@ export function createSchoolRepository(db: Db) {
       return updated;
     },
 
+    async publishTeacherReportCard(user: AuthUser, id: string, isPublished: boolean) {
+      const [card] = await db
+        .select({ classId: studentReportCards.classId, sectionId: studentReportCards.sectionId })
+        .from(studentReportCards)
+        .where(and(eq(studentReportCards.id, id), eq(studentReportCards.schoolId, user.schoolId)))
+        .limit(1);
+      if (!card) throw new ApiError(404, 'Report card not found');
+
+      if (!user.roles.includes('admin')) {
+        if (!user.staffId) throw new ApiError(403, 'Teacher profile is required');
+        const [assignment] = await db
+          .select({ id: teacherAssignments.id })
+          .from(teacherAssignments)
+          .where(
+            and(
+              eq(teacherAssignments.schoolId, user.schoolId),
+              eq(teacherAssignments.staffId, user.staffId),
+              eq(teacherAssignments.classId, card.classId),
+              eq(teacherAssignments.sectionId, card.sectionId),
+            ),
+          )
+          .limit(1);
+        if (!assignment) throw new ApiError(403, 'You are not assigned to this report card section');
+      }
+      return this.publishReportCard(user, id, isPublished);
+    },
+
     async portalBoardReportCards(user: AuthUser, studentId?: string | undefined) {
       const portalStudent = await resolvePortalStudent(db, user, studentId);
       const rows = await db
@@ -7580,6 +7698,26 @@ export function createSchoolRepository(db: Db) {
         .where(eq(inventoryItems.id, item.id));
 
       return allocation;
+    },
+
+    async listInventoryAllocations(user: AuthUser, status?: string) {
+      const conditions = [eq(inventoryAllocations.schoolId, user.schoolId)];
+      if (status && status !== 'all') {
+        conditions.push(eq(inventoryAllocations.status, status));
+      }
+      const rows = await db
+        .select({ allocation: inventoryAllocations, item: inventoryItems, staffMember: staff })
+        .from(inventoryAllocations)
+        .innerJoin(inventoryItems, eq(inventoryItems.id, inventoryAllocations.itemId))
+        .innerJoin(staff, eq(staff.id, inventoryAllocations.allocatedToStaffId))
+        .where(and(...conditions))
+        .orderBy(desc(inventoryAllocations.createdAt));
+      return rows.map(({ allocation, item, staffMember }) => ({
+        ...allocation,
+        itemName: item.name,
+        itemCode: item.itemCode,
+        staffName: staffMember.fullName,
+      }));
     },
 
     async returnInventoryAllocation(user: AuthUser, allocationId: string) {
@@ -9728,4 +9866,3 @@ export function calculateLateFee(
     daysLate,
   };
 }
-

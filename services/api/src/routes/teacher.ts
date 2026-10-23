@@ -26,6 +26,7 @@ import {
   updatePtmSlotNotesSchema,
   syncOfflineAttendanceSchema,
   generateReportCardsSchema,
+  publishReportCardSchema,
   recordStudentInterventionSchema,
   draftReportCardRemarksSchema,
   draftHomeworkFeedbackSchema,
@@ -421,10 +422,33 @@ teacherRoutes.get('/report-cards', async (c) => {
   }));
 });
 
+teacherRoutes.get('/grading-schemes', async (c) => {
+  const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+  return c.json(
+    await repo.listGradingSchemes(c.get('authUser'), c.req.query('academicYearId')),
+  );
+});
+
 teacherRoutes.post('/report-cards/generate', zValidator('json', generateReportCardsSchema), async (c) => {
   const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
   return c.json(await repo.generateReportCards(c.get('authUser'), c.req.valid('json')), 201);
 });
+
+teacherRoutes.put(
+  '/report-cards/:id/publish',
+  zValidator('param', idSchema),
+  zValidator('json', publishReportCardSchema),
+  async (c) => {
+    const repo = createSchoolRepository(createDb(c.env.DATABASE_URL));
+    return c.json(
+      await repo.publishTeacherReportCard(
+        c.get('authUser'),
+        c.req.valid('param').id,
+        c.req.valid('json').isPublished,
+      ),
+    );
+  },
+);
 
 // Phase 14: Applied AI & Enhanced Institutional UX
 teacherRoutes.get('/at-risk-students', async (c) => {
@@ -474,5 +498,3 @@ teacherRoutes.post(
     return c.json(await repo.draftHomeworkFeedback(c.req.valid('json')), 200);
   },
 );
-
-

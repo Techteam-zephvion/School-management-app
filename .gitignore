@@ -11,3 +11,4 @@ apps/flutter_app/build/
 .dev.vars
 *.zip
 .ignore/
+.agents/

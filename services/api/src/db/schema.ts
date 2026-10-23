@@ -1126,6 +1126,24 @@ export const staffLeaves = pgTable(
   ],
 );
 
+export const staffLeaveSubstitutions = pgTable(
+  'staff_leave_substitutions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    schoolId: uuid('school_id').notNull().references(() => schools.id, { onDelete: 'cascade' }),
+    staffLeaveId: uuid('staff_leave_id').notNull().references(() => staffLeaves.id, { onDelete: 'cascade' }),
+    timetableEntryId: uuid('timetable_entry_id').notNull().references(() => timetableEntries.id, { onDelete: 'cascade' }),
+    substituteStaffId: uuid('substitute_staff_id').notNull().references(() => staff.id, { onDelete: 'cascade' }),
+    assignedByUserId: uuid('assigned_by_user_id').references(() => appUsers.id, { onDelete: 'set null' }),
+    notifiedAt: timestamp('notified_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique().on(table.staffLeaveId, table.timetableEntryId),
+    index('staff_leave_substitute_idx').on(table.schoolId, table.substituteStaffId),
+  ],
+);
+
 export const transportVehicles = pgTable(
   'transport_vehicles',
   {

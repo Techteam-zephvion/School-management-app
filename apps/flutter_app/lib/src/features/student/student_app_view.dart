@@ -1,8 +1,10 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
+import '../../core/fluid_ui.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
@@ -14,6 +16,7 @@ import 'components/digital_id_card.dart';
 import 'components/fee_payment_sheet.dart';
 import 'components/fee_receipt_modal.dart';
 import 'components/homework_submission_sheet.dart';
+import 'views/student_services_view.dart';
 import 'utils/fee_receipt_pdf.dart';
 
 class StudentAppView extends ConsumerStatefulWidget {
@@ -84,8 +87,9 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
 
     // Live background auto-refresh every 15 seconds (bypassed in widget test harness)
-    final isTest =
-        WidgetsBinding.instance.runtimeType.toString().contains('Test');
+    final isTest = WidgetsBinding.instance.runtimeType.toString().contains(
+      'Test',
+    );
     if (!isTest) {
       _realtimeSyncTimer = Timer.periodic(const Duration(seconds: 15), (_) {
         if (mounted) _load(silent: true);
@@ -138,7 +142,8 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
           .map((row) => row.cast<String, Object?>())
           .toList();
 
-      final selectedId = studentId ??
+      final selectedId =
+          studentId ??
           _selectedStudentId ??
           (students.isEmpty ? null : students.first['id'] as String?);
 
@@ -152,7 +157,10 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
         api.getJson('/api/v1/portal/fees$query', session: session),
         api.getJson('/api/v1/portal/id-card$query', session: session),
         api.getList('/api/v1/portal/announcements$query', session: session),
-        api.getList('/api/v1/portal/board-report-cards$query', session: session),
+        api.getList(
+          '/api/v1/portal/board-report-cards$query',
+          session: session,
+        ),
       ]);
 
       if (!mounted) return;
@@ -174,7 +182,9 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
       if (!silent) {
         setState(() {
           _loading = false;
-          _error = e is ApiException ? e.message : 'Unable to load student data.';
+          _error = e is ApiException
+              ? e.message
+              : 'Unable to load student data.';
         });
       }
     }
@@ -215,18 +225,21 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
                     backgroundColor: isSelected
                         ? AppColors.primaryText
                         : AppColors.secondaryBackground,
-                    foregroundColor:
-                        isSelected ? Colors.white : AppColors.primaryText,
+                    foregroundColor: isSelected
+                        ? Colors.white
+                        : AppColors.primaryText,
                     child: Text(
-                      ((student['fullName'] as String?) ?? 'S')[0].toUpperCase(),
+                      ((student['fullName'] as String?) ?? 'S')[0]
+                          .toUpperCase(),
                     ),
                   ),
                   title: Text(
                     (student['fullName'] as String?) ?? 'Student',
                     style: TextStyle(
                       fontFamily: 'Switzer',
-                      fontWeight:
-                          isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
                     ),
                   ),
                   subtitle: Text(
@@ -234,8 +247,11 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
                     style: AppTypography.metadata,
                   ),
                   trailing: isSelected
-                      ? const Icon(Icons.check_circle,
-                          color: AppColors.primaryText, size: 20)
+                      ? const Icon(
+                          Icons.check_circle,
+                          color: AppColors.primaryText,
+                          size: 20,
+                        )
                       : null,
                   onTap: () {
                     Navigator.of(context).pop();
@@ -348,6 +364,9 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
               : const Icon(Icons.refresh, size: 20),
           onPressed: _loading ? null : () => _load(),
         ),
+        const SizedBox(width: 4),
+        const FluidMascotInsignia(size: 26),
+        const SizedBox(width: 4),
         IconButton(
           tooltip: 'Sign out',
           icon: const Icon(Icons.logout, size: 19),
@@ -357,10 +376,7 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
       ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
-        child: Container(
-          color: AppColors.primaryBorder,
-          height: 1,
-        ),
+        child: Container(color: AppColors.primaryBorder, height: 1),
       ),
     );
   }
@@ -384,16 +400,13 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
     }
 
     if (_loading && _profile == null) {
-      return const Center(
-        child: CircularProgressIndicator(strokeWidth: 2),
-      );
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
 
     if (_students.isEmpty) {
       return const EmptyStateView(
         title: 'No Student Profile Linked',
-        description:
-            'Please ask the school administrator to link your account to a student record.',
+        description: 'Please ask the school administrator to link your account to a student record.',
       );
     }
 
@@ -441,6 +454,11 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
                 icon: Icon(Icons.badge_outlined),
                 selectedIcon: Icon(Icons.badge),
                 label: Text('ID & Fees'),
+              ),
+              const NavigationRailDestination(
+                icon: Icon(Icons.apps_outlined),
+                selectedIcon: Icon(Icons.apps),
+                label: Text('Services'),
               ),
             ],
           ),
@@ -510,6 +528,11 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
             selectedIcon: Icon(Icons.badge, size: 22),
             label: 'ID & Fees',
           ),
+          const NavigationRequestDestination(
+            icon: Icon(Icons.apps_outlined, size: 22),
+            selectedIcon: Icon(Icons.apps, size: 22),
+            label: 'Services',
+          ),
         ],
       ),
     );
@@ -527,6 +550,14 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
         return _buildAcademicsTab();
       case 4:
         return _buildIdFeesTab();
+      case 5:
+        return StudentServicesView(
+          studentId: _selectedStudentId!,
+          timetableEntries: ((_timetable?['entries'] as List?) ?? const [])
+              .whereType<Map>()
+              .map((item) => item.cast<String, Object?>())
+              .toList(),
+        );
       default:
         return _buildTodayTab();
     }
@@ -760,44 +791,37 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
     required IconData icon,
     required VoidCallback onTap,
   }) {
-    return InkWell(
+    return FluidInteractiveCard(
       onTap: onTap,
+      padding: const EdgeInsets.all(14),
       borderRadius: AppRadii.rMd,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.mainBackground,
-          borderRadius: AppRadii.rMd,
-          border: Border.all(color: AppColors.primaryBorder),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 20, color: AppColors.primaryText),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: const TextStyle(
-                fontFamily: 'Switzer',
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.mutedText,
-              ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: AppColors.primaryText),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            style: const TextStyle(
+              fontFamily: 'Switzer',
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.mutedText,
             ),
-            const SizedBox(height: 2),
-            Text(
-              value,
-              style: const TextStyle(
-                fontFamily: 'Switzer',
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primaryText,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontFamily: 'Switzer',
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primaryText,
             ),
-          ],
-        ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }
@@ -898,109 +922,110 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
     final subject = (entry['subjectName'] as String?) ?? 'Subject';
     final teacher = (entry['staffName'] as String?) ?? 'Faculty';
     final room = (entry['roomNumber'] as String?) ?? 'Main Classroom';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.mainBackground,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: FluidInteractiveCard(
+        padding: const EdgeInsets.all(14),
         borderRadius: AppRadii.rMd,
-        border: Border.all(color: AppColors.primaryBorder),
-      ),
-      child: Row(
-        children: [
-          // Time badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.secondaryBackground,
-              borderRadius: AppRadii.rSm,
-              border: Border.all(color: AppColors.primaryBorder),
-            ),
-            child: Column(
-              children: [
-                Text(
-                  startTime,
-                  style: const TextStyle(
-                    fontFamily: 'Switzer',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primaryText,
-                  ),
-                ),
-                const Text(
-                  'to',
-                  style: TextStyle(
-                    fontFamily: 'Switzer',
-                    fontSize: 9,
-                    color: AppColors.mutedText,
-                  ),
-                ),
-                Text(
-                  endTime,
-                  style: const TextStyle(
-                    fontFamily: 'Switzer',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 14),
-
-          // Subject & Teacher info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  subject,
-                  style: const TextStyle(
-                    fontFamily: 'Switzer',
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primaryText,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    const Icon(Icons.person_outline,
-                        size: 13, color: AppColors.secondaryText),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        teacher,
-                        style: AppTypography.bodySecondary,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+        enableHoverTranslate: true,
+        child: Row(
+          children: [
+            // Time badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.secondaryBackground,
+                borderRadius: AppRadii.rSm,
+                border: Border.all(color: AppColors.primaryBorder),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    startTime,
+                    style: const TextStyle(
+                      fontFamily: 'Switzer',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryText,
                     ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Room tag
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.secondaryBackground,
-              borderRadius: AppRadii.rSm,
-            ),
-            child: Text(
-              room,
-              style: const TextStyle(
-                fontFamily: 'Switzer',
-                fontSize: 11,
-                color: AppColors.mutedText,
+                  ),
+                  const Text(
+                    'to',
+                    style: TextStyle(
+                      fontFamily: 'Switzer',
+                      fontSize: 9,
+                      color: AppColors.mutedText,
+                    ),
+                  ),
+                  Text(
+                    endTime,
+                    style: const TextStyle(
+                      fontFamily: 'Switzer',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryText,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 14),
+
+            // Subject & Teacher info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    subject,
+                    style: const TextStyle(
+                      fontFamily: 'Switzer',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryText,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.person_outline,
+                        size: 13,
+                        color: AppColors.secondaryText,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          teacher,
+                          style: AppTypography.bodySecondary,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Room tag
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.secondaryBackground,
+                borderRadius: AppRadii.rSm,
+              ),
+              child: Text(
+                room,
+                style: const TextStyle(
+                  fontFamily: 'Switzer',
+                  fontSize: 11,
+                  color: AppColors.mutedText,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1067,7 +1092,8 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
             const SizedBox(width: 8),
             ChoiceChip(
               label: Text(
-                  'Submitted (${allList.length - _pendingHomeworkCount})'),
+                'Submitted (${allList.length - _pendingHomeworkCount})',
+              ),
               selected: _homeworkFilter == 'submitted',
               selectedColor: AppColors.primaryText,
               labelStyle: TextStyle(
@@ -1139,8 +1165,10 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
             Row(
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.secondaryBackground,
                     borderRadius: AppRadii.rSm,
@@ -1158,10 +1186,7 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
                 ),
                 if (estimatedMin != null) ...[
                   const SizedBox(width: 8),
-                  Text(
-                    '⏱ $estimatedMin mins',
-                    style: AppTypography.metadata,
-                  ),
+                  Text('⏱ $estimatedMin mins', style: AppTypography.metadata),
                 ],
                 const Spacer(),
                 if (isSubmitted)
@@ -1172,10 +1197,7 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
                         : BadgeTone.info,
                   )
                 else
-                  const StatusBadge(
-                    label: 'PENDING',
-                    tone: BadgeTone.warning,
-                  ),
+                  const StatusBadge(label: 'PENDING', tone: BadgeTone.warning),
               ],
             ),
             const SizedBox(height: 10),
@@ -1193,17 +1215,17 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
             const SizedBox(height: 6),
 
             // Instructions
-            Text(
-              instructions,
-              style: AppTypography.bodySecondary,
-            ),
+            Text(instructions, style: AppTypography.bodySecondary),
             const SizedBox(height: 12),
 
             // Due Date & Teacher info
             Row(
               children: [
-                const Icon(Icons.event_outlined,
-                    size: 14, color: AppColors.mutedText),
+                const Icon(
+                  Icons.event_outlined,
+                  size: 14,
+                  color: AppColors.mutedText,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   'Due: $dueDate',
@@ -1215,8 +1237,11 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
                   ),
                 ),
                 const SizedBox(width: 14),
-                const Icon(Icons.person_outline,
-                    size: 14, color: AppColors.mutedText),
+                const Icon(
+                  Icons.person_outline,
+                  size: 14,
+                  color: AppColors.mutedText,
+                ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
@@ -1244,8 +1269,11 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.check_circle,
-                            size: 15, color: Colors.green),
+                        const Icon(
+                          Icons.check_circle,
+                          size: 15,
+                          color: Colors.green,
+                        ),
                         const SizedBox(width: 6),
                         const Text(
                           'Your Submission',
@@ -1259,7 +1287,9 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
                         if (marks != null)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.primaryText,
                               borderRadius: BorderRadius.circular(12),
@@ -1278,13 +1308,9 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
                     ),
                     if (content != null && content.isNotEmpty) ...[
                       const SizedBox(height: 6),
-                      Text(
-                        content,
-                        style: AppTypography.bodySecondary,
-                      ),
+                      Text(content, style: AppTypography.bodySecondary),
                     ],
-                    if (attachmentUrl != null &&
-                        attachmentUrl.isNotEmpty) ...[
+                    if (attachmentUrl != null && attachmentUrl.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
                         'Link: $attachmentUrl',
@@ -1306,8 +1332,11 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.feedback_outlined,
-                                size: 14, color: AppColors.primaryText),
+                            const Icon(
+                              Icons.feedback_outlined,
+                              size: 14,
+                              color: AppColors.primaryText,
+                            ),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
@@ -1525,8 +1554,8 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
     final board = (rc['board'] as String? ?? 'CBSE').toUpperCase();
     final pct = rc['overallPercentage'] as String? ?? '0%';
     final grade = rc['overallGrade'] as String? ?? 'A';
-    final resultStatus =
-        (rc['resultStatus'] as String? ?? 'Promoted').toUpperCase();
+    final resultStatus = (rc['resultStatus'] as String? ?? 'Promoted')
+        .toUpperCase();
     final attendanceRate = rc['attendancePercentage'] as String? ?? '100%';
 
     return Container(
@@ -1597,10 +1626,12 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
   }
 
   Future<void> _printPortalReportCard(Map<String, Object?> rc) async {
-    final scholasticData = (rc['scholasticParsed'] as List<dynamic>?)
+    final scholasticData =
+        (rc['scholasticParsed'] as List<dynamic>?)
             ?.cast<Map<String, Object?>>() ??
         const [];
-    final coScholasticData = (rc['coScholasticParsed'] as List<dynamic>?)
+    final coScholasticData =
+        (rc['coScholasticParsed'] as List<dynamic>?)
             ?.cast<Map<String, Object?>>() ??
         const [];
 
@@ -1608,18 +1639,23 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
       schoolName: 'Schoolic Model International School',
       schoolAffiliation: 'CBSE Affiliation No. 1930482',
       schoolAddress: '100ft Road, Indiranagar, Bengaluru, Karnataka - 560038',
-      studentName: rc['studentName'] as String? ??
+      studentName:
+          rc['studentName'] as String? ??
           _activeStudent?['fullName'] as String? ??
           'Student',
-      admissionNumber: rc['admissionNumber'] as String? ??
+      admissionNumber:
+          rc['admissionNumber'] as String? ??
           _activeStudent?['admissionNumber'] as String? ??
           '—',
-      rollNumber: rc['rollNumber'] as String? ??
+      rollNumber:
+          rc['rollNumber'] as String? ??
           _activeStudent?['rollNumber'] as String?,
-      className: rc['className'] as String? ??
+      className:
+          rc['className'] as String? ??
           _activeStudent?['className'] as String? ??
           'Class',
-      sectionName: rc['sectionName'] as String? ??
+      sectionName:
+          rc['sectionName'] as String? ??
           _activeStudent?['sectionName'] as String? ??
           'Section',
       termName: rc['term'] as String? ?? 'Annual',
@@ -1702,10 +1738,7 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
             ),
           ),
           const SizedBox(height: 2),
-          Text(
-            'Exam Date: $examDate',
-            style: AppTypography.metadata,
-          ),
+          Text('Exam Date: $examDate', style: AppTypography.metadata),
           if (remarks != null && remarks.isNotEmpty) ...[
             const SizedBox(height: 8),
             Container(
@@ -1716,15 +1749,13 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.comment_outlined,
-                      size: 13, color: AppColors.mutedText),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      remarks,
-                      style: AppTypography.metadata,
-                    ),
+                  const Icon(
+                    Icons.comment_outlined,
+                    size: 13,
+                    color: AppColors.mutedText,
                   ),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(remarks, style: AppTypography.metadata)),
                 ],
               ),
             ),
@@ -1742,7 +1773,8 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
     final student = _idCard?['student'] as Map<String, Object?>?;
     final qrPayload = _idCard?['qrPayload'] as String?;
 
-    final schoolName = (school?['name'] as String?) ??
+    final schoolName =
+        (school?['name'] as String?) ??
         (_profile?['school'] as Map?)?['name'] as String? ??
         'Schoolic';
     final schoolCode = (school?['code'] as String?) ?? 'SCH';
@@ -1752,7 +1784,8 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
     final rollNumber = (student?['rollNumber'] as String?) ?? '01';
     final className = (student?['className'] as String?) ?? 'Class';
     final sectionName = (student?['sectionName'] as String?) ?? 'A';
-    final academicYear = (student?['academicYearName'] as String?) ?? '2026-2027';
+    final academicYear =
+        (student?['academicYearName'] as String?) ?? '2026-2027';
     final guardianName = student?['guardianName'] as String?;
     final guardianPhone = student?['guardianPhone'] as String?;
 
@@ -1888,150 +1921,153 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
           ...((_fees?['allocations'] as List?) ?? const [])
               .whereType<Map>()
               .map((rawAlloc) {
-            final alloc = rawAlloc.cast<String, Object?>();
-            final allocId = (alloc['id'] as String?) ?? '';
-            final feeTitle = (alloc['feeStructureName'] as String?) ??
-                (alloc['feeName'] as String?) ??
-                'Tuition Fee';
-            final amount = (alloc['amount'] as int?) ?? 0;
-            final paid = (alloc['paidAmount'] as int?) ?? 0;
-            final due = (alloc['balanceAmount'] as int?) ?? (amount - paid);
-            final dueDate = (alloc['dueDate'] as String?) ?? 'Term End';
-            final status = (alloc['status'] as String?) ??
-                (due <= 0 ? 'paid' : (paid > 0 ? 'partial' : 'pending'));
+                final alloc = rawAlloc.cast<String, Object?>();
+                final allocId = (alloc['id'] as String?) ?? '';
+                final feeTitle =
+                    (alloc['feeStructureName'] as String?) ??
+                    (alloc['feeName'] as String?) ??
+                    'Tuition Fee';
+                final amount = (alloc['amount'] as int?) ?? 0;
+                final paid = (alloc['paidAmount'] as int?) ?? 0;
+                final due = (alloc['balanceAmount'] as int?) ?? (amount - paid);
+                final dueDate = (alloc['dueDate'] as String?) ?? 'Term End';
+                final status =
+                    (alloc['status'] as String?) ??
+                    (due <= 0 ? 'paid' : (paid > 0 ? 'partial' : 'pending'));
 
-            final isPaid = status == 'paid' || due <= 0;
-            final BadgeTone tone = isPaid
-                ? BadgeTone.success
-                : (status == 'overdue'
-                    ? BadgeTone.error
-                    : (paid > 0 ? BadgeTone.warning : BadgeTone.neutral));
+                final isPaid = status == 'paid' || due <= 0;
+                final BadgeTone tone = isPaid
+                    ? BadgeTone.success
+                    : (status == 'overdue'
+                          ? BadgeTone.error
+                          : (paid > 0 ? BadgeTone.warning : BadgeTone.neutral));
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.mainBackground,
-                borderRadius: AppRadii.rMd,
-                border: Border.all(color: AppColors.primaryBorder),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.mainBackground,
+                    borderRadius: AppRadii.rMd,
+                    border: Border.all(color: AppColors.primaryBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          feeTitle,
-                          style: const TextStyle(
-                            fontFamily: 'Switzer',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              feeTitle,
+                              style: const TextStyle(
+                                fontFamily: 'Switzer',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          StatusBadge(label: status.toUpperCase(), tone: tone),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text('Due Date: $dueDate', style: AppTypography.metadata),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Total', style: AppTypography.metadata),
+                              Text(
+                                '₹$amount',
+                                style: const TextStyle(
+                                  fontFamily: 'Switzer',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Paid', style: AppTypography.metadata),
+                              Text(
+                                '₹$paid',
+                                style: const TextStyle(
+                                  fontFamily: 'Switzer',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'Balance Due',
+                                style: AppTypography.metadata,
+                              ),
+                              Text(
+                                '₹$due',
+                                style: TextStyle(
+                                  fontFamily: 'Switzer',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: due > 0
+                                      ? Colors.redAccent
+                                      : Colors.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      if (!isPaid && due > 0) ...[
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 38,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.accent,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: AppRadii.rSm,
+                              ),
+                            ),
+                            icon: const Icon(Icons.payment, size: 16),
+                            label: Text(
+                              'Pay ₹$due Online',
+                              style: const TextStyle(
+                                fontFamily: 'Switzer',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            onPressed: () {
+                              FeePaymentSheet.show(
+                                context,
+                                allocationId: allocId,
+                                feeName: feeTitle,
+                                totalAmount: amount,
+                                paidAmount: paid,
+                                balanceDue: due,
+                                studentName: fullName,
+                                admissionNumber: admissionNumber,
+                                onPaymentSuccess: () => _load(silent: true),
+                              );
+                            },
                           ),
                         ),
-                      ),
-                      StatusBadge(
-                        label: status.toUpperCase(),
-                        tone: tone,
-                      ),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Due Date: $dueDate',
-                    style: AppTypography.metadata,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Total', style: AppTypography.metadata),
-                          Text(
-                            '₹$amount',
-                            style: const TextStyle(
-                              fontFamily: 'Switzer',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Paid', style: AppTypography.metadata),
-                          Text(
-                            '₹$paid',
-                            style: const TextStyle(
-                              fontFamily: 'Switzer',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text('Balance Due', style: AppTypography.metadata),
-                          Text(
-                            '₹$due',
-                            style: TextStyle(
-                              fontFamily: 'Switzer',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: due > 0 ? Colors.redAccent : Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  if (!isPaid && due > 0) ...[
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 38,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.accent,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: AppRadii.rSm),
-                        ),
-                        icon: const Icon(Icons.payment, size: 16),
-                        label: Text(
-                          'Pay ₹$due Online',
-                          style: const TextStyle(
-                            fontFamily: 'Switzer',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        onPressed: () {
-                          FeePaymentSheet.show(
-                            context,
-                            allocationId: allocId,
-                            feeName: feeTitle,
-                            totalAmount: amount,
-                            paidAmount: paid,
-                            balanceDue: due,
-                            studentName: fullName,
-                            admissionNumber: admissionNumber,
-                            onPaymentSuccess: () => _load(silent: true),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            );
-          }),
+                );
+              }),
         ],
 
         // Paid Receipts & Payment History
@@ -2062,7 +2098,11 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
             child: Center(
               child: Column(
                 children: [
-                  const Icon(Icons.receipt_long_outlined, size: 30, color: AppColors.mutedText),
+                  const Icon(
+                    Icons.receipt_long_outlined,
+                    size: 30,
+                    color: AppColors.mutedText,
+                  ),
                   const SizedBox(height: 8),
                   const Text(
                     'No Payment Receipts Found',
@@ -2083,18 +2123,21 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
             ),
           ),
         ] else ...[
-          ...((_fees?['payments'] as List?) ?? const [])
-              .whereType<Map>()
-              .map((rawPmt) {
+          ...((_fees?['payments'] as List?) ?? const []).whereType<Map>().map((
+            rawPmt,
+          ) {
             final pmt = rawPmt.cast<String, Object?>();
             final receiptNo = (pmt['receiptNumber'] as String?) ?? 'REC-PAID';
             final pmtAmount = (pmt['amountPaid'] as int?) ?? 0;
             final method = (pmt['paymentMethod'] as String?) ?? 'Online';
-            final feeTitle = (pmt['feeStructureName'] as String?) ??
+            final feeTitle =
+                (pmt['feeStructureName'] as String?) ??
                 (pmt['feeName'] as String?) ??
                 'Institutional Fee';
             final dateRaw = (pmt['paidAt'] as String?) ?? '';
-            final dateFormatted = dateRaw.length >= 10 ? dateRaw.substring(0, 10) : dateRaw;
+            final dateFormatted = dateRaw.length >= 10
+                ? dateRaw.substring(0, 10)
+                : dateRaw;
             final ref = pmt['transactionReference'] as String?;
 
             return Container(
@@ -2113,7 +2156,11 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
                       color: Colors.green.withValues(alpha: 0.1),
                       borderRadius: AppRadii.rSm,
                     ),
-                    child: const Icon(Icons.receipt_long, size: 20, color: Colors.green),
+                    child: const Icon(
+                      Icons.receipt_long,
+                      size: 20,
+                      color: Colors.green,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -2194,44 +2241,38 @@ class _StudentAppViewState extends ConsumerState<StudentAppView>
     final priority = (item['priority'] as String?) ?? 'normal';
     final isUrgent = priority == 'urgent' || priority == 'important';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.mainBackground,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: FluidInteractiveCard(
+        padding: const EdgeInsets.all(14),
         borderRadius: AppRadii.rMd,
-        border: Border.all(
-          color: isUrgent ? Colors.redAccent.withValues(alpha: 0.4) : AppColors.primaryBorder,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontFamily: 'Switzer',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+        borderColor: isUrgent
+            ? Colors.redAccent.withValues(alpha: 0.4)
+            : AppColors.primaryBorder,
+        enableHoverTranslate: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontFamily: 'Switzer',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-              if (isUrgent)
-                const StatusBadge(
-                  label: 'IMPORTANT',
-                  tone: BadgeTone.error,
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            body,
-            style: AppTypography.bodySecondary,
-          ),
-        ],
+                if (isUrgent)
+                  const StatusBadge(label: 'IMPORTANT', tone: BadgeTone.error),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(body, style: AppTypography.bodySecondary),
+          ],
+        ),
       ),
     );
   }

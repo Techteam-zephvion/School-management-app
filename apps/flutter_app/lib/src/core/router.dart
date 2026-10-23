@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '../features/admin/admin_dashboard.dart';
 import '../features/auth/login_screen.dart';
+import '../features/docs/docs_page.dart';
+import '../features/legal/privacy_policy_view.dart';
 import '../features/portal/portal_dashboard.dart';
 import '../features/shared/shell.dart';
 import '../features/teacher/teacher_dashboard.dart';
@@ -16,6 +18,12 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: auth,
     redirect: (context, state) {
       if (auth.isLoading) return null;
+
+      final atDocs = state.matchedLocation.startsWith('/docs');
+      final atLegal = state.matchedLocation.startsWith('/privacy') ||
+          state.matchedLocation.startsWith('/terms') ||
+          state.matchedLocation.startsWith('/data-safety');
+      if (atDocs || atLegal) return null; // Publicly accessible without mandatory login
 
       final signedIn = auth.session != null;
       final atLogin = state.matchedLocation == '/login';
@@ -38,6 +46,22 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(path: '/docs', builder: (context, state) => const DocsPage()),
+      GoRoute(
+        path: '/privacy',
+        builder: (context, state) =>
+            const PrivacyPolicyView(initialSection: LegalSection.privacy),
+      ),
+      GoRoute(
+        path: '/terms',
+        builder: (context, state) =>
+            const PrivacyPolicyView(initialSection: LegalSection.terms),
+      ),
+      GoRoute(
+        path: '/data-safety',
+        builder: (context, state) =>
+            const PrivacyPolicyView(initialSection: LegalSection.dataSafety),
+      ),
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [

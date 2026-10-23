@@ -12,7 +12,15 @@ class AppColors {
   static const Color secondaryBorder = Color(0xFFD4D4D4);
   static const Color secondaryText = Color(0xFF737373);
   static const Color mutedText = Color(0xFFA3A3A3);
-  static const Color accent = Color(0xFF10A37F);
+  // Official Schoolic Brand Design System Tokens (Slide 2 & Slide 5)
+  static const Color brandCyan = Color(0xFF00A3FF);
+  static const Color brandDark = Color(0xFF111111);
+  static const Color brandCyanSoft = Color(0xFFE0F2FE);
+  static const Color brandCyanBorder = Color(0xFFBAE6FD);
+  static const Color brandCyanDark = Color(0xFF0284C7);
+
+  // Unified brand accent color
+  static const Color accent = Color(0xFF00A3FF);
 
   // Subtle semantic colors
   static const Color statusSuccess = Color(0xFF10A37F);
@@ -25,11 +33,55 @@ class AppColors {
 class AppMotion {
   const AppMotion._();
 
+  static const Duration press = Duration(milliseconds: 120);
   static const Duration quick = Duration(milliseconds: 120);
   static const Duration normal = Duration(milliseconds: 160);
-  static const Duration comfortable = Duration(milliseconds: 200);
+  static const Duration comfortable = Duration(milliseconds: 220);
+  static const Duration modal = Duration(milliseconds: 260);
 
   static const Curve curve = Curves.easeOutCubic;
+  static const Curve fluidOut = Cubic(0.23, 1.0, 0.32, 1.0);
+  static const Curve drawer = Cubic(0.32, 0.72, 0.0, 1.0);
+  static const Curve springLike = Cubic(0.175, 0.885, 0.32, 1.05);
+}
+
+class AppShadows {
+  const AppShadows._();
+
+  static const List<BoxShadow> ambientSoft = [
+    BoxShadow(
+      color: Color(0x08000000),
+      blurRadius: 16,
+      offset: Offset(0, 4),
+    ),
+    BoxShadow(
+      color: Color(0x04000000),
+      blurRadius: 4,
+      offset: Offset(0, 1),
+    ),
+  ];
+
+  static const List<BoxShadow> ambientElevated = [
+    BoxShadow(
+      color: Color(0x12000000),
+      blurRadius: 32,
+      spreadRadius: -4,
+      offset: Offset(0, 12),
+    ),
+    BoxShadow(
+      color: Color(0x08000000),
+      blurRadius: 8,
+      offset: Offset(0, 2),
+    ),
+  ];
+
+  static const List<BoxShadow> glowCyan = [
+    BoxShadow(
+      color: Color(0x3300A3FF),
+      blurRadius: 28,
+      spreadRadius: 2,
+    ),
+  ];
 }
 
 class AppRadii {
@@ -38,10 +90,18 @@ class AppRadii {
   static const double sm = 4.0;
   static const double md = 6.0;
   static const double lg = 8.0;
+  static const double xl = 12.0;
+  static const double xxl = 16.0;
+  static const double bezelOuter = 20.0;
+  static const double bezelInner = 14.0;
 
   static final BorderRadius rSm = BorderRadius.circular(sm);
   static final BorderRadius rMd = BorderRadius.circular(md);
   static final BorderRadius rLg = BorderRadius.circular(lg);
+  static final BorderRadius rXl = BorderRadius.circular(xl);
+  static final BorderRadius rXxl = BorderRadius.circular(xxl);
+  static final BorderRadius rBezelOuter = BorderRadius.circular(bezelOuter);
+  static final BorderRadius rBezelInner = BorderRadius.circular(bezelInner);
 }
 
 class AppTypography {

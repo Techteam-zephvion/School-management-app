@@ -656,7 +656,7 @@ void main() {
 
         final logoFinder = find.byType(SchoolicLogo).first;
         expect(logoFinder, findsOneWidget);
-        expect(find.text('Schoolic.'), findsOneWidget);
+        expect(find.text('Schoolic'), findsOneWidget);
 
         final logoTopLeft = tester.getTopLeft(logoFinder);
         // The logo must be rendered strictly below the 44.0px status bar
@@ -667,18 +667,18 @@ void main() {
 
   group('Schoolic Official Logo Branding', () {
     testWidgets(
-      'SchoolicLogo renders horizontal Schoolic. full name by default with Switzer bold typography and accessibility label',
+      'SchoolicLogo renders horizontal Schoolic full name by default with Switzer bold typography and accessibility label',
       (tester) async {
         final handle = tester.ensureSemantics();
         await tester.pumpWidget(
           const MaterialApp(home: Scaffold(body: SchoolicLogo(size: 24))),
         );
 
-        final textFinder = find.text('Schoolic.');
+        final textFinder = find.text('Schoolic');
         expect(textFinder, findsOneWidget);
 
         final textWidget = tester.widget<Text>(textFinder);
-        expect(textWidget.data, 'Schoolic.');
+        expect(textWidget.data, 'Schoolic');
         expect(textWidget.style?.fontFamily, 'Switzer');
         expect(textWidget.style?.fontWeight, FontWeight.w700);
         expect(textWidget.style?.fontSize, 24);
@@ -690,12 +690,12 @@ void main() {
       },
     );
 
-    testWidgets('SchoolicLogo.compact renders compact S. mark', (tester) async {
+    testWidgets('SchoolicLogo.compact renders compact S mark', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(home: Scaffold(body: SchoolicLogo.compact(size: 20))),
       );
 
-      final textFinder = find.text('S.');
+      final textFinder = find.text('S');
       expect(textFinder, findsOneWidget);
     });
 
@@ -706,10 +706,34 @@ void main() {
         ),
       );
 
-      final textWidget = tester.widget<Text>(find.text('Schoolic.'));
+      final textWidget = tester.widget<Text>(find.text('Schoolic'));
       expect(textWidget.style?.fontSize, 32);
       expect(textWidget.style?.color, Colors.white);
     });
+
+    testWidgets(
+      'SchoolicLogo renders cyan square dot positioned at the baseline (down not up)',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(home: Scaffold(body: SchoolicLogo(size: 40))),
+        );
+
+        final textFinder = find.text('Schoolic');
+        final textTopLeft = tester.getTopLeft(textFinder);
+        final textBottomRight = tester.getBottomRight(textFinder);
+
+        final dotFinder = find.byWidgetPredicate(
+          (w) => w is Container && w.constraints?.maxWidth == 8.0,
+        );
+        expect(dotFinder, findsOneWidget);
+        final dotTopLeft = tester.getTopLeft(dotFinder);
+        final dotBottomRight = tester.getBottomRight(dotFinder);
+
+        // Dot bottom must be down near text bottom, NOT up near text top
+        expect(dotTopLeft.dy, greaterThan(textTopLeft.dy + 20.0));
+        expect((dotBottomRight.dy - textBottomRight.dy).abs(), lessThan(10.0));
+      },
+    );
   });
 
   group('Schoolic Product Tour & Shortcuts', () {
@@ -763,8 +787,8 @@ void main() {
         );
         await tester.pump();
 
-        // Brand logo renders Schoolic.
-        expect(find.text('Schoolic.'), findsOneWidget);
+        // Brand logo renders Schoolic
+        expect(find.text('Schoolic'), findsOneWidget);
 
         // Password visibility toggle icon is present
         final toggleFinder = find.byTooltip('Show password');

@@ -58,7 +58,7 @@ class AdminSettingsView extends StatelessWidget {
               ),
               _settingRow(
                 'Design Identity',
-                'Strict Monochrome (#111111 / #FFFFFF) with Emerald (#10A37F) Accent',
+                'Schoolic Tactile Fluid (#00A3FF Electric Cyan & #111111 Monochrome)',
                 isPhone: isPhone,
               ),
               _settingRow(

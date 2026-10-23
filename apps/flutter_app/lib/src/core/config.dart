@@ -6,7 +6,7 @@ class AppConfig {
 
   static const neonAuthUrl = String.fromEnvironment(
     'NEON_AUTH_URL',
-    defaultValue: '',
+    defaultValue: 'https://ep-polished-silence-b52ozwm7.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth',
   );
 
   static bool get isLocalDev =>

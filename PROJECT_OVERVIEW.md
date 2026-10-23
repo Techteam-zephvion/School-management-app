@@ -31,7 +31,7 @@
 * **ORM & Migrations:** Drizzle ORM (`drizzle-orm`, `drizzle-kit`).
 * **Authentication:** Neon Managed Auth / Better Auth with JWT bearer verification and fail-closed security.
 * **Hosting:** Cloudflare Pages (Frontend Web) & Cloudflare Workers (Backend API).
-* **Hardware/Mobile:** Production Android Release APK (`com.schoolic.schoolic`) deployed directly to physical devices.
+* **Hardware/Mobile:** Production Android Release APK (`com.zephvion.schoolic`) deployed directly to physical devices.
 
 ---
 
@@ -161,7 +161,7 @@ pnpm wrangler secret put AI_API_KEY --env staging
 | **Web Client** | Staging | `https://schoolic-staging.pages.dev` | **Live & Active** |
 | **Edge API Worker** | Production | `https://schoolic-api.schoolic-api.workers.dev` | **Live & Active** |
 | **Edge API Worker** | Staging | `https://schoolic-api-staging.schoolic-api.workers.dev` | **Live & Active** |
-| **Mobile Client** | Android Release APK | `com.schoolic.schoolic` | **Installed on physical device** |
+| **Mobile Client** | Android Release APK | `com.zephvion.schoolic` | **Installed on physical device** |
 
 ---
 

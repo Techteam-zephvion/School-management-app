@@ -31,7 +31,13 @@ Future<Map<String, Object?>> postAuthJson(
     );
   });
   xhr.send(jsonEncode(body));
-  final request = await completer.future;
+  final request = await completer.future.timeout(
+    const Duration(seconds: 6),
+    onTimeout: () => throw AuthTransportException(
+      'Authentication request timed out. Please try again or use Demo mode.',
+      408,
+    ),
+  );
   return _decode(request.status ?? 0, request.responseText ?? '');
 }
 
@@ -51,7 +57,13 @@ Future<Map<String, Object?>> getAuthJson(Uri uri, {http.Client? httpClient}) asy
     );
   });
   xhr.send();
-  final request = await completer.future;
+  final request = await completer.future.timeout(
+    const Duration(seconds: 6),
+    onTimeout: () => throw AuthTransportException(
+      'Authentication request timed out. Please try again or use Demo mode.',
+      408,
+    ),
+  );
   return _decode(request.status ?? 0, request.responseText ?? '');
 }
 
@@ -71,7 +83,13 @@ Future<void> postAuth(Uri uri, {http.Client? httpClient}) async {
     );
   });
   xhr.send();
-  final request = await completer.future;
+  final request = await completer.future.timeout(
+    const Duration(seconds: 6),
+    onTimeout: () => throw AuthTransportException(
+      'Authentication request timed out.',
+      408,
+    ),
+  );
   final status = request.status ?? 0;
   if (status < 200 || status >= 300) {
     throw AuthTransportException('Authentication request failed', status);

@@ -9,6 +9,7 @@ import { portalRoutes } from './routes/portal';
 import { teacherRoutes } from './routes/teacher';
 import { webhookRoutes } from './routes/webhooks';
 import { publicRoutes } from './routes/public';
+import { getPrivacyPolicyHtml, getTermsOfServiceHtml, getDataDeletionHtml } from './legal/privacy-policy-html';
 import type { AppBindings } from './types';
 
 export function createApp() {
@@ -16,8 +17,8 @@ export function createApp() {
 
   app.use('*', logger());
   app.use('*', async (c, next) => {
-    const isProduction = c.env.APP_ENV === 'production';
-    const configuredOrigins = (c.env.CORS_ORIGIN || '')
+    const isProduction = c.env?.APP_ENV === 'production';
+    const configuredOrigins = (c.env?.CORS_ORIGIN || '')
       .split(',')
       .map((o) => o.trim())
       .filter(Boolean);
@@ -48,6 +49,14 @@ export function createApp() {
 
   app.onError((error, c) => fail(c, error));
   app.get('/health', (c) => c.json({ ok: true, service: 'schoolic-api' }));
+
+  // Public Privacy Policy & Legal endpoints for Google Play Console and web compliance
+  app.get('/privacy', (c) => c.html(getPrivacyPolicyHtml()));
+  app.get('/terms', (c) => c.html(getTermsOfServiceHtml()));
+  app.get('/data-deletion', (c) => c.html(getDataDeletionHtml()));
+  app.get('/api/v1/public/privacy', (c) => c.html(getPrivacyPolicyHtml()));
+  app.get('/api/v1/public/terms', (c) => c.html(getTermsOfServiceHtml()));
+  app.get('/api/v1/public/data-deletion', (c) => c.html(getDataDeletionHtml()));
 
   app.route('/api/v1/bootstrap', bootstrapRoutes);
   app.route('/api/v1/webhooks', webhookRoutes);

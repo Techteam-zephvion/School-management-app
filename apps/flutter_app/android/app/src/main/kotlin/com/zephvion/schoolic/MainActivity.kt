@@ -1,4 +1,4 @@
-package com.schoolic.schoolic
+package com.zephvion.schoolic
 
 import io.flutter.embedding.android.FlutterActivity
 

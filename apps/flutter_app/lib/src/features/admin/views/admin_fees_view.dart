@@ -79,10 +79,22 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
 
     try {
       final api = ref.read(apiClientProvider);
-      final summary = await api.getJson('/api/v1/admin/fees/summary', session: session);
-      final structures = await api.getList('/api/v1/admin/fees/structures', session: session);
-      final allocations = await api.getList('/api/v1/admin/fees/allocations', session: session);
-      final payments = await api.getList('/api/v1/admin/fees/payments', session: session);
+      final summary = await api.getJson(
+        '/api/v1/admin/fees/summary',
+        session: session,
+      );
+      final structures = await api.getList(
+        '/api/v1/admin/fees/structures',
+        session: session,
+      );
+      final allocations = await api.getList(
+        '/api/v1/admin/fees/allocations',
+        session: session,
+      );
+      final payments = await api.getList(
+        '/api/v1/admin/fees/payments',
+        session: session,
+      );
       final concessions = await api.listFeeConcessions(session: session);
       final refunds = await api.listFeeRefunds(session: session);
 
@@ -114,15 +126,20 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
   List<Map<String, Object?>> get _filteredAllocations {
     final query = _searchController.text.trim().toLowerCase();
     return _allocations.where((a) {
-      if (_filterClassId != null && a['classId'] != _filterClassId) return false;
-      if (_filterSectionId != null && a['sectionId'] != _filterSectionId) return false;
+      if (_filterClassId != null && a['classId'] != _filterClassId)
+        return false;
+      if (_filterSectionId != null && a['sectionId'] != _filterSectionId)
+        return false;
       if (_filterStatus != 'all' && a['status'] != _filterStatus) return false;
       if (query.isNotEmpty) {
         final name = (a['studentName'] as String? ?? '').toLowerCase();
         final adm = (a['admissionNumber'] as String? ?? '').toLowerCase();
         final roll = (a['rollNumber'] as String? ?? '').toLowerCase();
         final fee = (a['feeStructureName'] as String? ?? '').toLowerCase();
-        if (!name.contains(query) && !adm.contains(query) && !roll.contains(query) && !fee.contains(query)) {
+        if (!name.contains(query) &&
+            !adm.contains(query) &&
+            !roll.contains(query) &&
+            !fee.contains(query)) {
           return false;
         }
       }
@@ -228,13 +245,19 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _navTab('allocations', 'Student Dues & Allocations (${_allocations.length})'),
+            _navTab(
+              'allocations',
+              'Student Dues & Allocations (${_allocations.length})',
+            ),
             const SizedBox(width: 24),
             _navTab('structures', 'Fee Structures (${_structures.length})'),
             const SizedBox(width: 24),
             _navTab('payments', 'Receipts Ledger (${_payments.length})'),
             const SizedBox(width: 24),
-            _navTab('concessions', 'Concessions & Waivers (${_concessions.length})'),
+            _navTab(
+              'concessions',
+              'Concessions & Waivers (${_concessions.length})',
+            ),
             const SizedBox(width: 24),
             _navTab('refunds', 'Refunds (${_refunds.length})'),
           ],
@@ -289,7 +312,9 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
-                headingRowColor: WidgetStateProperty.all(AppColors.secondaryBackground),
+                headingRowColor: WidgetStateProperty.all(
+                  AppColors.secondaryBackground,
+                ),
                 columns: const [
                   DataColumn(label: Text('Student')),
                   DataColumn(label: Text('Class & Section')),
@@ -316,16 +341,23 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
                           children: [
                             Text(
                               a['studentName'] as String? ?? '—',
-                              style: const TextStyle(fontWeight: FontWeight.w600),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             Text(
                               'Adm: ${a['admissionNumber'] ?? '—'}',
-                              style: const TextStyle(fontSize: 12, color: AppColors.secondaryText),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.secondaryText,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      DataCell(Text('${a['className']} ${a['sectionName']}'.trim())),
+                      DataCell(
+                        Text('${a['className']} ${a['sectionName']}'.trim()),
+                      ),
                       DataCell(Text(a['feeStructureName'] as String? ?? '—')),
                       DataCell(Text(a['dueDate'] as String? ?? '—')),
                       DataCell(Text(_currencyFormat.format(billed))),
@@ -335,7 +367,9 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
                           _currencyFormat.format(balance),
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            color: balance > 0 ? AppColors.statusError : AppColors.accent,
+                            color: balance > 0
+                                ? AppColors.statusError
+                                : AppColors.accent,
                           ),
                         ),
                       ),
@@ -346,7 +380,13 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
                                 onPressed: () => _openRecordPaymentDialog(a),
                                 child: const Text('Collect Fee'),
                               )
-                            : const Text('Fully Paid', style: TextStyle(color: AppColors.secondaryText, fontSize: 13)),
+                            : const Text(
+                                'Fully Paid',
+                                style: TextStyle(
+                                  color: AppColors.secondaryText,
+                                  fontSize: 13,
+                                ),
+                              ),
                       ),
                     ],
                   );
@@ -372,8 +412,13 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
               hintText: 'Search student or fee...',
               prefixIcon: const Icon(Icons.search, size: 18),
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 10,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
             ),
             onChanged: (_) => setState(() {}),
           ),
@@ -383,7 +428,12 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
           hint: const Text('All Classes'),
           items: [
             const DropdownMenuItem(value: null, child: Text('All Classes')),
-            ...widget.classes.map((c) => DropdownMenuItem(value: c['id'] as String?, child: Text(c['name'] as String? ?? ''))),
+            ...widget.classes.map(
+              (c) => DropdownMenuItem(
+                value: c['id'] as String?,
+                child: Text(c['name'] as String? ?? ''),
+              ),
+            ),
           ],
           onChanged: (val) {
             setState(() {
@@ -438,7 +488,9 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
-          headingRowColor: WidgetStateProperty.all(AppColors.secondaryBackground),
+          headingRowColor: WidgetStateProperty.all(
+            AppColors.secondaryBackground,
+          ),
           columns: const [
             DataColumn(label: Text('Fee Name')),
             DataColumn(label: Text('Code')),
@@ -457,25 +509,49 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(s['name'] as String? ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                      if (s['description'] != null && (s['description'] as String).isNotEmpty)
+                      Text(
+                        s['name'] as String? ?? '',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      if (s['description'] != null &&
+                          (s['description'] as String).isNotEmpty)
                         Text(
                           s['description'] as String,
-                          style: const TextStyle(fontSize: 12, color: AppColors.secondaryText),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.secondaryText,
+                          ),
                         ),
                     ],
                   ),
                 ),
                 DataCell(Text(s['code'] as String? ?? '—')),
                 DataCell(Text(s['academicYearName'] as String? ?? '—')),
-                DataCell(Text((s['frequency'] as String? ?? 'term').toUpperCase())),
-                DataCell(Text(_currencyFormat.format(amount), style: const TextStyle(fontWeight: FontWeight.w600))),
+                DataCell(
+                  Text((s['frequency'] as String? ?? 'term').toUpperCase()),
+                ),
+                DataCell(
+                  Text(
+                    _currencyFormat.format(amount),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
                 DataCell(Text(s['dueDate'] as String? ?? '—')),
                 DataCell(
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    tooltip: 'Delete Structure',
-                    onPressed: () => _deleteStructure(s['id'] as String),
+                  Wrap(
+                    spacing: 4,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.account_tree_outlined, size: 18),
+                        tooltip: 'Manage fee heads',
+                        onPressed: () => _manageStructureHeads(s),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        tooltip: 'Delete structure',
+                        onPressed: () => _deleteStructure(s['id'] as String),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -502,7 +578,9 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
-          headingRowColor: WidgetStateProperty.all(AppColors.secondaryBackground),
+          headingRowColor: WidgetStateProperty.all(
+            AppColors.secondaryBackground,
+          ),
           columns: const [
             DataColumn(label: Text('Receipt #')),
             DataColumn(label: Text('Date & Time')),
@@ -516,14 +594,19 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
           rows: _payments.map((p) {
             final amount = (p['amountPaid'] as num?)?.toInt() ?? 0;
             final paidAt = p['paidAt'] as String? ?? '';
-            final formattedDate = paidAt.length >= 10 ? paidAt.substring(0, 10) : paidAt;
+            final formattedDate = paidAt.length >= 10
+                ? paidAt.substring(0, 10)
+                : paidAt;
 
             return DataRow(
               cells: [
                 DataCell(
                   Text(
                     p['receiptNumber'] as String? ?? '—',
-                    style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 DataCell(Text(formattedDate)),
@@ -532,8 +615,17 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(p['studentName'] as String? ?? '—', style: const TextStyle(fontWeight: FontWeight.w600)),
-                      Text('Adm: ${p['admissionNumber'] ?? '—'}', style: const TextStyle(fontSize: 12, color: AppColors.secondaryText)),
+                      Text(
+                        p['studentName'] as String? ?? '—',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        'Adm: ${p['admissionNumber'] ?? '—'}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.secondaryText,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -541,10 +633,15 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
                 DataCell(
                   Text(
                     _currencyFormat.format(amount),
-                    style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.accent),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.accent,
+                    ),
                   ),
                 ),
-                DataCell(Text((p['paymentMethod'] as String? ?? 'cash').toUpperCase())),
+                DataCell(
+                  Text((p['paymentMethod'] as String? ?? 'cash').toUpperCase()),
+                ),
                 DataCell(Text(p['recordedByStaffName'] as String? ?? 'Admin')),
                 DataCell(
                   IconButton(
@@ -566,10 +663,18 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Fee Structure'),
-        content: const Text('Are you sure you want to delete this fee structure? This cannot be undone.'),
+        content: const Text(
+          'Are you sure you want to delete this fee structure? This cannot be undone.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
@@ -579,7 +684,9 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
     if (session == null) return;
 
     try {
-      await ref.read(apiClientProvider).deleteJson('/api/v1/admin/fees/structures/$id', session: session);
+      await ref
+          .read(apiClientProvider)
+          .deleteJson('/api/v1/admin/fees/structures/$id', session: session);
       setState(() => _notice = 'Fee structure deleted.');
       await _loadFeeData();
     } catch (_) {
@@ -622,7 +729,10 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
         allocation: allocation,
         onPaid: (receipt) {
           _loadFeeData();
-          setState(() => _notice = 'Payment recorded. Receipt ${receipt['receiptNumber']} issued.');
+          setState(
+            () => _notice =
+                'Payment recorded. Receipt ${receipt['receiptNumber']} issued.',
+          );
         },
       ),
     );
@@ -633,7 +743,10 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildSubHeader('Fee Concessions & Scholarships', _openAddConcessionDialog),
+          _buildSubHeader(
+            'Fee Concessions & Scholarships',
+            _openAddConcessionDialog,
+          ),
           const SizedBox(height: 24),
           const Center(
             child: Padding(
@@ -651,7 +764,10 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildSubHeader('Fee Concessions & Scholarships', _openAddConcessionDialog),
+        _buildSubHeader(
+          'Fee Concessions & Scholarships',
+          _openAddConcessionDialog,
+        ),
         const SizedBox(height: 16),
         Container(
           decoration: BoxDecoration(
@@ -666,19 +782,59 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
               DataColumn(label: Text('Category')),
               DataColumn(label: Text('Discount Value')),
               DataColumn(label: Text('Status')),
+              DataColumn(label: Text('Actions')),
             ],
             rows: _concessions.map((c) {
               final type = c['type'] as String? ?? 'flat';
               final val = (c['value'] as num?)?.toInt() ?? 0;
-              final displayVal = type == 'percentage' ? '$val%' : _currencyFormat.format(val);
+              final displayVal = type == 'percentage'
+                  ? '$val%'
+                  : _currencyFormat.format(val);
 
               return DataRow(
                 cells: [
-                  DataCell(Text(c['name'] as String? ?? '—', style: const TextStyle(fontWeight: FontWeight.w600))),
-                  DataCell(Text(c['code'] as String? ?? '—', style: const TextStyle(fontFamily: 'monospace'))),
-                  DataCell(Text((c['category'] as String? ?? 'merit').toUpperCase())),
-                  DataCell(Text(displayVal, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.statusSuccess))),
-                  const DataCell(StatusBadge(label: 'ACTIVE', tone: BadgeTone.success)),
+                  DataCell(
+                    Text(
+                      c['name'] as String? ?? '—',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      c['code'] as String? ?? '—',
+                      style: const TextStyle(fontFamily: 'monospace'),
+                    ),
+                  ),
+                  DataCell(
+                    Text((c['category'] as String? ?? 'merit').toUpperCase()),
+                  ),
+                  DataCell(
+                    Text(
+                      displayVal,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.statusSuccess,
+                      ),
+                    ),
+                  ),
+                  const DataCell(
+                    StatusBadge(label: 'ACTIVE', tone: BadgeTone.success),
+                  ),
+                  DataCell(
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () => _openApplyConcessionDialog(c),
+                          child: const Text('Apply to student'),
+                        ),
+                        TextButton(
+                          onPressed: _showAppliedConcessions,
+                          child: const Text('View applied'),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               );
             }).toList(),
@@ -727,22 +883,69 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
               DataColumn(label: Text('Mode')),
               DataColumn(label: Text('Reason')),
               DataColumn(label: Text('Status')),
+              DataColumn(label: Text('Actions')),
             ],
             rows: _refunds.map((r) {
               final amount = (r['amount'] as num?)?.toInt() ?? 0;
-              final status = (r['status'] as String? ?? 'pending').toLowerCase();
+              final status = (r['status'] as String? ?? 'pending')
+                  .toLowerCase();
 
               return DataRow(
                 cells: [
-                  DataCell(Text(r['refundNumber'] as String? ?? '—', style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w600))),
+                  DataCell(
+                    Text(
+                      r['refundNumber'] as String? ?? '—',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                   DataCell(Text(r['studentName'] as String? ?? 'Student')),
-                  DataCell(Text(_currencyFormat.format(amount), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.accent))),
-                  DataCell(Text((r['mode'] as String? ?? 'bank_transfer').toUpperCase())),
+                  DataCell(
+                    Text(
+                      _currencyFormat.format(amount),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.accent,
+                      ),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      (r['mode'] as String? ?? 'bank_transfer').toUpperCase(),
+                    ),
+                  ),
                   DataCell(Text(r['reason'] as String? ?? '—')),
-                  DataCell(StatusBadge(
-                    label: status.toUpperCase(),
-                    tone: status == 'processed' || status == 'approved' ? BadgeTone.success : BadgeTone.neutral,
-                  )),
+                  DataCell(
+                    StatusBadge(
+                      label: status.toUpperCase(),
+                      tone: status == 'processed' || status == 'approved'
+                          ? BadgeTone.success
+                          : BadgeTone.neutral,
+                    ),
+                  ),
+                  DataCell(
+                    PopupMenuButton<String>(
+                      tooltip: 'Update refund status',
+                      enabled: status != 'processed' && status != 'rejected',
+                      onSelected: (value) => _updateRefundStatus(r, value),
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(
+                          value: 'approved',
+                          child: Text('Approve refund'),
+                        ),
+                        PopupMenuItem(
+                          value: 'processed',
+                          child: Text('Mark processed'),
+                        ),
+                        PopupMenuItem(
+                          value: 'rejected',
+                          child: Text('Reject refund'),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               );
             }).toList(),
@@ -756,13 +959,272 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
         FilledButton.icon(
           onPressed: onAdd,
           icon: const Icon(Icons.add, size: 18),
           label: const Text('Add Record'),
         ),
       ],
+    );
+  }
+
+  Future<void> _openApplyConcessionDialog(
+    Map<String, Object?> concession,
+  ) async {
+    if (_allocations.isEmpty) {
+      setState(
+        () => _error =
+            'Create a student fee allocation before applying a concession.',
+      );
+      return;
+    }
+    var allocation = _allocations.first;
+    final reason = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (_, setDialogState) => AlertDialog(
+          title: Text('Apply ${concession['name'] ?? 'concession'}'),
+          content: SizedBox(
+            width: 520,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<Map<String, Object?>>(
+                  initialValue: allocation,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Student fee allocation',
+                  ),
+                  items: _allocations
+                      .map(
+                        (item) => DropdownMenuItem(
+                          value: item,
+                          child: Text(
+                            '${item['studentName']} • ${item['feeStructureName']}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) =>
+                      setDialogState(() => allocation = value ?? allocation),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: reason,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Reason',
+                    helperText: 'Optional audit note for this concession.',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Apply concession'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+    try {
+      await ref
+          .read(apiClientProvider)
+          .applyStudentConcession(
+            session: session,
+            studentId: allocation['studentId'] as String,
+            allocationId: allocation['id'] as String,
+            concessionId: concession['id'] as String,
+            reason: reason.text.trim().isEmpty ? null : reason.text.trim(),
+          );
+      setState(
+        () => _notice = 'Concession applied to ${allocation['studentName']}.',
+      );
+      await _loadFeeData();
+    } catch (error) {
+      setState(() => _error = 'Unable to apply concession: $error');
+    }
+  }
+
+  Future<void> _showAppliedConcessions() async {
+    final session = ref.read(authControllerProvider).session;
+    if (session == null) return;
+    try {
+      final rows = await ref
+          .read(apiClientProvider)
+          .listStudentConcessions(session: session);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Applied concessions'),
+          content: SizedBox(
+            width: 620,
+            height: 420,
+            child: rows.isEmpty
+                ? const Center(child: Text('No concessions have been applied.'))
+                : ListView.separated(
+                    itemCount: rows.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (_, index) {
+                      final row = rows[index];
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('${row['studentName'] ?? 'Student'}'),
+                        subtitle: Text(
+                          '${row['concessionName'] ?? row['name'] ?? 'Concession'} • ${row['reason'] ?? 'No note'}',
+                        ),
+                        trailing: StatusBadge.fromStatusString(
+                          row['status'] as String? ?? 'active',
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      setState(() => _error = 'Unable to load applied concessions: $error');
+    }
+  }
+
+  Future<void> _updateRefundStatus(
+    Map<String, Object?> refund,
+    String status,
+  ) async {
+    final session = ref.read(authControllerProvider).session;
+    final id = refund['id'] as String?;
+    if (session == null || id == null) return;
+    try {
+      await ref
+          .read(apiClientProvider)
+          .updateFeeRefundStatus(
+            session: session,
+            refundId: id,
+            status: status,
+          );
+      setState(() => _notice = 'Refund status updated to $status.');
+      await _loadFeeData();
+    } catch (error) {
+      setState(() => _error = 'Unable to update refund: $error');
+    }
+  }
+
+  Future<void> _manageStructureHeads(Map<String, Object?> structure) async {
+    final session = ref.read(authControllerProvider).session;
+    final id = structure['id'] as String?;
+    if (session == null || id == null) return;
+    List<Map<String, Object?>> heads;
+    try {
+      heads = await ref
+          .read(apiClientProvider)
+          .listFeeStructureHeads(session: session, feeStructureId: id);
+    } catch (error) {
+      setState(() => _error = 'Unable to load fee heads: $error');
+      return;
+    }
+    if (!mounted) return;
+    final name = TextEditingController();
+    final amount = TextEditingController();
+    var optional = false;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (_, setDialogState) => AlertDialog(
+          title: Text('Fee heads • ${structure['name']}'),
+          content: SizedBox(
+            width: 520,
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                if (heads.isEmpty)
+                  const Text(
+                    'No component heads yet.',
+                    style: AppTypography.bodySecondary,
+                  )
+                else
+                  ...heads.map(
+                    (head) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('${head['headName']}'),
+                      subtitle: Text(
+                        head['isOptional'] == true ? 'Optional' : 'Required',
+                      ),
+                      trailing: Text(
+                        _currencyFormat.format(head['amount'] ?? 0),
+                      ),
+                    ),
+                  ),
+                const Divider(),
+                TextField(
+                  controller: name,
+                  decoration: const InputDecoration(labelText: 'New head name'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: amount,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Amount'),
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: optional,
+                  onChanged: (value) =>
+                      setDialogState(() => optional = value ?? false),
+                  title: const Text('Optional fee head'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final parsed = int.tryParse(amount.text.trim());
+                if (name.text.trim().length < 2 || parsed == null || parsed < 0)
+                  return;
+                await ref
+                    .read(apiClientProvider)
+                    .createFeeStructureHead(
+                      session: session,
+                      feeStructureId: id,
+                      headName: name.text.trim(),
+                      amount: parsed,
+                      isOptional: optional,
+                    );
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+                setState(() => _notice = 'Fee head added.');
+                await _loadFeeData();
+              },
+              child: const Text('Add fee head'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -784,58 +1246,102 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Concession Name *')),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Concession Name *',
+                ),
+              ),
               const SizedBox(height: 12),
-              TextField(controller: codeController, decoration: const InputDecoration(labelText: 'Policy Code * (e.g. SIBLING15)')),
+              TextField(
+                controller: codeController,
+                decoration: const InputDecoration(
+                  labelText: 'Policy Code * (e.g. SIBLING15)',
+                ),
+              ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: type,
                 decoration: const InputDecoration(labelText: 'Discount Type'),
                 items: const [
-                  DropdownMenuItem(value: 'percentage', child: Text('Percentage (%)')),
-                  DropdownMenuItem(value: 'flat', child: Text('Flat Amount (₹)')),
+                  DropdownMenuItem(
+                    value: 'percentage',
+                    child: Text('Percentage (%)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'flat',
+                    child: Text('Flat Amount (₹)'),
+                  ),
                 ],
-                onChanged: (val) => setDialogState(() => type = val ?? 'percentage'),
+                onChanged: (val) =>
+                    setDialogState(() => type = val ?? 'percentage'),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: valueController,
                 keyboardType: TextInputType.number,
-                decoration: InputDecoration(labelText: type == 'percentage' ? 'Percentage (e.g. 15)' : 'Amount in ₹'),
+                decoration: InputDecoration(
+                  labelText: type == 'percentage'
+                      ? 'Percentage (e.g. 15)'
+                      : 'Amount in ₹',
+                ),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: category,
                 decoration: const InputDecoration(labelText: 'Category'),
                 items: const [
-                  DropdownMenuItem(value: 'merit', child: Text('Merit Scholarship')),
-                  DropdownMenuItem(value: 'sibling', child: Text('Sibling Discount')),
-                  DropdownMenuItem(value: 'staff_ward', child: Text('Staff Ward')),
-                  DropdownMenuItem(value: 'financial_aid', child: Text('Financial Aid / EWS')),
-                  DropdownMenuItem(value: 'sports', child: Text('Sports Quota')),
+                  DropdownMenuItem(
+                    value: 'merit',
+                    child: Text('Merit Scholarship'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'sibling',
+                    child: Text('Sibling Discount'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'staff_ward',
+                    child: Text('Staff Ward'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'financial_aid',
+                    child: Text('Financial Aid / EWS'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'sports',
+                    child: Text('Sports Quota'),
+                  ),
                 ],
-                onChanged: (val) => setDialogState(() => category = val ?? 'merit'),
+                onChanged: (val) =>
+                    setDialogState(() => category = val ?? 'merit'),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
               onPressed: () async {
                 final val = int.tryParse(valueController.text.trim()) ?? 0;
-                if (nameController.text.trim().isEmpty || codeController.text.trim().isEmpty || val <= 0) {
+                if (nameController.text.trim().isEmpty ||
+                    codeController.text.trim().isEmpty ||
+                    val <= 0) {
                   return;
                 }
                 Navigator.pop(ctx);
                 try {
-                  await ref.read(apiClientProvider).createFeeConcession(
-                    session: session,
-                    name: nameController.text.trim(),
-                    code: codeController.text.trim(),
-                    type: type,
-                    value: val,
-                    category: category,
-                  );
+                  await ref
+                      .read(apiClientProvider)
+                      .createFeeConcession(
+                        session: session,
+                        name: nameController.text.trim(),
+                        code: codeController.text.trim(),
+                        type: type,
+                        value: val,
+                        category: category,
+                      );
                   setState(() => _notice = 'Concession policy created.');
                   await _loadFeeData();
                 } catch (e) {
@@ -869,62 +1375,91 @@ class _AdminFeesViewState extends ConsumerState<AdminFeesView> {
             children: [
               DropdownButtonFormField<String>(
                 initialValue: selectedAllocationId,
-                decoration: const InputDecoration(labelText: 'Select Student Allocation *'),
+                decoration: const InputDecoration(
+                  labelText: 'Select Student Allocation *',
+                ),
                 items: _allocations
-                    .map((a) => DropdownMenuItem(
-                          value: a['id'] as String?,
-                          child: Text('${a['studentName']} — ${a['feeStructureName']}'),
-                        ))
+                    .map(
+                      (a) => DropdownMenuItem(
+                        value: a['id'] as String?,
+                        child: Text(
+                          '${a['studentName']} — ${a['feeStructureName']}',
+                        ),
+                      ),
+                    )
                     .toList(),
-                onChanged: (val) => setDialogState(() => selectedAllocationId = val),
+                onChanged: (val) =>
+                    setDialogState(() => selectedAllocationId = val),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: amountController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Refund Amount (₹) *'),
+                decoration: const InputDecoration(
+                  labelText: 'Refund Amount (₹) *',
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: reasonController,
-                decoration: const InputDecoration(labelText: 'Reason for Refund *'),
+                decoration: const InputDecoration(
+                  labelText: 'Reason for Refund *',
+                ),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: mode,
                 decoration: const InputDecoration(labelText: 'Payment Mode'),
                 items: const [
-                  DropdownMenuItem(value: 'bank_transfer', child: Text('Bank Transfer (NEFT/RTGS)')),
+                  DropdownMenuItem(
+                    value: 'bank_transfer',
+                    child: Text('Bank Transfer (NEFT/RTGS)'),
+                  ),
                   DropdownMenuItem(value: 'cash', child: Text('Cash Counter')),
                   DropdownMenuItem(value: 'cheque', child: Text('Cheque')),
-                  DropdownMenuItem(value: 'gateway_refund', child: Text('Payment Gateway (Cashfree)')),
+                  DropdownMenuItem(
+                    value: 'gateway_refund',
+                    child: Text('Payment Gateway (Cashfree)'),
+                  ),
                 ],
-                onChanged: (val) => setDialogState(() => mode = val ?? 'bank_transfer'),
+                onChanged: (val) =>
+                    setDialogState(() => mode = val ?? 'bank_transfer'),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
               onPressed: () async {
                 final amt = int.tryParse(amountController.text.trim()) ?? 0;
-                if (selectedAllocationId == null || amt <= 0 || reasonController.text.trim().isEmpty) {
+                if (selectedAllocationId == null ||
+                    amt <= 0 ||
+                    reasonController.text.trim().isEmpty) {
                   return;
                 }
-                final alloc = _allocations.firstWhere((a) => a['id'] == selectedAllocationId);
+                final alloc = _allocations.firstWhere(
+                  (a) => a['id'] == selectedAllocationId,
+                );
                 final studentId = alloc['studentId'] as String;
 
                 Navigator.pop(ctx);
                 try {
-                  await ref.read(apiClientProvider).createFeeRefund(
-                    session: session,
-                    allocationId: selectedAllocationId!,
-                    studentId: studentId,
-                    amount: amt,
-                    reason: reasonController.text.trim(),
-                    mode: mode,
+                  await ref
+                      .read(apiClientProvider)
+                      .createFeeRefund(
+                        session: session,
+                        allocationId: selectedAllocationId!,
+                        studentId: studentId,
+                        amount: amt,
+                        reason: reasonController.text.trim(),
+                        mode: mode,
+                      );
+                  setState(
+                    () => _notice = 'Refund request recorded successfully.',
                   );
-                  setState(() => _notice = 'Refund request recorded successfully.');
                   await _loadFeeData();
                 } catch (e) {
                   setState(() => _error = 'Failed to record refund: $e');
@@ -960,7 +1495,10 @@ class _AddStructureModalState extends ConsumerState<_AddStructureModal> {
   final _code = TextEditingController();
   final _description = TextEditingController();
   final _amount = TextEditingController();
-  final _dueDate = TextEditingController(text: DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 30))));
+  final _dueDate = TextEditingController(
+    text: DateFormat('yyyy-MM-dd')
+        .format(DateTime.now().add(const Duration(days: 30))),
+  );
   String? _yearId;
   String _frequency = 'term';
   bool _saving = false;
@@ -989,8 +1527,14 @@ class _AddStructureModalState extends ConsumerState<_AddStructureModal> {
     return AppDialog(
       title: 'Add Fee Structure',
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Saving...' : 'Save Structure')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: Text(_saving ? 'Saving...' : 'Save Structure'),
+        ),
       ],
       child: SingleChildScrollView(
         child: Column(
@@ -1000,31 +1544,48 @@ class _AddStructureModalState extends ConsumerState<_AddStructureModal> {
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: Text(_error!, style: const TextStyle(color: AppColors.statusError)),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: AppColors.statusError),
+                ),
               ),
             DropdownButtonFormField<String>(
               initialValue: _yearId,
               decoration: const InputDecoration(labelText: 'Academic Year *'),
               items: widget.years
-                  .map((y) => DropdownMenuItem(value: y['id'] as String, child: Text(y['name'] as String? ?? '')))
+                  .map(
+                    (y) => DropdownMenuItem(
+                      value: y['id'] as String,
+                      child: Text(y['name'] as String? ?? ''),
+                    ),
+                  )
                   .toList(),
               onChanged: (v) => setState(() => _yearId = v),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _name,
-              decoration: const InputDecoration(labelText: 'Fee Name *', hintText: 'e.g. Annual Tuition Fee'),
+              decoration: const InputDecoration(
+                labelText: 'Fee Name *',
+                hintText: 'e.g. Annual Tuition Fee',
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _code,
-              decoration: const InputDecoration(labelText: 'Fee Code *', hintText: 'e.g. TUIT-2026'),
+              decoration: const InputDecoration(
+                labelText: 'Fee Code *',
+                hintText: 'e.g. TUIT-2026',
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _amount,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Amount (₹) *', hintText: 'e.g. 25000'),
+              decoration: const InputDecoration(
+                labelText: 'Amount (₹) *',
+                hintText: 'e.g. 25000',
+              ),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
@@ -1041,12 +1602,16 @@ class _AddStructureModalState extends ConsumerState<_AddStructureModal> {
             const SizedBox(height: 12),
             TextField(
               controller: _dueDate,
-              decoration: const InputDecoration(labelText: 'Default Due Date (YYYY-MM-DD)'),
+              decoration: const InputDecoration(
+                labelText: 'Default Due Date (YYYY-MM-DD)',
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _description,
-              decoration: const InputDecoration(labelText: 'Description (Optional)'),
+              decoration: const InputDecoration(
+                labelText: 'Description (Optional)',
+              ),
             ),
           ],
         ),
@@ -1059,8 +1624,13 @@ class _AddStructureModalState extends ConsumerState<_AddStructureModal> {
     if (session == null || _yearId == null) return;
 
     final amountNum = int.tryParse(_amount.text.trim());
-    if (_name.text.trim().isEmpty || _code.text.trim().isEmpty || amountNum == null || amountNum <= 0) {
-      setState(() => _error = 'Please fill all required fields with valid values.');
+    if (_name.text.trim().isEmpty ||
+        _code.text.trim().isEmpty ||
+        amountNum == null ||
+        amountNum <= 0) {
+      setState(
+        () => _error = 'Please fill all required fields with valid values.',
+      );
       return;
     }
 
@@ -1078,8 +1648,12 @@ class _AddStructureModalState extends ConsumerState<_AddStructureModal> {
           'code': _code.text.trim().toUpperCase(),
           'amount': amountNum,
           'frequency': _frequency,
-          'dueDate': _dueDate.text.trim().isNotEmpty ? _dueDate.text.trim() : null,
-          'description': _description.text.trim().isNotEmpty ? _description.text.trim() : null,
+          'dueDate': _dueDate.text.trim().isNotEmpty
+              ? _dueDate.text.trim()
+              : null,
+          'description': _description.text.trim().isNotEmpty
+              ? _description.text.trim()
+              : null,
         },
         session: session,
       );
@@ -1118,7 +1692,10 @@ class _AssignFeeModalState extends ConsumerState<_AssignFeeModal> {
   String? _studentId;
   String? _structureId;
   final _amount = TextEditingController();
-  final _dueDate = TextEditingController(text: DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 15))));
+  final _dueDate = TextEditingController(
+    text: DateFormat('yyyy-MM-dd')
+        .format(DateTime.now().add(const Duration(days: 15))),
+  );
   bool _saving = false;
   String? _error;
 
@@ -1134,8 +1711,14 @@ class _AssignFeeModalState extends ConsumerState<_AssignFeeModal> {
     return AppDialog(
       title: 'Assign Fee to Student',
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Assigning...' : 'Assign Fee')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: Text(_saving ? 'Assigning...' : 'Assign Fee'),
+        ),
       ],
       child: SingleChildScrollView(
         child: Column(
@@ -1145,16 +1728,21 @@ class _AssignFeeModalState extends ConsumerState<_AssignFeeModal> {
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: Text(_error!, style: const TextStyle(color: AppColors.statusError)),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: AppColors.statusError),
+                ),
               ),
             DropdownButtonFormField<String>(
               initialValue: _studentId,
               decoration: const InputDecoration(labelText: 'Student *'),
               items: widget.students
-                  .map((s) => DropdownMenuItem(
-                        value: s['id'] as String,
-                        child: Text('${s['fullName']} (${s['admissionNumber']})'),
-                      ))
+                  .map(
+                    (s) => DropdownMenuItem(
+                      value: s['id'] as String,
+                      child: Text('${s['fullName']} (${s['admissionNumber']})'),
+                    ),
+                  )
                   .toList(),
               onChanged: (v) => setState(() => _studentId = v),
             ),
@@ -1163,19 +1751,25 @@ class _AssignFeeModalState extends ConsumerState<_AssignFeeModal> {
               initialValue: _structureId,
               decoration: const InputDecoration(labelText: 'Fee Structure *'),
               items: widget.structures
-                  .map((s) => DropdownMenuItem(
-                        value: s['id'] as String,
-                        child: Text('${s['name']} (₹${s['amount']})'),
-                      ))
+                  .map(
+                    (s) => DropdownMenuItem(
+                      value: s['id'] as String,
+                      child: Text('${s['name']} (₹${s['amount']})'),
+                    ),
+                  )
                   .toList(),
               onChanged: (v) {
                 setState(() {
                   _structureId = v;
-                  final match = widget.structures.firstWhere((s) => s['id'] == v, orElse: () => const {});
+                  final match = widget.structures.firstWhere(
+                    (s) => s['id'] == v,
+                    orElse: () => const {},
+                  );
                   if (match['amount'] != null) {
                     _amount.text = match['amount'].toString();
                   }
-                  if (match['dueDate'] != null && (match['dueDate'] as String).isNotEmpty) {
+                  if (match['dueDate'] != null &&
+                      (match['dueDate'] as String).isNotEmpty) {
                     _dueDate.text = match['dueDate'] as String;
                   }
                 });
@@ -1185,12 +1779,16 @@ class _AssignFeeModalState extends ConsumerState<_AssignFeeModal> {
             TextField(
               controller: _amount,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Billed Amount (₹) *'),
+              decoration: const InputDecoration(
+                labelText: 'Billed Amount (₹) *',
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _dueDate,
-              decoration: const InputDecoration(labelText: 'Due Date (YYYY-MM-DD) *'),
+              decoration: const InputDecoration(
+                labelText: 'Due Date (YYYY-MM-DD) *',
+              ),
             ),
           ],
         ),
@@ -1211,7 +1809,9 @@ class _AssignFeeModalState extends ConsumerState<_AssignFeeModal> {
       return;
     }
 
-    final selectedStructure = widget.structures.firstWhere((s) => s['id'] == _structureId);
+    final selectedStructure = widget.structures.firstWhere(
+      (s) => s['id'] == _structureId,
+    );
     final academicYearId = selectedStructure['academicYearId'] as String?;
 
     if (academicYearId == null) {
@@ -1256,7 +1856,8 @@ class _RecordPaymentModal extends ConsumerStatefulWidget {
   final void Function(Map<String, Object?> receipt) onPaid;
 
   @override
-  ConsumerState<_RecordPaymentModal> createState() => _RecordPaymentModalState();
+  ConsumerState<_RecordPaymentModal> createState() =>
+      _RecordPaymentModalState();
 }
 
 class _RecordPaymentModalState extends ConsumerState<_RecordPaymentModal> {
@@ -1291,8 +1892,14 @@ class _RecordPaymentModalState extends ConsumerState<_RecordPaymentModal> {
     return AppDialog(
       title: 'Collect Fee Payment',
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Recording...' : 'Collect & Issue Receipt')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: Text(_saving ? 'Recording...' : 'Collect & Issue Receipt'),
+        ),
       ],
       child: SingleChildScrollView(
         child: Column(
@@ -1309,11 +1916,20 @@ class _RecordPaymentModalState extends ConsumerState<_RecordPaymentModal> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Student: $studentName', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(
+                    'Student: $studentName',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 4),
                   Text('Fee: $feeName', style: const TextStyle(fontSize: 13)),
                   const SizedBox(height: 4),
-                  Text('Balance Outstanding: ₹$balance', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.statusError)),
+                  Text(
+                    'Balance Outstanding: ₹$balance',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.statusError,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1321,12 +1937,17 @@ class _RecordPaymentModalState extends ConsumerState<_RecordPaymentModal> {
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: Text(_error!, style: const TextStyle(color: AppColors.statusError)),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: AppColors.statusError),
+                ),
               ),
             TextField(
               controller: _amountPaid,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Amount to Collect (₹) *'),
+              decoration: const InputDecoration(
+                labelText: 'Amount to Collect (₹) *',
+              ),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
@@ -1335,8 +1956,14 @@ class _RecordPaymentModalState extends ConsumerState<_RecordPaymentModal> {
               items: const [
                 DropdownMenuItem(value: 'cash', child: Text('Cash')),
                 DropdownMenuItem(value: 'upi', child: Text('UPI / QR')),
-                DropdownMenuItem(value: 'card', child: Text('Credit / Debit Card')),
-                DropdownMenuItem(value: 'bank_transfer', child: Text('Bank Transfer (NEFT/IMPS)')),
+                DropdownMenuItem(
+                  value: 'card',
+                  child: Text('Credit / Debit Card'),
+                ),
+                DropdownMenuItem(
+                  value: 'bank_transfer',
+                  child: Text('Bank Transfer (NEFT/IMPS)'),
+                ),
                 DropdownMenuItem(value: 'cheque', child: Text('Cheque')),
               ],
               onChanged: (v) => setState(() => _paymentMethod = v ?? 'cash'),
@@ -1344,12 +1971,16 @@ class _RecordPaymentModalState extends ConsumerState<_RecordPaymentModal> {
             const SizedBox(height: 12),
             TextField(
               controller: _ref,
-              decoration: const InputDecoration(labelText: 'Transaction / Cheque Ref (Optional)'),
+              decoration: const InputDecoration(
+                labelText: 'Transaction / Cheque Ref (Optional)',
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _notes,
-              decoration: const InputDecoration(labelText: 'Receipt Notes (Optional)'),
+              decoration: const InputDecoration(
+                labelText: 'Receipt Notes (Optional)',
+              ),
             ),
           ],
         ),
@@ -1379,7 +2010,9 @@ class _RecordPaymentModalState extends ConsumerState<_RecordPaymentModal> {
           'allocationId': widget.allocation['id'],
           'amountPaid': amountNum,
           'paymentMethod': _paymentMethod,
-          'transactionReference': _ref.text.trim().isNotEmpty ? _ref.text.trim() : null,
+          'transactionReference': _ref.text.trim().isNotEmpty
+              ? _ref.text.trim()
+              : null,
           'notes': _notes.text.trim().isNotEmpty ? _notes.text.trim() : null,
         },
         session: session,
@@ -1406,20 +2039,28 @@ class _ReceiptModal extends StatelessWidget {
   Widget build(BuildContext context) {
     final receiptNum = payment['receiptNumber'] as String? ?? '—';
     final amount = (payment['amountPaid'] as num?)?.toInt() ?? 0;
-    final method = (payment['paymentMethod'] as String? ?? 'cash').toUpperCase();
+    final method = (payment['paymentMethod'] as String? ?? 'cash')
+        .toUpperCase();
     final student = payment['studentName'] as String? ?? '—';
     final adm = payment['admissionNumber'] as String? ?? '—';
     final fee = payment['feeStructureName'] as String? ?? '—';
     final paidAt = payment['paidAt'] as String? ?? '';
-    final recordedBy = payment['recordedByStaffName'] as String? ?? 'Administrator';
+    final recordedBy =
+        payment['recordedByStaffName'] as String? ?? 'Administrator';
     final ref = payment['transactionReference'] as String?;
 
     return AlertDialog(
       title: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text('Fee Payment Receipt', style: TextStyle(fontWeight: FontWeight.bold)),
-          IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+          const Text(
+            'Fee Payment Receipt',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => Navigator.pop(context),
+          ),
         ],
       ),
       content: Container(
@@ -1437,25 +2078,44 @@ class _ReceiptModal extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Schoolic.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                const Text(
+                  'Schoolic.',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.accent.withValues(alpha: 0.1),
                     borderRadius: AppRadii.rSm,
                   ),
-                  child: const Text('PAID', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 12)),
+                  child: const Text(
+                    'PAID',
+                    style: TextStyle(
+                      color: AppColors.accent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
               ],
             ),
             const Divider(height: 24),
             _receiptRow('Receipt Number', receiptNum, isBold: true),
-            _receiptRow('Date & Time', paidAt.length >= 19 ? paidAt.substring(0, 19).replaceAll('T', ' ') : paidAt),
+            _receiptRow(
+              'Date & Time',
+              paidAt.length >= 19
+                  ? paidAt.substring(0, 19).replaceAll('T', ' ')
+                  : paidAt,
+            ),
             _receiptRow('Student Name', student),
             _receiptRow('Admission No', adm),
             _receiptRow('Fee Category', fee),
             _receiptRow('Payment Method', method),
-            if (ref != null && ref.isNotEmpty) _receiptRow('Reference / UTR', ref),
+            if (ref != null && ref.isNotEmpty)
+              _receiptRow('Reference / UTR', ref),
             _receiptRow('Received By', recordedBy),
             const Divider(height: 24),
             _receiptRow('Total Amount Paid', '₹$amount', isLarge: true),
@@ -1492,18 +2152,31 @@ class _ReceiptModal extends StatelessWidget {
     );
   }
 
-  Widget _receiptRow(String label, String value, {bool isBold = false, bool isLarge = false}) {
+  Widget _receiptRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    bool isLarge = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13, color: AppColors.secondaryText)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.secondaryText,
+            ),
+          ),
           Text(
             value,
             style: TextStyle(
               fontSize: isLarge ? 16 : 13,
-              fontWeight: (isBold || isLarge) ? FontWeight.bold : FontWeight.w500,
+              fontWeight: (isBold || isLarge)
+                  ? FontWeight.bold
+                  : FontWeight.w500,
               color: isLarge ? AppColors.accent : AppColors.primaryText,
             ),
           ),

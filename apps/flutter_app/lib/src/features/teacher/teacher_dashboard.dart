@@ -1,12 +1,14 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-
 import '../../core/api_client.dart';
+import '../../core/fluid_ui.dart';
 import '../../core/models.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
+import '../shared/components/brand_deck_dialog.dart';
 import '../shared/components/command_palette.dart';
 import '../shared/components/feedback_banner.dart';
 import '../shared/components/schoolic_logo.dart';
@@ -23,6 +25,7 @@ import 'views/teacher_marks_view.dart';
 import 'views/teacher_my_day_view.dart';
 import 'views/teacher_timetable_view.dart';
 import 'views/teacher_messages_view.dart';
+import 'views/teacher_operations_view.dart';
 
 class TeacherDashboard extends ConsumerStatefulWidget {
   const TeacherDashboard({super.key});
@@ -50,8 +53,9 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
     _loadData();
 
     // Background real-time live sync every 20s (bypassed in test harness)
-    final isTest =
-        WidgetsBinding.instance.runtimeType.toString().contains('Test');
+    final isTest = WidgetsBinding.instance.runtimeType.toString().contains(
+      'Test',
+    );
     if (!isTest) {
       _realtimeSyncTimer = Timer.periodic(const Duration(seconds: 20), (_) {
         if (mounted) _loadData(silent: true);
@@ -238,26 +242,6 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
                       const SizedBox(width: 4),
                     ],
                     const SchoolicLogo(size: 20),
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.secondaryBackground,
-                        borderRadius: AppRadii.rSm,
-                        border: Border.all(color: AppColors.primaryBorder),
-                      ),
-                      child: const Text(
-                        'TEACHER',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.secondaryText,
-                        ),
-                      ),
-                    ),
                     if (!isMobile) ...[
                       const SizedBox(width: 24),
                       // Navigation tab buttons
@@ -293,10 +277,12 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
                         Icons.campaign_outlined,
                       ),
                       const SizedBox(width: 4),
+                      _buildTabButton(8, 'Messages', Icons.chat_bubble_outline),
+                      const SizedBox(width: 4),
                       _buildTabButton(
-                        8,
-                        'Messages',
-                        Icons.chat_bubble_outline,
+                        9,
+                        'Operations',
+                        Icons.event_note_outlined,
                       ),
                     ],
 
@@ -309,7 +295,10 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
                         onActionSelected: _handleCommandPaletteAction,
                       ),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.secondaryBackground,
                           borderRadius: AppRadii.rMd,
@@ -318,7 +307,11 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.search, size: 14, color: AppColors.secondaryText),
+                            const Icon(
+                              Icons.search,
+                              size: 14,
+                              color: AppColors.secondaryText,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               isMobile ? 'Search' : 'Quick Actions...',
@@ -331,11 +324,16 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
                             if (!isMobile) ...[
                               const SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 1,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppColors.mainBackground,
                                   borderRadius: AppRadii.rSm,
-                                  border: Border.all(color: AppColors.primaryBorder),
+                                  border: Border.all(
+                                    color: AppColors.primaryBorder,
+                                  ),
                                 ),
                                 child: const Text(
                                   '⌘K',
@@ -397,6 +395,9 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
                       ),
                       const SizedBox(width: 8),
                     ],
+
+                    const FluidMascotInsignia(size: 26),
+                    const SizedBox(width: 6),
 
                     IconButton(
                       tooltip: 'Sign out',
@@ -461,31 +462,7 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
                   bottom: BorderSide(color: AppColors.primaryBorder),
                 ),
               ),
-              child: Row(
-                children: [
-                  const SchoolicLogo(size: 20),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.secondaryBackground,
-                      borderRadius: AppRadii.rSm,
-                      border: Border.all(color: AppColors.primaryBorder),
-                    ),
-                    child: const Text(
-                      'TEACHER',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.secondaryText,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              child: const Row(children: [SchoolicLogo(size: 20)]),
             ),
             const SizedBox(height: 12),
             Expanded(
@@ -508,10 +485,27 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
                   _drawerTabItem(5, 'Homework', Icons.assignment_outlined),
                   _drawerTabItem(6, 'Marks', Icons.fact_check_outlined),
                   _drawerTabItem(7, 'Announcements', Icons.campaign_outlined),
-                  _drawerTabItem(8, 'Messages & Hours', Icons.chat_bubble_outline),
+                  _drawerTabItem(
+                    8,
+                    'Messages & Hours',
+                    Icons.chat_bubble_outline,
+                  ),
+                  _drawerTabItem(
+                    9,
+                    'Teacher operations',
+                    Icons.event_note_outlined,
+                  ),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Divider(height: 1, color: AppColors.primaryBorder),
+                  ),
+                  _drawerActionItem(
+                    label: 'Brand Deck',
+                    icon: Icons.palette_outlined,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      BrandDeckDialog.show(context);
+                    },
                   ),
                   _drawerActionItem(
                     label: 'Tutorial',
@@ -672,22 +666,25 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
   Widget _buildTabButton(int index, String label, IconData icon) {
     final isSelected = _activeTab == index;
 
-    return InkWell(
+    return FluidPressable(
+      scaleDown: 0.98,
       onTap: () => setState(() {
         _activeTab = index;
         _error = null;
       }),
-      borderRadius: AppRadii.rMd,
-      child: Container(
+      child: AnimatedContainer(
+        duration: AppMotion.normal,
+        curve: AppMotion.fluidOut,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.secondaryBackground
               : Colors.transparent,
           borderRadius: AppRadii.rMd,
-          border: isSelected
-              ? Border.all(color: AppColors.primaryBorder)
-              : null,
+          border: Border.all(
+            color: isSelected ? AppColors.primaryBorder : Colors.transparent,
+          ),
+          boxShadow: isSelected ? AppShadows.ambientSoft : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -705,7 +702,7 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
               style: TextStyle(
                 fontFamily: 'Switzer',
                 fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                 color: isSelected
                     ? AppColors.primaryText
                     : AppColors.secondaryText,
@@ -771,6 +768,8 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard>
         );
       case 8:
         return const TeacherMessagesView();
+      case 9:
+        return TeacherOperationsView(assignments: _assignments);
       default:
         return const SizedBox.shrink();
     }

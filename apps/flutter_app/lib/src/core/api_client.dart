@@ -47,7 +47,10 @@ class ApiClient {
     }
 
     if (neonAuthUrl.isEmpty) {
-      throw ApiException('NEON_AUTH_URL is not configured for this build.', 400);
+      throw ApiException(
+        'NEON_AUTH_URL is not configured for this build.',
+        400,
+      );
     }
 
     auth_transport.clearAuthCookies();
@@ -70,7 +73,10 @@ class ApiClient {
       throw ApiException('Network connection error: ${exception.message}', 503);
     } catch (exception) {
       if (exception is ApiException) rethrow;
-      throw ApiException('Unable to connect to authentication service. Please try again.', 503);
+      throw ApiException(
+        'Unable to connect to authentication service. Please try again.',
+        503,
+      );
     }
 
     final token = tokenResponse['token'] as String?;
@@ -162,8 +168,15 @@ class ApiClient {
     }
   }
 
-  Future<AuthSession> currentUser({String? bearerToken, AuthSession? devSession}) async {
-    final json = await getJson('/api/v1/me', bearerToken: bearerToken, devSession: devSession);
+  Future<AuthSession> currentUser({
+    String? bearerToken,
+    AuthSession? devSession,
+  }) async {
+    final json = await getJson(
+      '/api/v1/me',
+      bearerToken: bearerToken,
+      devSession: devSession,
+    );
     return AuthSession(
       email: json['email'] as String,
       displayName: json['displayName'] as String?,
@@ -211,7 +224,9 @@ class ApiClient {
     try {
       final baseUri = Uri.parse('$apiBaseUrl$path');
       final uri = queryParameters != null && queryParameters.isNotEmpty
-          ? baseUri.replace(queryParameters: {...baseUri.queryParameters, ...queryParameters})
+          ? baseUri.replace(
+              queryParameters: {...baseUri.queryParameters, ...queryParameters},
+            )
           : baseUri;
       final response = await _sendWithRetry(
         bearerToken: session.bearerToken,
@@ -271,9 +286,7 @@ class ApiClient {
         ),
       );
       _ensureSuccess(response);
-      return _decodeList(response)
-          .whereType<Map<String, Object?>>()
-          .toList();
+      return _decodeList(response).whereType<Map<String, Object?>>().toList();
     } on ApiException {
       rethrow;
     } on http.ClientException catch (exception) {
@@ -283,33 +296,26 @@ class ApiClient {
     }
   }
 
-
   Future<Map<String, Object?>> createFeePaymentOrder({
     required AuthSession session,
     required String allocationId,
     required int amount,
     String? returnUrl,
   }) async {
-    return postJson(
-      '/api/v1/portal/fees/orders',
-      {
-        'allocationId': allocationId,
-        'amount': amount,
-        'returnUrl': ?returnUrl,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/portal/fees/orders', {
+      'allocationId': allocationId,
+      'amount': amount,
+      'returnUrl': ?returnUrl,
+    }, session: session);
   }
 
   Future<Map<String, Object?>> verifyFeePaymentOrder({
     required AuthSession session,
     required String orderId,
   }) async {
-    return postJson(
-      '/api/v1/portal/fees/verify',
-      {'orderId': orderId},
-      session: session,
-    );
+    return postJson('/api/v1/portal/fees/verify', {
+      'orderId': orderId,
+    }, session: session);
   }
 
   Future<Map<String, Object?>> uploadAdmissionDocument({
@@ -321,17 +327,18 @@ class ApiClient {
     String? contentType,
   }) async {
     try {
-      final uri = Uri.parse('$apiBaseUrl/api/v1/admin/admissions/applications/$applicationId/documents/$documentId/upload');
+      final uri = Uri.parse(
+        '$apiBaseUrl/api/v1/admin/admissions/applications/$applicationId/documents/$documentId/upload',
+      );
       final request = http.MultipartRequest('POST', uri);
-      final headers = _headers(bearerToken: session.bearerToken, devSession: session);
+      final headers = _headers(
+        bearerToken: session.bearerToken,
+        devSession: session,
+      );
       headers.remove('content-type');
       request.headers.addAll(headers);
       request.files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          bytes,
-          filename: fileName,
-        ),
+        http.MultipartFile.fromBytes('file', bytes, filename: fileName),
       );
 
       final streamedResponse = await _httpClient.send(request);
@@ -353,7 +360,9 @@ class ApiClient {
     required String documentId,
   }) async {
     try {
-      final uri = Uri.parse('$apiBaseUrl/api/v1/admin/admissions/applications/$applicationId/documents/$documentId/download');
+      final uri = Uri.parse(
+        '$apiBaseUrl/api/v1/admin/admissions/applications/$applicationId/documents/$documentId/download',
+      );
       final response = await _sendWithRetry(
         bearerToken: session.bearerToken,
         request: (token) => _httpClient.get(
@@ -376,7 +385,10 @@ class ApiClient {
     required AuthSession session,
     required String documentId,
   }) async {
-    return deleteJson('/api/v1/admin/admissions/documents/$documentId/file', session: session);
+    return deleteJson(
+      '/api/v1/admin/admissions/documents/$documentId/file',
+      session: session,
+    );
   }
 
   Future<Map<String, Object?>> putJson(
@@ -429,7 +441,10 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, Object?>> deleteJson(String path, {required AuthSession session}) async {
+  Future<Map<String, Object?>> deleteJson(
+    String path, {
+    required AuthSession session,
+  }) async {
     try {
       final response = await _sendWithRetry(
         bearerToken: session.bearerToken,
@@ -455,11 +470,10 @@ class ApiClient {
     required String entity,
     required String csv,
   }) async {
-    return postJson(
-      '/api/v1/admin/imports/preview',
-      {'entity': entity, 'csv': csv},
-      session: session,
-    );
+    return postJson('/api/v1/admin/imports/preview', {
+      'entity': entity,
+      'csv': csv,
+    }, session: session);
   }
 
   Future<Map<String, Object?>> commitBulkImport({
@@ -470,17 +484,13 @@ class ApiClient {
     String? defaultClassId,
     String? defaultSectionId,
   }) async {
-    return postJson(
-      '/api/v1/admin/imports/commit',
-      {
-        'entity': entity,
-        'records': records,
-        'academicYearId': ?academicYearId,
-        'defaultClassId': ?defaultClassId,
-        'defaultSectionId': ?defaultSectionId,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/imports/commit', {
+      'entity': entity,
+      'records': records,
+      'academicYearId': ?academicYearId,
+      'defaultClassId': ?defaultClassId,
+      'defaultSectionId': ?defaultSectionId,
+    }, session: session);
   }
 
   // Phase 10: Onboarding Wizard
@@ -498,17 +508,13 @@ class ApiClient {
     required String endDate,
     required List<Map<String, Object?>> classes,
   }) async {
-    return postJson(
-      '/api/v1/admin/onboarding/wizard',
-      {
-        'schoolName': schoolName,
-        'academicYearName': academicYearName,
-        'startDate': startDate,
-        'endDate': endDate,
-        'classes': classes,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/onboarding/wizard', {
+      'schoolName': schoolName,
+      'academicYearName': academicYearName,
+      'startDate': startDate,
+      'endDate': endDate,
+      'classes': classes,
+    }, session: session);
   }
 
   // Phase 10: Notifications
@@ -517,10 +523,7 @@ class ApiClient {
     String? channel,
     String? status,
   }) async {
-    final params = <String, String>{
-      'channel': ?channel,
-      'status': ?status,
-    };
+    final params = <String, String>{'channel': ?channel, 'status': ?status};
     return getList(
       '/api/v1/admin/notifications',
       session: session,
@@ -538,19 +541,15 @@ class ApiClient {
     String? recipientUserId,
     Map<String, Object?>? data,
   }) async {
-    return postJson(
-      '/api/v1/admin/notifications/send',
-      {
-        'channel': channel,
-        'title': title,
-        'body': body,
-        'recipientPhone': ?recipientPhone,
-        'recipientEmail': ?recipientEmail,
-        'recipientUserId': ?recipientUserId,
-        'data': ?data,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/notifications/send', {
+      'channel': channel,
+      'title': title,
+      'body': body,
+      'recipientPhone': ?recipientPhone,
+      'recipientEmail': ?recipientEmail,
+      'recipientUserId': ?recipientUserId,
+      'data': ?data,
+    }, session: session);
   }
 
   Future<Map<String, Object?>> triggerFeeReminders({
@@ -585,17 +584,13 @@ class ApiClient {
     required String autoReplyMessage,
     required bool isEnabled,
   }) async {
-    return putJson(
-      '/api/v1/teacher/availability',
-      {
-        'startTime': startTime,
-        'endTime': endTime,
-        'availableDays': availableDays,
-        'autoReplyMessage': autoReplyMessage,
-        'isEnabled': isEnabled,
-      },
-      session: session,
-    );
+    return putJson('/api/v1/teacher/availability', {
+      'startTime': startTime,
+      'endTime': endTime,
+      'availableDays': availableDays,
+      'autoReplyMessage': autoReplyMessage,
+      'isEnabled': isEnabled,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> listChatConversations({
@@ -613,16 +608,12 @@ class ApiClient {
     required String subject,
     String? initialMessage,
   }) async {
-    return postJson(
-      '/api/v1/portal/chat/conversations',
-      {
-        'studentId': studentId,
-        'teacherStaffId': teacherStaffId,
-        'subject': subject,
-        'initialMessage': ?initialMessage,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/portal/chat/conversations', {
+      'studentId': studentId,
+      'teacherStaffId': teacherStaffId,
+      'subject': subject,
+      'initialMessage': ?initialMessage,
+    }, session: session);
   }
 
   Future<Map<String, Object?>> listChatMessages({
@@ -631,7 +622,10 @@ class ApiClient {
     bool isPortal = false,
   }) async {
     final prefix = isPortal ? '/api/v1/portal' : '/api/v1/teacher';
-    return getJson('$prefix/chat/conversations/$conversationId/messages', session: session);
+    return getJson(
+      '$prefix/chat/conversations/$conversationId/messages',
+      session: session,
+    );
   }
 
   Future<Map<String, Object?>> sendChatMessage({
@@ -641,11 +635,9 @@ class ApiClient {
     bool isPortal = false,
   }) async {
     final prefix = isPortal ? '/api/v1/portal' : '/api/v1/teacher';
-    return postJson(
-      '$prefix/chat/conversations/$conversationId/messages',
-      {'content': content},
-      session: session,
-    );
+    return postJson('$prefix/chat/conversations/$conversationId/messages', {
+      'content': content,
+    }, session: session);
   }
 
   // Phase 11: Enterprise RBAC & DPDP Compliance
@@ -672,10 +664,7 @@ class ApiClient {
     String? studentId,
     String? status,
   }) async {
-    final params = <String, String>{
-      'studentId': ?studentId,
-      'status': ?status,
-    };
+    final params = <String, String>{'studentId': ?studentId, 'status': ?status};
     return getList(
       '/api/v1/admin/dpdp/consents',
       session: session,
@@ -692,27 +681,21 @@ class ApiClient {
     String verifiedVia = 'portal_submission',
     String? validUntil,
   }) async {
-    return postJson(
-      '/api/v1/admin/dpdp/consents',
-      {
-        'studentId': studentId,
-        'parentGuardianName': parentGuardianName,
-        'parentGuardianPhone': parentGuardianPhone,
-        'consentType': consentType,
-        'verifiedVia': verifiedVia,
-        'validUntil': ?validUntil,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/dpdp/consents', {
+      'studentId': studentId,
+      'parentGuardianName': parentGuardianName,
+      'parentGuardianPhone': parentGuardianPhone,
+      'consentType': consentType,
+      'verifiedVia': verifiedVia,
+      'validUntil': ?validUntil,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> listDsrRequests({
     required AuthSession session,
     String? status,
   }) async {
-    final params = <String, String>{
-      'status': ?status,
-    };
+    final params = <String, String>{'status': ?status};
     return getList(
       '/api/v1/admin/dpdp/dsr',
       session: session,
@@ -727,15 +710,11 @@ class ApiClient {
     required String resolutionNotes,
     bool? anonymizeStudent,
   }) async {
-    return putJson(
-      '/api/v1/admin/dpdp/dsr/$requestId',
-      {
-        'status': status,
-        'resolutionNotes': resolutionNotes,
-        'anonymizeStudent': ?anonymizeStudent,
-      },
-      session: session,
-    );
+    return putJson('/api/v1/admin/dpdp/dsr/$requestId', {
+      'status': status,
+      'resolutionNotes': resolutionNotes,
+      'anonymizeStudent': ?anonymizeStudent,
+    }, session: session);
   }
 
   Future<Map<String, Object?>> submitPortalDsrRequest({
@@ -744,15 +723,11 @@ class ApiClient {
     required String requestType,
     required String reason,
   }) async {
-    return postJson(
-      '/api/v1/portal/dpdp/dsr',
-      {
-        'studentId': ?studentId,
-        'requestType': requestType,
-        'reason': reason,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/portal/dpdp/dsr', {
+      'studentId': ?studentId,
+      'requestType': requestType,
+      'reason': reason,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> listPortalDsrRequests({
@@ -766,11 +741,9 @@ class ApiClient {
     required String sectionId,
     String? classTeacherStaffId,
   }) async {
-    return putJson(
-      '/api/v1/admin/sections/$sectionId/class-teacher',
-      {'classTeacherStaffId': classTeacherStaffId},
-      session: session,
-    );
+    return putJson('/api/v1/admin/sections/$sectionId/class-teacher', {
+      'classTeacherStaffId': classTeacherStaffId,
+    }, session: session);
   }
 
   // Phase 11: Financial Depth (Concessions, Refunds, Heads)
@@ -788,17 +761,13 @@ class ApiClient {
     required int value,
     required String category,
   }) async {
-    return postJson(
-      '/api/v1/admin/fees/concessions',
-      {
-        'name': name,
-        'code': code,
-        'type': type,
-        'value': value,
-        'category': category,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/fees/concessions', {
+      'name': name,
+      'code': code,
+      'type': type,
+      'value': value,
+      'category': category,
+    }, session: session);
   }
 
   Future<Map<String, Object?>> applyStudentConcession({
@@ -808,16 +777,12 @@ class ApiClient {
     required String concessionId,
     String? reason,
   }) async {
-    return postJson(
-      '/api/v1/admin/fees/concessions/apply',
-      {
-        'studentId': studentId,
-        'allocationId': allocationId,
-        'concessionId': concessionId,
-        'reason': ?reason,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/fees/concessions/apply', {
+      'studentId': studentId,
+      'allocationId': allocationId,
+      'concessionId': concessionId,
+      'reason': ?reason,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> listStudentConcessions({
@@ -840,9 +805,7 @@ class ApiClient {
     required AuthSession session,
     String? status,
   }) async {
-    final params = <String, String>{
-      'status': ?status,
-    };
+    final params = <String, String>{'status': ?status};
     return getList(
       '/api/v1/admin/fees/refunds',
       session: session,
@@ -860,19 +823,15 @@ class ApiClient {
     String mode = 'bank_transfer',
     String? referenceNumber,
   }) async {
-    return postJson(
-      '/api/v1/admin/fees/refunds',
-      {
-        'allocationId': allocationId,
-        'studentId': studentId,
-        'paymentId': ?paymentId,
-        'amount': amount,
-        'reason': reason,
-        'mode': mode,
-        'referenceNumber': ?referenceNumber,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/fees/refunds', {
+      'allocationId': allocationId,
+      'studentId': studentId,
+      'paymentId': ?paymentId,
+      'amount': amount,
+      'reason': reason,
+      'mode': mode,
+      'referenceNumber': ?referenceNumber,
+    }, session: session);
   }
 
   Future<Map<String, Object?>> updateFeeRefundStatus({
@@ -880,18 +839,19 @@ class ApiClient {
     required String refundId,
     required String status,
   }) async {
-    return putJson(
-      '/api/v1/admin/fees/refunds/$refundId/status',
-      {'status': status},
-      session: session,
-    );
+    return putJson('/api/v1/admin/fees/refunds/$refundId/status', {
+      'status': status,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> listFeeStructureHeads({
     required AuthSession session,
     required String feeStructureId,
   }) async {
-    return getList('/api/v1/admin/fees/structures/$feeStructureId/heads', session: session);
+    return getList(
+      '/api/v1/admin/fees/structures/$feeStructureId/heads',
+      session: session,
+    );
   }
 
   Future<Map<String, Object?>> createFeeStructureHead({
@@ -901,15 +861,11 @@ class ApiClient {
     required int amount,
     bool isOptional = false,
   }) async {
-    return postJson(
-      '/api/v1/admin/fees/structures/$feeStructureId/heads',
-      {
-        'headName': headName,
-        'amount': amount,
-        'isOptional': isOptional,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/fees/structures/$feeStructureId/heads', {
+      'headName': headName,
+      'amount': amount,
+      'isOptional': isOptional,
+    }, session: session);
   }
 
   // --- Phase 12: Operations (Leaves, Transport, Certificates, Calendar & PTM) ---
@@ -937,14 +893,10 @@ class ApiClient {
     required String status,
     String? reviewerNotes,
   }) async {
-    return putJson(
-      '/api/v1/admin/leaves/students/$leaveId/status',
-      {
-        'status': status,
-        'reviewerNotes': ?reviewerNotes,
-      },
-      session: session,
-    );
+    return putJson('/api/v1/admin/leaves/students/$leaveId/status', {
+      'status': status,
+      'reviewerNotes': ?reviewerNotes,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> getStaffLeaves({
@@ -971,17 +923,13 @@ class ApiClient {
     required String endDate,
     required String reason,
   }) async {
-    return postJson(
-      '/api/v1/admin/leaves/staff',
-      {
-        'staffId': ?staffId,
-        'leaveType': leaveType,
-        'startDate': startDate,
-        'endDate': endDate,
-        'reason': reason,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/leaves/staff', {
+      'staffId': ?staffId,
+      'leaveType': leaveType,
+      'startDate': startDate,
+      'endDate': endDate,
+      'reason': reason,
+    }, session: session);
   }
 
   Future<Map<String, Object?>> reviewStaffLeave({
@@ -990,25 +938,42 @@ class ApiClient {
     required String status,
     String? reviewerNotes,
   }) async {
-    return putJson(
-      '/api/v1/admin/leaves/staff/$leaveId/status',
-      {
-        'status': status,
-        'reviewerNotes': ?reviewerNotes,
-      },
-      session: session,
-    );
+    return putJson('/api/v1/admin/leaves/staff/$leaveId/status', {
+      'status': status,
+      'reviewerNotes': ?reviewerNotes,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> getStaffLeaveSubstitutes({
     required AuthSession session,
     required String leaveId,
   }) async {
-    return getList('/api/v1/admin/leaves/staff/$leaveId/substitutes', session: session);
+    final response = await getJson(
+      '/api/v1/admin/leaves/staff/$leaveId/substitutes',
+      session: session,
+    );
+    return (response['periodSubstitutions'] as List? ?? const [])
+        .whereType<Map>()
+        .map((entry) => entry.cast<String, Object?>())
+        .toList();
+  }
+
+  Future<Map<String, Object?>> assignStaffLeaveSubstitute({
+    required AuthSession session,
+    required String leaveId,
+    required String timetableEntryId,
+    required String substituteStaffId,
+  }) async {
+    return postJson('/api/v1/admin/leaves/staff/$leaveId/substitutes', {
+      'timetableEntryId': timetableEntryId,
+      'substituteStaffId': substituteStaffId,
+    }, session: session);
   }
 
   // 2. Transport
-  Future<List<Map<String, Object?>>> getTransportVehicles({required AuthSession session}) async {
+  Future<List<Map<String, Object?>>> getTransportVehicles({
+    required AuthSession session,
+  }) async {
     return getList('/api/v1/admin/transport/vehicles', session: session);
   }
 
@@ -1022,22 +987,20 @@ class ApiClient {
     String? fitnessExpiry,
     String status = 'active',
   }) async {
-    return postJson(
-      '/api/v1/admin/transport/vehicles',
-      {
-        'vehicleNumber': vehicleNumber,
-        'model': model,
-        'capacity': capacity,
-        'gpsDeviceId': ?gpsDeviceId,
-        'insuranceExpiry': ?insuranceExpiry,
-        'fitnessExpiry': ?fitnessExpiry,
-        'status': status,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/transport/vehicles', {
+      'vehicleNumber': vehicleNumber,
+      'model': model,
+      'capacity': capacity,
+      'gpsDeviceId': ?gpsDeviceId,
+      'insuranceExpiry': ?insuranceExpiry,
+      'fitnessExpiry': ?fitnessExpiry,
+      'status': status,
+    }, session: session);
   }
 
-  Future<List<Map<String, Object?>>> getTransportDrivers({required AuthSession session}) async {
+  Future<List<Map<String, Object?>>> getTransportDrivers({
+    required AuthSession session,
+  }) async {
     return getList('/api/v1/admin/transport/drivers', session: session);
   }
 
@@ -1049,20 +1012,18 @@ class ApiClient {
     String? licenseExpiry,
     String status = 'active',
   }) async {
-    return postJson(
-      '/api/v1/admin/transport/drivers',
-      {
-        'fullName': fullName,
-        'phone': phone,
-        'licenseNumber': licenseNumber,
-        'licenseExpiry': ?licenseExpiry,
-        'status': status,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/transport/drivers', {
+      'fullName': fullName,
+      'phone': phone,
+      'licenseNumber': licenseNumber,
+      'licenseExpiry': ?licenseExpiry,
+      'status': status,
+    }, session: session);
   }
 
-  Future<List<Map<String, Object?>>> getTransportRoutes({required AuthSession session}) async {
+  Future<List<Map<String, Object?>>> getTransportRoutes({
+    required AuthSession session,
+  }) async {
     return getList('/api/v1/admin/transport/routes', session: session);
   }
 
@@ -1076,26 +1037,25 @@ class ApiClient {
     String? driverId,
     String status = 'active',
   }) async {
-    return postJson(
-      '/api/v1/admin/transport/routes',
-      {
-        'routeNumber': routeNumber,
-        'routeName': routeName,
-        'startPoint': startPoint,
-        'endPoint': endPoint,
-        'vehicleId': ?vehicleId,
-        'driverId': ?driverId,
-        'status': status,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/transport/routes', {
+      'routeNumber': routeNumber,
+      'routeName': routeName,
+      'startPoint': startPoint,
+      'endPoint': endPoint,
+      'vehicleId': ?vehicleId,
+      'driverId': ?driverId,
+      'status': status,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> getTransportStops({
     required AuthSession session,
     required String routeId,
   }) async {
-    return getList('/api/v1/admin/transport/routes/$routeId/stops', session: session);
+    return getList(
+      '/api/v1/admin/transport/routes/$routeId/stops',
+      session: session,
+    );
   }
 
   Future<Map<String, Object?>> createTransportStop({
@@ -1109,20 +1069,16 @@ class ApiClient {
     String? latitude,
     String? longitude,
   }) async {
-    return postJson(
-      '/api/v1/admin/transport/stops',
-      {
-        'routeId': routeId,
-        'stopName': stopName,
-        'pickupTime': pickupTime,
-        'dropTime': dropTime,
-        'stopOrder': stopOrder,
-        'monthlyFeeAmount': monthlyFeeAmount,
-        'latitude': ?latitude,
-        'longitude': ?longitude,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/transport/stops', {
+      'routeId': routeId,
+      'stopName': stopName,
+      'pickupTime': pickupTime,
+      'dropTime': dropTime,
+      'stopOrder': stopOrder,
+      'monthlyFeeAmount': monthlyFeeAmount,
+      'latitude': ?latitude,
+      'longitude': ?longitude,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> getTransportAllocations({
@@ -1149,17 +1105,13 @@ class ApiClient {
     String? academicYearId,
     String? startDate,
   }) async {
-    return postJson(
-      '/api/v1/admin/transport/allocations',
-      {
-        'studentId': studentId,
-        'routeId': routeId,
-        'stopId': stopId,
-        'academicYearId': ?academicYearId,
-        'startDate': ?startDate,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/transport/allocations', {
+      'studentId': studentId,
+      'routeId': routeId,
+      'stopId': stopId,
+      'academicYearId': ?academicYearId,
+      'startDate': ?startDate,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> getTransportLogs({
@@ -1167,10 +1119,7 @@ class ApiClient {
     String? routeId,
     String? date,
   }) async {
-    final params = <String, String>{
-      'routeId': ?routeId,
-      'date': ?date,
-    };
+    final params = <String, String>{'routeId': ?routeId, 'date': ?date};
     return getList(
       '/api/v1/admin/transport/logs',
       session: session,
@@ -1187,18 +1136,14 @@ class ApiClient {
     String? currentStopId,
     String? notes,
   }) async {
-    return postJson(
-      '/api/v1/admin/transport/logs',
-      {
-        'routeId': routeId,
-        'date': ?date,
-        'tripType': tripType,
-        'status': status,
-        'currentStopId': ?currentStopId,
-        'notes': ?notes,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/transport/logs', {
+      'routeId': routeId,
+      'date': ?date,
+      'tripType': tripType,
+      'status': status,
+      'currentStopId': ?currentStopId,
+      'notes': ?notes,
+    }, session: session);
   }
 
   // 3. Certificates
@@ -1209,7 +1154,8 @@ class ApiClient {
   }) async {
     final params = <String, String>{
       'studentId': ?studentId,
-      if (certificateType != null && certificateType != 'all') 'certificateType': certificateType,
+      if (certificateType != null && certificateType != 'all')
+        'certificateType': certificateType,
     };
     return getList(
       '/api/v1/admin/certificates',
@@ -1226,17 +1172,13 @@ class ApiClient {
     String? issueDate,
     Map<String, Object?>? metadata,
   }) async {
-    return postJson(
-      '/api/v1/admin/certificates',
-      {
-        'studentId': studentId,
-        'certificateType': certificateType,
-        'academicYearId': ?academicYearId,
-        'issueDate': ?issueDate,
-        'metadata': ?metadata,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/certificates/issue', {
+      'studentId': studentId,
+      'certificateType': certificateType,
+      'academicYearId': ?academicYearId,
+      'issueDate': ?issueDate,
+      'metadata': ?metadata,
+    }, session: session);
   }
 
   Future<Map<String, Object?>> revokeCertificate({
@@ -1244,13 +1186,9 @@ class ApiClient {
     required String certificateId,
     String? reason,
   }) async {
-    return postJson(
-      '/api/v1/admin/certificates/$certificateId/revoke',
-      {
-        'reason': ?reason,
-      },
-      session: session,
-    );
+    return putJson('/api/v1/admin/certificates/$certificateId/revoke', {
+      'reason': ?reason,
+    }, session: session);
   }
 
   // 4. Calendar & PTM
@@ -1261,7 +1199,8 @@ class ApiClient {
     String? endDate,
   }) async {
     final params = <String, String>{
-      if (targetAudience != null && targetAudience != 'all') 'targetAudience': targetAudience,
+      if (targetAudience != null && targetAudience != 'all')
+        'targetAudience': targetAudience,
       'startDate': ?startDate,
       'endDate': ?endDate,
     };
@@ -1283,20 +1222,16 @@ class ApiClient {
     String targetAudience = 'all',
     String? academicYearId,
   }) async {
-    return postJson(
-      '/api/v1/admin/calendar',
-      {
-        'title': title,
-        'description': ?description,
-        'eventType': eventType,
-        'startDate': startDate,
-        'endDate': endDate,
-        'isAllDay': isAllDay,
-        'targetAudience': targetAudience,
-        'academicYearId': ?academicYearId,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/calendar', {
+      'title': title,
+      'description': ?description,
+      'eventType': eventType,
+      'startDate': startDate,
+      'endDate': endDate,
+      'isAllDay': isAllDay,
+      'targetAudience': targetAudience,
+      'academicYearId': ?academicYearId,
+    }, session: session);
   }
 
   Future<Map<String, Object?>> deleteCalendarEvent({
@@ -1306,7 +1241,9 @@ class ApiClient {
     return deleteJson('/api/v1/admin/calendar/$eventId', session: session);
   }
 
-  Future<List<Map<String, Object?>>> getPtmSchedules({required AuthSession session}) async {
+  Future<List<Map<String, Object?>>> getPtmSchedules({
+    required AuthSession session,
+  }) async {
     return getList('/api/v1/admin/ptm/schedules', session: session);
   }
 
@@ -1320,19 +1257,15 @@ class ApiClient {
     List<String>? teacherStaffIds,
     String? academicYearId,
   }) async {
-    return postJson(
-      '/api/v1/admin/ptm/schedules',
-      {
-        'title': title,
-        'eventDate': eventDate,
-        'startTime': startTime,
-        'endTime': endTime,
-        'slotDurationMinutes': slotDurationMinutes,
-        'teacherStaffIds': ?teacherStaffIds,
-        'academicYearId': ?academicYearId,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/ptm/schedules', {
+      'title': title,
+      'eventDate': eventDate,
+      'startTime': startTime,
+      'endTime': endTime,
+      'slotDurationMinutes': slotDurationMinutes,
+      'teacherStaffIds': ?teacherStaffIds,
+      'academicYearId': ?academicYearId,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> getPtmSlots({
@@ -1363,9 +1296,7 @@ class ApiClient {
     required AuthSession session,
     String? academicYearId,
   }) async {
-    final params = <String, String>{
-      'academicYearId': ?academicYearId,
-    };
+    final params = <String, String>{'academicYearId': ?academicYearId};
     return getList(
       '/api/v1/admin/academics/grading-schemes',
       session: session,
@@ -1382,18 +1313,14 @@ class ApiClient {
     int? passingPercentage,
     bool? isDefault,
   }) async {
-    return postJson(
-      '/api/v1/admin/academics/grading-schemes',
-      {
-        'name': name,
-        'board': board,
-        'academicYearId': ?academicYearId,
-        'description': ?description,
-        'passingPercentage': ?passingPercentage,
-        'isDefault': ?isDefault,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/academics/grading-schemes', {
+      'name': name,
+      'board': board,
+      'academicYearId': ?academicYearId,
+      'description': ?description,
+      'passingPercentage': ?passingPercentage,
+      'isDefault': ?isDefault,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> seedDefaultBoardSchemes({
@@ -1419,19 +1346,15 @@ class ApiClient {
     String? remarks,
     int? orderIndex,
   }) async {
-    return postJson(
-      '/api/v1/admin/academics/grading-schemes/scales',
-      {
-        'schemeId': schemeId,
-        'grade': grade,
-        'minScore': minScore,
-        'maxScore': maxScore,
-        'gradePoint': gradePoint,
-        'remarks': ?remarks,
-        'orderIndex': ?orderIndex,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/academics/grading-schemes/scales', {
+      'schemeId': schemeId,
+      'grade': grade,
+      'minScore': minScore,
+      'maxScore': maxScore,
+      'gradePoint': gradePoint,
+      'remarks': ?remarks,
+      'orderIndex': ?orderIndex,
+    }, session: session);
   }
 
   Future<Map<String, Object?>> createEvaluationComponent({
@@ -1444,19 +1367,15 @@ class ApiClient {
     String? term,
     int? orderIndex,
   }) async {
-    return postJson(
-      '/api/v1/admin/academics/grading-schemes/components',
-      {
-        'schemeId': schemeId,
-        'name': name,
-        'componentType': componentType,
-        'weightagePercentage': weightagePercentage,
-        'maxMarks': maxMarks,
-        'term': ?term,
-        'orderIndex': ?orderIndex,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/academics/grading-schemes/components', {
+      'schemeId': schemeId,
+      'name': name,
+      'componentType': componentType,
+      'weightagePercentage': weightagePercentage,
+      'maxMarks': maxMarks,
+      'term': ?term,
+      'orderIndex': ?orderIndex,
+    }, session: session);
   }
 
   Future<Map<String, Object?>> generateReportCards({
@@ -1469,19 +1388,15 @@ class ApiClient {
     List<String>? studentIds,
     String? teacherRemarks,
   }) async {
-    return postJson(
-      '/api/v1/admin/academics/report-cards/generate',
-      {
-        'academicYearId': academicYearId,
-        'classId': classId,
-        'sectionId': sectionId,
-        'schemeId': schemeId,
-        'term': ?term,
-        'studentIds': ?studentIds,
-        'teacherRemarks': ?teacherRemarks,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/academics/report-cards/generate', {
+      'academicYearId': academicYearId,
+      'classId': classId,
+      'sectionId': sectionId,
+      'schemeId': schemeId,
+      'term': ?term,
+      'studentIds': ?studentIds,
+      'teacherRemarks': ?teacherRemarks,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> getReportCards({
@@ -1523,20 +1438,26 @@ class ApiClient {
   }) async {
     return putJson(
       '/api/v1/admin/academics/report-cards/$reportCardId/publish',
-      {
-        'isPublished': isPublished,
-      },
+      {'isPublished': isPublished},
       session: session,
     );
+  }
+
+  Future<Map<String, Object?>> publishTeacherReportCard({
+    required AuthSession session,
+    required String reportCardId,
+    required bool isPublished,
+  }) async {
+    return putJson('/api/v1/teacher/report-cards/$reportCardId/publish', {
+      'isPublished': isPublished,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> getPortalBoardReportCards({
     required AuthSession session,
     String? studentId,
   }) async {
-    final params = <String, String>{
-      'studentId': ?studentId,
-    };
+    final params = <String, String>{'studentId': ?studentId};
     return getList(
       '/api/v1/portal/board-report-cards',
       session: session,
@@ -1552,22 +1473,16 @@ class ApiClient {
     List<Map<String, Object?>> batches, {
     required AuthSession session,
   }) async {
-    return postJson(
-      '/api/v1/teacher/attendance/sync',
-      {
-        'batches': batches,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/teacher/attendance/sync', {
+      'batches': batches,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> getOfflineSyncLogs({
     required AuthSession session,
     String? staffId,
   }) async {
-    final params = <String, String>{
-      'staffId': ?staffId,
-    };
+    final params = <String, String>{'staffId': ?staffId};
     return getList(
       '/api/v1/admin/academics/offline-sync-logs',
       session: session,
@@ -1636,11 +1551,7 @@ class ApiClient {
   }) async {
     return postJson(
       '/api/v1/admin/analytics/at-risk-students/$studentId/intervene',
-      {
-        'action': action,
-        'notes': notes,
-        'status': ?status,
-      },
+      {'action': action, 'notes': notes, 'status': ?status},
       session: session,
     );
   }
@@ -1649,11 +1560,9 @@ class ApiClient {
     required AuthSession session,
     required String query,
   }) async {
-    return postJson(
-      '/api/v1/admin/analytics/natural-language-query',
-      {'query': query},
-      session: session,
-    );
+    return postJson('/api/v1/admin/analytics/natural-language-query', {
+      'query': query,
+    }, session: session);
   }
 
   Future<Map<String, Object?>> draftReportCardRemarks({
@@ -1665,18 +1574,14 @@ class ApiClient {
     List<Map<String, dynamic>>? subjects,
     List<Map<String, dynamic>>? coScholastic,
   }) async {
-    return postJson(
-      '/api/v1/teacher/ai/draft-remarks',
-      {
-        'studentName': studentName,
-        'overallPercentage': overallPercentage,
-        'attendanceRate': ?attendanceRate,
-        'tone': tone,
-        'subjects': ?subjects,
-        'coScholastic': ?coScholastic,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/teacher/ai/draft-remarks', {
+      'studentName': studentName,
+      'overallPercentage': overallPercentage,
+      'attendanceRate': ?attendanceRate,
+      'tone': tone,
+      'subjects': ?subjects,
+      'coScholastic': ?coScholastic,
+    }, session: session);
   }
 
   Future<Map<String, Object?>> draftHomeworkFeedback({
@@ -1688,18 +1593,14 @@ class ApiClient {
     String? strengths,
     String? areasForImprovement,
   }) async {
-    return postJson(
-      '/api/v1/teacher/ai/homework-feedback',
-      {
-        'assignmentTitle': assignmentTitle,
-        'subject': subject,
-        'studentScore': studentScore,
-        'maxScore': maxScore,
-        'strengths': ?strengths,
-        'areasForImprovement': ?areasForImprovement,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/teacher/ai/homework-feedback', {
+      'assignmentTitle': assignmentTitle,
+      'subject': subject,
+      'studentScore': studentScore,
+      'maxScore': maxScore,
+      'strengths': ?strengths,
+      'areasForImprovement': ?areasForImprovement,
+    }, session: session);
   }
 
   // ==========================================
@@ -1714,7 +1615,8 @@ class ApiClient {
   }) async {
     final queryParams = <String, String>{};
     if (search != null && search.isNotEmpty) queryParams['search'] = search;
-    if (category != null && category.isNotEmpty) queryParams['category'] = category;
+    if (category != null && category.isNotEmpty)
+      queryParams['category'] = category;
 
     final queryString = queryParams.isEmpty
         ? ''
@@ -1744,7 +1646,8 @@ class ApiClient {
   }) async {
     final queryParams = <String, String>{};
     if (status != null && status.isNotEmpty) queryParams['status'] = status;
-    if (memberType != null && memberType.isNotEmpty) queryParams['memberType'] = memberType;
+    if (memberType != null && memberType.isNotEmpty)
+      queryParams['memberType'] = memberType;
 
     final queryString = queryParams.isEmpty
         ? ''
@@ -1782,10 +1685,7 @@ class ApiClient {
   Future<Map<String, Object?>> getLibraryStats({
     required AuthSession session,
   }) async {
-    return getJson(
-      '/api/v1/admin/operations/library/stats',
-      session: session,
-    );
+    return getJson('/api/v1/admin/operations/library/stats', session: session);
   }
 
   // --- 2. Inventory & Asset Management ---
@@ -1795,8 +1695,10 @@ class ApiClient {
     String? condition,
   }) async {
     final queryParams = <String, String>{};
-    if (category != null && category.isNotEmpty) queryParams['category'] = category;
-    if (condition != null && condition.isNotEmpty) queryParams['condition'] = condition;
+    if (category != null && category.isNotEmpty)
+      queryParams['category'] = category;
+    if (condition != null && condition.isNotEmpty)
+      queryParams['condition'] = condition;
 
     final queryString = queryParams.isEmpty
         ? ''
@@ -1828,6 +1730,17 @@ class ApiClient {
       '/api/v1/admin/operations/inventory/items/$itemId/allocate',
       payload,
       session: session,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> getInventoryAllocations({
+    required AuthSession session,
+    String? status,
+  }) async {
+    return getList(
+      '/api/v1/admin/operations/inventory/allocations',
+      session: session,
+      queryParameters: status == null ? null : {'status': status},
     );
   }
 
@@ -1953,7 +1866,8 @@ class ApiClient {
     String? roomType,
   }) async {
     final queryParams = <String, String>{};
-    if (roomType != null && roomType.isNotEmpty) queryParams['roomType'] = roomType;
+    if (roomType != null && roomType.isNotEmpty)
+      queryParams['roomType'] = roomType;
 
     final queryString = queryParams.isEmpty
         ? ''
@@ -2081,7 +1995,8 @@ class ApiClient {
     String? studentId,
   }) async {
     final queryParams = <String, String>{};
-    if (studentId != null && studentId.isNotEmpty) queryParams['studentId'] = studentId;
+    if (studentId != null && studentId.isNotEmpty)
+      queryParams['studentId'] = studentId;
 
     final queryString = queryParams.isEmpty
         ? ''
@@ -2107,19 +2022,13 @@ class ApiClient {
   Future<List<Map<String, Object?>>> getClasses({
     required AuthSession session,
   }) async {
-    return getList(
-      '/api/v1/admin/classes',
-      session: session,
-    );
+    return getList('/api/v1/admin/classes', session: session);
   }
 
   Future<List<Map<String, Object?>>> getSubjects({
     required AuthSession session,
   }) async {
-    return getList(
-      '/api/v1/admin/subjects',
-      session: session,
-    );
+    return getList('/api/v1/admin/subjects', session: session);
   }
 
   // ==========================================
@@ -2129,10 +2038,7 @@ class ApiClient {
   Future<List<Map<String, Object?>>> getEducationalTrusts({
     required AuthSession session,
   }) async {
-    return getList(
-      '/api/v1/admin/federation/trusts',
-      session: session,
-    );
+    return getList('/api/v1/admin/federation/trusts', session: session);
   }
 
   Future<Map<String, Object?>> createEducationalTrust({
@@ -2151,14 +2057,10 @@ class ApiClient {
     required String trustId,
     String? schoolId,
   }) async {
-    return postJson(
-      '/api/v1/admin/federation/trusts/link',
-      {
-        'trustId': trustId,
-        'schoolId': ?schoolId,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/federation/trusts/link', {
+      'trustId': trustId,
+      'schoolId': ?schoolId,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> getTrustCampuses({
@@ -2212,14 +2114,10 @@ class ApiClient {
     required String status,
     String? remarks,
   }) async {
-    return putJson(
-      '/api/v1/admin/federation/transfers/$transferId/status',
-      {
-        'status': status,
-        'remarks': ?remarks,
-      },
-      session: session,
-    );
+    return putJson('/api/v1/admin/federation/transfers/$transferId/status', {
+      'status': status,
+      'remarks': ?remarks,
+    }, session: session);
   }
 
   // ==========================================
@@ -2229,10 +2127,7 @@ class ApiClient {
   Future<List<Map<String, Object?>>> getBiometricDevices({
     required AuthSession session,
   }) async {
-    return getList(
-      '/api/v1/admin/biometrics/devices',
-      session: session,
-    );
+    return getList('/api/v1/admin/biometrics/devices', session: session);
   }
 
   Future<Map<String, Object?>> registerBiometricDevice({
@@ -2252,14 +2147,10 @@ class ApiClient {
     String status = 'online',
     String? ipAddress,
   }) async {
-    return postJson(
-      '/api/v1/admin/biometrics/devices/$deviceId/heartbeat',
-      {
-        'status': status,
-        'ipAddress': ?ipAddress,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/biometrics/devices/$deviceId/heartbeat', {
+      'status': status,
+      'ipAddress': ?ipAddress,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> ingestBiometricPunches({
@@ -2267,14 +2158,10 @@ class ApiClient {
     required String deviceId,
     required List<Map<String, Object?>> punches,
   }) async {
-    return postList(
-      '/api/v1/admin/biometrics/punches/ingest',
-      {
-        'deviceId': deviceId,
-        'punches': punches,
-      },
-      session: session,
-    );
+    return postList('/api/v1/admin/biometrics/punches/ingest', {
+      'deviceId': deviceId,
+      'punches': punches,
+    }, session: session);
   }
 
   Future<List<Map<String, Object?>>> getBiometricPunches({
@@ -2293,14 +2180,10 @@ class ApiClient {
     String? date,
     String? classId,
   }) async {
-    return postJson(
-      '/api/v1/admin/biometrics/punches/reconcile',
-      {
-        'date': ?date,
-        'classId': ?classId,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/biometrics/punches/reconcile', {
+      'date': ?date,
+      'classId': ?classId,
+    }, session: session);
   }
 
   // ==========================================
@@ -2343,7 +2226,8 @@ class ApiClient {
     final params = <String, String>{
       if (classId != null && classId.isNotEmpty) 'classId': classId,
       if (subjectId != null && subjectId.isNotEmpty) 'subjectId': subjectId,
-      if (bloomLevel != null && bloomLevel.isNotEmpty && bloomLevel != 'all') 'bloomLevel': bloomLevel,
+      if (bloomLevel != null && bloomLevel.isNotEmpty && bloomLevel != 'all')
+        'bloomLevel': bloomLevel,
     };
     return getList(
       '/api/v1/admin/obe/questions',
@@ -2356,11 +2240,7 @@ class ApiClient {
     required AuthSession session,
     required Map<String, Object?> payload,
   }) async {
-    return postJson(
-      '/api/v1/admin/obe/questions',
-      payload,
-      session: session,
-    );
+    return postJson('/api/v1/admin/obe/questions', payload, session: session);
   }
 
   Future<Map<String, Object?>> generateBlueprintedPaper({
@@ -2370,16 +2250,12 @@ class ApiClient {
     int totalMarks = 100,
     Map<String, int>? bloomDistribution,
   }) async {
-    return postJson(
-      '/api/v1/admin/obe/blueprint/generate',
-      {
-        'classId': classId,
-        'subjectId': subjectId,
-        'totalMarks': totalMarks,
-        'bloomDistribution': ?bloomDistribution,
-      },
-      session: session,
-    );
+    return postJson('/api/v1/admin/obe/blueprint/generate', {
+      'classId': classId,
+      'subjectId': subjectId,
+      'totalMarks': totalMarks,
+      'bloomDistribution': ?bloomDistribution,
+    }, session: session);
   }
 
   // ==========================================
@@ -2406,11 +2282,7 @@ class ApiClient {
     required AuthSession session,
     required Map<String, Object?> payload,
   }) async {
-    return postJson(
-      '/api/v1/admin/alumni/profiles',
-      payload,
-      session: session,
-    );
+    return postJson('/api/v1/admin/alumni/profiles', payload, session: session);
   }
 
   Future<Map<String, Object?>> updateAlumniProfile({
@@ -2430,7 +2302,8 @@ class ApiClient {
     String? status,
   }) async {
     final params = <String, String>{
-      if (status != null && status.isNotEmpty && status != 'all') 'status': status,
+      if (status != null && status.isNotEmpty && status != 'all')
+        'status': status,
     };
     return getList(
       '/api/v1/admin/alumni/transcripts',
@@ -2458,23 +2331,20 @@ class ApiClient {
     String? issuedDocumentKey,
     String? notes,
   }) async {
-    return putJson(
-      '/api/v1/admin/alumni/transcripts/$requestId/status',
-      {
-        'status': status,
-        'feePaid': ?feePaid,
-        'issuedDocumentKey': ?issuedDocumentKey,
-        'notes': ?notes,
-      },
-      session: session,
-    );
+    return putJson('/api/v1/admin/alumni/transcripts/$requestId/status', {
+      'status': status,
+      'feePaid': ?feePaid,
+      'issuedDocumentKey': ?issuedDocumentKey,
+      'notes': ?notes,
+    }, session: session);
   }
 
   Map<String, String> _headers({String? bearerToken, AuthSession? devSession}) {
     return {
       'content-type': 'application/json',
       if (bearerToken != null) 'authorization': 'Bearer $bearerToken',
-      if (devSession?.devNeonUserId != null) 'x-dev-neon-user-id': devSession!.devNeonUserId!,
+      if (devSession?.devNeonUserId != null)
+        'x-dev-neon-user-id': devSession!.devNeonUserId!,
       if (devSession?.devNeonUserId != null) 'x-dev-email': devSession!.email,
     };
   }
@@ -2485,16 +2355,19 @@ class ApiClient {
     if (response.body.isNotEmpty) {
       try {
         final body = _decode(response);
-        if (body['error'] is String && (body['error'] as String).trim().isNotEmpty) {
+        if (body['error'] is String &&
+            (body['error'] as String).trim().isNotEmpty) {
           serverMessage = (body['error'] as String).trim();
-        } else if (body['message'] is String && (body['message'] as String).trim().isNotEmpty) {
+        } else if (body['message'] is String &&
+            (body['message'] as String).trim().isNotEmpty) {
           serverMessage = (body['message'] as String).trim();
         }
       } catch (_) {
         // Non-JSON response
       }
     }
-    final errorMessage = serverMessage ??
+    final errorMessage =
+        serverMessage ??
         (response.statusCode >= 500
             ? 'Schoolic service is currently unavailable. Please try again later.'
             : 'Request failed (${response.statusCode})');

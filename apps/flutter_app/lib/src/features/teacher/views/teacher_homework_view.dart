@@ -8,6 +8,7 @@ import '../../shared/components/empty_state_view.dart';
 import '../../shared/components/feedback_banner.dart';
 import '../../shared/components/page_header.dart';
 import '../../shared/components/status_badge.dart';
+import '../components/ai_homework_feedback_dialog.dart';
 
 class TeacherHomeworkView extends ConsumerStatefulWidget {
   const TeacherHomeworkView({required this.assignments, super.key});
@@ -74,9 +75,9 @@ class _TeacherHomeworkViewState extends ConsumerState<TeacherHomeworkView> {
       final rows = await ref
           .read(apiClientProvider)
           .getList('/api/v1/teacher/homework', session: session);
-      setState(() => _homework = rows);
+      if (mounted) setState(() => _homework = rows);
     } on ApiException catch (exception) {
-      setState(() => _error = exception.message);
+      if (mounted) setState(() => _error = exception.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -130,11 +131,14 @@ class _TeacherHomeworkViewState extends ConsumerState<TeacherHomeworkView> {
       }
       _clearForm();
       await _load();
-      setState(
-        () => _notice = id == null ? 'Homework assigned.' : 'Homework updated.',
-      );
+      if (mounted) {
+        setState(
+          () =>
+              _notice = id == null ? 'Homework assigned.' : 'Homework updated.',
+        );
+      }
     } on ApiException catch (exception) {
-      setState(() => _error = exception.message);
+      if (mounted) setState(() => _error = exception.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -154,9 +158,9 @@ class _TeacherHomeworkViewState extends ConsumerState<TeacherHomeworkView> {
           .deleteJson('/api/v1/teacher/homework/$id', session: session);
       if (_editing?['id'] == id) _clearForm();
       await _load();
-      setState(() => _notice = 'Homework removed.');
+      if (mounted) setState(() => _notice = 'Homework removed.');
     } on ApiException catch (exception) {
-      setState(() => _error = exception.message);
+      if (mounted) setState(() => _error = exception.message);
     }
   }
 
@@ -403,7 +407,14 @@ class _TeacherHomeworkViewState extends ConsumerState<TeacherHomeworkView> {
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: [
+              FilledButton.tonalIcon(
+                onPressed: () =>
+                    _HomeworkSubmissionsDialog.show(context, assignment: item),
+                icon: const Icon(Icons.fact_check_outlined, size: 16),
+                label: const Text('Review submissions'),
+              ),
               OutlinedButton.icon(
                 onPressed: () => _edit(item),
                 icon: const Icon(Icons.edit_outlined, size: 16),
@@ -430,4 +441,428 @@ String _assignmentLabel(Map<String, Object?> assignment) {
 String _defaultDueDate() {
   final date = DateTime.now().add(const Duration(days: 2));
   return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+}
+
+class _HomeworkSubmissionsDialog extends ConsumerStatefulWidget {
+  const _HomeworkSubmissionsDialog({required this.assignment});
+
+  final Map<String, Object?> assignment;
+
+  static Future<void> show(
+    BuildContext context, {
+    required Map<String, Object?> assignment,
+  }) {
+    return showDialog<void>(
+      context: context,
+      builder: (_) => _HomeworkSubmissionsDialog(assignment: assignment),
+    );
+  }
+
+  @override
+  ConsumerState<_HomeworkSubmissionsDialog> createState() =>
+      _HomeworkSubmissionsDialogState();
+}
+
+class _HomeworkSubmissionsDialogState
+    extends ConsumerState<_HomeworkSubmissionsDialog> {
+  List<Map<String, Object?>> _rows = const [];
+  bool _loading = true;
+  String? _error;
+  String _filter = 'all';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final session = ref.read(authControllerProvider).session;
+    final id = widget.assignment['id'];
+    if (session == null || id == null) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final response = await ref
+          .read(apiClientProvider)
+          .getJson(
+            '/api/v1/teacher/homework/$id/submissions',
+            session: session,
+          );
+      final rows = ((response['submissions'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((row) => row.cast<String, Object?>())
+          .toList();
+      if (mounted) setState(() => _rows = rows);
+    } on ApiException catch (exception) {
+      if (mounted) setState(() => _error = exception.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = _rows.where((row) {
+      final submission = row['submission'] as Map?;
+      if (_filter == 'pending') return submission == null;
+      if (_filter == 'submitted') {
+        return submission != null && submission['status'] != 'reviewed';
+      }
+      if (_filter == 'reviewed') return submission?['status'] == 'reviewed';
+      return true;
+    }).toList();
+    final submitted = _rows.where((row) => row['submission'] != null).length;
+    final reviewed = _rows.where((row) {
+      final submission = row['submission'] as Map?;
+      return submission?['status'] == 'reviewed';
+    }).length;
+
+    return Dialog(
+      insetPadding: const EdgeInsets.all(20),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 920, maxHeight: 720),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.assignment['title'] as String? ??
+                              'Homework submissions',
+                          style: AppTypography.sectionHeading,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$submitted of ${_rows.length} submitted • $reviewed reviewed',
+                          style: AppTypography.bodySecondary,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Refresh submissions',
+                    onPressed: _loading ? null : _load,
+                    icon: const Icon(Icons.refresh),
+                  ),
+                  IconButton(
+                    tooltip: 'Close submissions',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final entry in const {
+                    'all': 'All',
+                    'pending': 'Pending',
+                    'submitted': 'Needs review',
+                    'reviewed': 'Reviewed',
+                  }.entries)
+                    ChoiceChip(
+                      label: Text(entry.value),
+                      selected: _filter == entry.key,
+                      onSelected: (_) => setState(() => _filter = entry.key),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (_error != null)
+                FeedbackBanner(
+                  message: 'Unable to load submissions. $_error',
+                  tone: FeedbackTone.error,
+                  onDismiss: () => setState(() => _error = null),
+                ),
+              Expanded(
+                child: _loading
+                    ? const Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : visible.isEmpty
+                    ? const EmptyStateView(
+                        title: 'No submissions in this view',
+                        description: 'Choose another status filter or refresh the assignment.',
+                        icon: Icons.inbox_outlined,
+                      )
+                    : ListView.separated(
+                        itemCount: visible.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) =>
+                            _submissionRow(visible[index]),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _submissionRow(Map<String, Object?> row) {
+    final student =
+        (row['student'] as Map?)?.cast<String, Object?>() ?? const {};
+    final submission = (row['submission'] as Map?)?.cast<String, Object?>();
+    final status = submission?['status'] as String? ?? 'pending';
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.secondaryBackground,
+        borderRadius: AppRadii.rMd,
+        border: Border.all(color: AppColors.primaryBorder),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  student['fullName'] as String? ?? 'Student',
+                  style: AppTypography.subsectionHeading,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Roll ${student['rollNumber'] ?? '—'} • ${student['admissionNumber'] ?? 'No admission number'}',
+                  style: AppTypography.metadata,
+                ),
+              ],
+            ),
+          ),
+          StatusBadge.fromStatusString(status),
+          const SizedBox(width: 10),
+          if (submission == null)
+            const Text(
+              'Awaiting submission',
+              style: AppTypography.bodySecondary,
+            )
+          else
+            FilledButton.tonal(
+              onPressed: () => _review(student, submission),
+              child: Text(status == 'reviewed' ? 'Open review' : 'Review'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _review(
+    Map<String, Object?> student,
+    Map<String, Object?> submission,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _GradeSubmissionDialog(
+        assignment: widget.assignment,
+        student: student,
+        submission: submission,
+      ),
+    );
+    await _load();
+  }
+}
+
+class _GradeSubmissionDialog extends ConsumerStatefulWidget {
+  const _GradeSubmissionDialog({
+    required this.assignment,
+    required this.student,
+    required this.submission,
+  });
+
+  final Map<String, Object?> assignment;
+  final Map<String, Object?> student;
+  final Map<String, Object?> submission;
+
+  @override
+  ConsumerState<_GradeSubmissionDialog> createState() =>
+      _GradeSubmissionDialogState();
+}
+
+class _GradeSubmissionDialogState
+    extends ConsumerState<_GradeSubmissionDialog> {
+  late final TextEditingController _marks;
+  late final TextEditingController _feedback;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _marks = TextEditingController(
+      text: '${widget.submission['marksObtained'] ?? ''}',
+    );
+    _feedback = TextEditingController(
+      text: widget.submission['teacherFeedback'] as String? ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _marks.dispose();
+    _feedback.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final session = ref.read(authControllerProvider).session;
+    final submissionId = widget.submission['id'];
+    final marks = int.tryParse(_marks.text.trim());
+    if (session == null || submissionId == null || _saving) return;
+    if (marks == null || marks < 0 || marks > 100) {
+      setState(() => _error = 'Enter marks from 0 to 100.');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await ref.read(apiClientProvider).postJson(
+        '/api/v1/teacher/homework/submissions/$submissionId/grade',
+        {
+          'marksObtained': marks,
+          'teacherFeedback': _feedback.text.trim().isEmpty
+              ? null
+              : _feedback.text.trim(),
+          'status': 'reviewed',
+        },
+        session: session,
+      );
+      if (mounted) Navigator.of(context).pop();
+    } on ApiException catch (exception) {
+      if (mounted) setState(() => _error = exception.message);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.all(20),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 720),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                widget.student['fullName'] as String? ?? 'Review submission',
+                style: AppTypography.sectionHeading,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                widget.assignment['title'] as String? ?? 'Homework',
+                style: AppTypography.bodySecondary,
+              ),
+              const SizedBox(height: 18),
+              Text('Student response', style: AppTypography.subsectionHeading),
+              const SizedBox(height: 6),
+              SelectableText(
+                widget.submission['content'] as String? ??
+                    'No written response.',
+                style: AppTypography.bodySecondary,
+              ),
+              if ((widget.submission['attachmentUrl'] as String?)?.isNotEmpty ??
+                  false) ...[
+                const SizedBox(height: 14),
+                Text('Attachment', style: AppTypography.subsectionHeading),
+                const SizedBox(height: 6),
+                SelectableText(
+                  widget.submission['attachmentUrl'] as String,
+                  style: AppTypography.bodySecondary,
+                ),
+              ],
+              const SizedBox(height: 18),
+              TextField(
+                controller: _marks,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Marks out of 100',
+                  helperText: 'Enter a whole number from 0 to 100.',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _feedback,
+                maxLines: 5,
+                decoration: const InputDecoration(
+                  labelText: 'Feedback',
+                  helperText:
+                      'Explain strengths and the next improvement to make.',
+                ),
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    final score = int.tryParse(_marks.text.trim()) ?? 0;
+                    AiHomeworkFeedbackDialog.show(
+                      context,
+                      initialAssignmentTitle:
+                          widget.assignment['title'] as String? ?? '',
+                      initialSubject:
+                          widget.assignment['subjectName'] as String? ??
+                          'Subject',
+                      initialScore: score,
+                      initialMaxScore: 100,
+                      onApplyFeedback: (text) => _feedback.text = text,
+                    );
+                  },
+                  icon: const Icon(Icons.auto_awesome_outlined, size: 16),
+                  label: const Text('Draft feedback with AI'),
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 10),
+                FeedbackBanner(
+                  message: 'Unable to save review. $_error',
+                  tone: FeedbackTone.error,
+                  onDismiss: () => setState(() => _error = null),
+                ),
+              ],
+              const SizedBox(height: 18),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  TextButton(
+                    onPressed: _saving
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.check, size: 16),
+                    label: const Text('Save review'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -184,6 +184,14 @@ class _CommandPaletteDialogState extends State<CommandPaletteDialog> {
         shortcut: 'G M',
         onSelect: () => widget.onActionSelected?.call('nav:federation'),
       ),
+      CommandItem(
+        title: 'Documentation & How-To Guides',
+        subtitle: 'Browse all features, workflows, and step-by-step processes with screenshots',
+        category: 'Navigation',
+        icon: Icons.menu_book_outlined,
+        shortcut: 'G D',
+        onSelect: () => widget.onActionSelected?.call('nav:docs'),
+      ),
 
       // Campus Operations Quick Actions
       CommandItem(

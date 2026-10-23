@@ -841,7 +841,7 @@
      - Size: 53,605,503 bytes (51.12 MiB)
      - SHA-256: `3fd18d5d9955bbe6a4cd365875359192deba12985a62ae1e3a18eb8824a2e8f6`
      - Signing: development-signed fallback (keystore secret not configured in repository)
-     - Package: `com.schoolic.schoolic`, Version: `1.0.0+6.947a843`
+     - Package: `com.zephvion.schoolic`, Version: `1.0.0+6.947a843`
      - Verification: Universal AOT release build with `arm64-v8a`, `armeabi-v7a`, `x86_64` native code; no debug `kernel_blob.bin`; staging API embedded.
   2. **Android App Bundle (`schoolic-android-aab-staging`):**
      - File: `schoolic-staging-release.aab`
@@ -891,7 +891,7 @@
 - Native builds use the staging API `https://schoolic-api-staging.schoolic-api.workers.dev` and staging Neon Auth URL through the existing Dart define mechanism.
 - Staging native builds set `SCHOOLIC_ALLOW_DEV_SIGN_IN=false`; no database URLs, AI keys, bootstrap tokens, or server-only secrets are embedded in Flutter artifacts.
 - Added Android internet permission, Schoolic app names for native windows, a native CSV file fallback, and cookie preservation for Neon Auth on non-web clients.
-- Android scaffold uses package ID `com.schoolic.schoolic`, JDK 17, Gradle wrapper `9.3.1`, and Android Gradle Plugin `9.1.1`.
+- Android scaffold uses package ID `com.zephvion.schoolic`, JDK 17, Gradle wrapper `9.3.1`, and Android Gradle Plugin `9.1.1`.
 - Local verification before GitHub Actions trigger:
   - `pnpm api:typecheck` passed.
   - `pnpm api:test` passed: 4 files, 32 tests.

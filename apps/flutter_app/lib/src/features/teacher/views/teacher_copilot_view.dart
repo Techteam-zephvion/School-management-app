@@ -329,7 +329,11 @@ class _TeacherCopilotViewState extends ConsumerState<TeacherCopilotView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Generate', style: AppTypography.subsectionHeading),
+              Row(
+                children: [
+                  Text('Generate', style: AppTypography.subsectionHeading),
+                ],
+              ),
               const SizedBox(height: 12),
               TextField(
                 controller: _topic,
