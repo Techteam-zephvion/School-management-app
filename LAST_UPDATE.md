@@ -1,4 +1,25 @@
-# Last Update (October 17, 2026)
+# Last Update (October 23, 2026)
+
+## Phase 17: Google Play Compliance & Production Deployment
+
+### Summary
+- **Package ID Migration:**
+  - Migrated Android application ID and namespace from `com.schoolic.schoolic` to `com.zephvion.schoolic` across Gradle (`build.gradle.kts`), Kotlin (`com.zephvion.schoolic.MainActivity`), and desktop targets.
+  - Successfully verified Android build configuration via `./gradlew tasks --dry-run`.
+- **Google Play Store Policy & Legal Compliance:**
+  - Created zero-dependency public legal HTML templates in `services/api/src/legal/privacy-policy-html.ts` serving:
+    - `/privacy` & `/api/v1/public/privacy`: Comprehensive institutional privacy policy with DPDP Act 2023 disclosures.
+    - `/terms` & `/api/v1/public/terms`: Official Terms of Service.
+    - `/data-deletion` & `/api/v1/public/data-deletion`: Public Account & Data Deletion page with step-by-step instructions (in-app, web form, email) and data retention specifications meeting Google Play requirements.
+  - Implemented in-app `PrivacyPolicyView` (`apps/flutter_app/lib/src/features/legal/privacy_policy_view.dart`) with interactive tabs for Privacy Policy, Data Safety disclosures, and Terms of Service.
+  - Registered public GoRouter routes for `/privacy`, `/terms`, `/data-safety` with unauthenticated access guards.
+  - Added clickable Privacy Policy and Terms links directly in the login screen footer.
+- **Production Deployment:**
+  - Edge API deployed to production Cloudflare Worker: `https://schoolic-api.schoolic-api.workers.dev` (Version ID: `a61b7658-c8ad-47dd-b736-eb860d5180ed`).
+  - Web client compiled and deployed to production Cloudflare Pages: `https://schoolic.pages.dev` (Deployment: `8df4a69e.schoolic.pages.dev`).
+  - Live HTTP verification: `/data-deletion`, `/privacy`, and root web pages return `HTTP/2 200`.
+
+---
 
 ## Phase 16: Multi-Campus Federation & Enterprise Biometrics
 
