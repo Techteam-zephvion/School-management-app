@@ -15,6 +15,7 @@ import '../shared/components/feedback_banner.dart';
 import '../shared/components/schoolic_logo.dart';
 import '../shared/components/shortcuts_dialog.dart';
 import '../shared/components/tour_dialog.dart';
+import 'components/demo_roster_dialog.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -312,6 +313,45 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             email: 'admin@portfolio.schoolic.test',
                             password: 'Schoolic@2026',
                             role: AppRole.admin,
+                          ),
+                          FluidPressable(
+                            onTap: () => DemoRosterDialog.show(
+                              context,
+                              onSelect: (email, password, role) {
+                                _email.text = email;
+                                _password.text = password;
+                                setState(() => _validationError = null);
+                                if (AppConfig.isLocalDev) {
+                                  ref.read(authControllerProvider).devSignIn(role);
+                                } else {
+                                  ref.read(authControllerProvider).signIn(email, password);
+                                }
+                              },
+                            ),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.brandCyan.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: AppColors.brandCyan.withValues(alpha: 0.4)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(Icons.people_alt_outlined, size: 13, color: AppColors.brandCyan),
+                                  SizedBox(width: 5),
+                                  Text(
+                                    'All Demo Accounts (16)',
+                                    style: TextStyle(
+                                      fontFamily: 'Switzer',
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.brandCyan,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
